@@ -1,43 +1,29 @@
-Remember cache flushes - needed with multiple cores
+This is my very first RPi(2) project ever, and first ever project that
+I have to deal with ARM core (and assembly).
+This project started in the first days of april 2015.
 
- qOffsets. Report the offsets to use when relocating downloaded code.
+This will hopefully become a standalone gdb-stub for RPi2 using serial line
+for communicating with a gdb client.
 
- qSupported. Report the features supported by the RSP server.
-   As a minimum, just the packet size can be reported.
+The idea is that this loader/debugger boots, and it could be used for uploading
+and then debugging bare metal progams on RPi2.
 
- A RSP server supporting standard remote debugging (i.e. using the GDB target
- remote command) should implement at least the following RSP packets in
- addition to those required for standard remote debugging:
+I don't take any responsibility of anything that happens, if someone dares to
+try this. You can use this but totally on your own risk.
+I don't have any means of debugging, so I have to write this code "blindfolded".
+I may fix this and that and even expand this, but I give no promises to maintain
+this in any way.
 
-    !. Advise the target that extended remote debugging is being used.
+Hopefully this is useful reading material for those that want to learn about
+gdb-stubs.
 
-    R. Restart the program being run.
-
-    vAttach. Attach to a new process with a specified process ID.
-      This packet need not be implemented if the target has no concept of
-      a process ID, but should return an error code.
-
-    vRun. Specify a new program and arguments to run. A minimal implementation
-      may restrict this to the case where only the current program may be run again. 
-    
- In the RSP, the s packet indicates stepping of a single machine instruction,
- not a high level statement. In this way it maps to GDB's stepi command, not its
- step command (which confusingly can be abbreviated to just s). 
-    
-    
 missing:
 breakpoints and single-stepping
+exception state initializations (stacks)
+???
 
-single-step
-- marker: we need to know if we were single-stepping when we hit breakpoint.
-
-- we should take into account all branching instructions
-  both ARM and THUMB
-  
-- Also jumps and loading PC should be treated as branches
-
-Instruction classification for single stepping
-
+--------------------------
+Some kind of description
 
 This is a rough 'conceptual' pseudocode of the program
 Here asynchronous/independent code sequences are called processes
@@ -149,6 +135,46 @@ internally executed. When a single-step breakpoint is hit, the single-step
 breakpoint(s) are removed and the breakpoint is re-installed to the place defined
 by the earlier 'Z'-command.
 
+
+------------------------
+Notes and reminders
+
+single-step
+- marker: we need to know if we were single-stepping when we hit breakpoint.
+
+- we should take into account all branching instructions
+  both ARM and THUMB
+  
+- Also jumps and loading PC should be treated as branches
+
+Instruction classification for single stepping
+
+
+ qOffsets. Report the offsets to use when relocating downloaded code.
+
+ qSupported. Report the features supported by the RSP server.
+   As a minimum, just the packet size can be reported.
+
+ A RSP server supporting standard remote debugging (i.e. using the GDB target
+ remote command) should implement at least the following RSP packets in
+ addition to those required for standard remote debugging:
+
+    !. Advise the target that extended remote debugging is being used.
+
+    R. Restart the program being run.
+
+    vAttach. Attach to a new process with a specified process ID.
+      This packet need not be implemented if the target has no concept of
+      a process ID, but should return an error code.
+
+    vRun. Specify a new program and arguments to run. A minimal implementation
+      may restrict this to the case where only the current program may be run again. 
+    
+ In the RSP, the s packet indicates stepping of a single machine instruction,
+ not a high level statement. In this way it maps to GDB's stepi command, not its
+ step command (which confusingly can be abbreviated to just s). 
+    
+
 ------
 0xef9f0001 = SWI/SVC 9f0001
 0xe7f001f0 = Architecturally undefined
@@ -167,8 +193,13 @@ static const unsigned long arm_eabi_breakpoint = 0xe7f001f0;
 
 --------
 
+instructions
+
+BX = branch and change ARM/THUMB mode
+
 ARM
 Each ARM instruction is a single 32-bit word
+ 
 branches
 conditional branches
 
@@ -177,6 +208,8 @@ branches
 conditional branches
 
 --------
+
+example:
 
 static int
 arm_breakpoint_at (CORE_ADDR where)
