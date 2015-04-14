@@ -1,0 +1,195 @@
+Most of the info needed here was found from:
+http://www.wss.co.uk/pinknoise/ARMinstrs/ARMinstrs.html#Instructions
+Kudos!
+
+1110xxxx xxxxxxxx xxxxxxxx xxxxxxxx E    AL(Always)	      branch
+1111xxxx xxxxxxxx xxxxxxxx xxxxxxxx F    NV(Never)	      linear
+Others are true conditionals
+
+ Data Processing Instructions
+
+xxxx000a aaaSnnnn ddddcccc ctttmmmm  Register form
+xxxx001a aaaSnnnn ddddrrrr bbbbbbbb  Immediate form
+        ADDEQS Rd, Rn, Rm, ASL Rc
+if dddd = 1111 (PC) then branch, otherwise linear
+
+ Branch Instructions
+xxxx101L oooooooo oooooooo oooooooo
+
+oooo... = offset = (sign extended version of bits 0-23)
+destination address = current address + 8 + (4 * offset)
+L = with link register
+
+ Multiplication / Long Multiplication (ARM7DM)
+xxxx0000 1UAShhhh llllssss 1001mmmm
+The program counter, R15 should not be used.
+
+ Single Data Transfer
+
+xxxx010P UBWLnnnn ddddoooo oooooooo  Immediate form
+xxxx011P UBWLnnnn ddddcccc ctt0mmmm  Register form
+If the immediate form of the instruction is used, the o field gives
+a 12-bit offset
+If R15 is used as Rd, the PSR is not modified. The PC should not be used in Op2. 
+Don't use writeback or post-indexing when the base register is the PC.
+Don't use the PC as Rd for an LDRB or STRB.
+
+ Block Data Transfer
+
+xxxx100P USWLnnnn llllllll llllllll
+The U bit indicates whether the address will be modified by +4 (set),
+or -4 (clear) for each register.
+The W bit always indicates writeback.
+If set, the L bit indicates a load operation should be performed.
+If clear, a save.
+The P bit is used indicate whether to increment/decrement
+the base before or after each load/store (see the table below).
+
+Bit l is set if Rl is to be loaded/stored by this operation. 
+Stub	Meaning                         P	U
+DA	Decrement Rn After each store/load	0	0
+DB	Decrement Rn Before each store/load	1	0
+IA	Increment Rn After each store/load	0	1
+IB	Increment Rn Before each store/load	1	1
+
+The PC should not be used as the base register.
+
+If the S bit is set, the instruction is LDM and R15 is in the register list, then:
+    In 26-bit privileged modes, all 32 bits of R15 will be loaded.
+    In 26-bit user mode, the 4 flags and 24 PC bits of R15 will be loaded.
+      Bits 27, 26, 1 and 0 of the loaded value will be ignored.
+    In 32-bit modes, all 32 bits of R15 will be loaded, though note that the
+      two bottom bits are always zero, so any ones loaded to them will be ignored.
+      In addition, the SPSR of the current mode will be transferred to the CPSR;
+      since user mode does not have an SPSR, this type of instruction should not be
+      used in 32-bit user mode. 
+don't specify writeback if the base register is being loaded
+Further special cases occur if the program counter is present in the list of registers
+to load and save.
+    The PSR is always saved with the PC (in 26 bit modes) (and the PC will always
+      be 12 bytes further on, rather than the usual 8 (in all modes)).
+    On a load, only the bits of the PSR that are alterable in the current mode can be
+      affected, and then only if the S bit is set. 
+
+ Software interrupt
+
+xxxx1111 yyyyyyyy yyyyyyyy yyyyyyyy
+
+ Co-processor data operations
+
+xxxx1110 oooonnnn ddddpppp qqq0mmmm
+       CDP p, o, CRd, CRn, CRm, q
+
+ Co-processor data transfer and register transfers
+
+xxxx110P UNWLnnnn DDDDpppp oooooooo LDC/STC
+xxxx1110 oooLNNNN ddddpppp qqq1MMMM MRC/MCR
+       LDCNEL p,CRd,[Rn],#-100 ;long form (N=1), post-indexed
+Rd should not be R15 for an MCR instruction.
+If Rd is R15 for an MRC instruction, the top 4 bits of the word
+transferred are used to set the flags; the remaining 28 bits are discarded.
+
+ Single Data Swap (ARM 3 and later including ARM 2aS)
+
+xxxx0001 0B00nnnn dddd0000 1001mmmm
+None of Rd, Rn, and Rm may be R15
+
+ Status Register transfer (ARM 6 and later)
+
+xxxx0001 0s10aaaa 11110000 0000mmmm  MSR  Register form
+xxxx0011 0s10aaaa 1111rrrr bbbbbbbb  MSR  Immediate form
+xxxx0001 0s001111 dddd0000 00000000  MRS
+Rd must not be R15.
+
+ Undefined instructions
+
+xxxx0001 yyyyyyyy yyyyyyyy 1yy1yyyy ARM 2 only
+xxxx011y yyyyyyyy yyyyyyyy yyy1yyyy
+On encountering an undefined instruction, the ARM switches to
+Undef mode and jumps to undef exception.
+
+------------
+
+xxxxgggf fffyyyyy yyyyyyyy yyyyyyyy
+
+ggg ff
+000	Data Processing Instructions - register form
+	Multiplication, R15 should not be used
+	Single Data Swap, None of Rd, Rn, and Rm may be R15
+	MSR  Register form, Rd must not be R15
+	MRS, Rd must not be R15
+	Undefined instructions - ARM 2 only
+001	Data Processing Instructions - immediate form
+	MSR  Immediate form
+010	Single Data Transfer - immediate form, if Rd=PC, check
+011	Single Data Transfer - register form, if Rd=PC, check
+	Undefined instructions - undef exception
+100	Block Data Transfer - check
+101	Branch Instructions
+110	LDC/STC - linear (check)
+111	Software interrupt
+	Co-processor data operations
+	MRC/MCR, if Rd = PC, check
+	
+gggffff
+000	Data Processing Instructions - register form
+	0000	AND     	Boolean And     	Rd = Rn AND Op2
+	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
+	0010	SUB     	Subtract        	Rd = Rn  -  Op2
+	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+	0100	ADD     	Addition        	bit4=0
+	0101	ADC     	Add with Carry   	bit4=0
+	0110	SBC     	Subtract with carry 	bit4=0
+	0111	RSC     	Reverse sub w/carry 	bit4=0
+	01UA	Multiplication / Long Multiplication (ARM7DM) bit4=1
+	1000	TST     	Test bit        	bit4=0
+	1001	TEQ     	Test equality   	bit4=0
+	1010	CMP     	Compare         	bit4=0
+	1011	CMN     	Compare Negative	bit4=0
+	10B0	Single Data Swap bit4=1
+	10s1	MSR  Register form bit4=1
+	10s1	MRS bit4=1
+	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
+	1101	MOV     	Move value      	Rd =        Op2
+	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
+	1111	MVN     	Move Not        	Rd =    NOT Op2
+
+001	Data Processing Instructions - immediate form
+	0000	AND     	Boolean And     	Rd = Rn AND Op2
+	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
+	0010	SUB     	Subtract        	Rd = Rn  -  Op2
+	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+	0100	ADD     	Addition        	Rd = Rn  +  Op2
+	0101	ADC     	Add with Carry   	Rd = Rn  +  Op2 + C
+	0110	SBC     	Subtract with carry 	Rd = Rn  -  Op2 - (1-C)
+	0111	RSC     	Reverse sub w/carry 	Rd = Op2 -  Rn  - (1-C)
+	1000	TST     	Test bit        	Rn AND Op2
+	1001	TEQ     	Test equality   	bit20=1
+	1010	CMP     	Compare         	Rn  -  Op2
+	1011	CMN     	Compare Negative	bit20=1
+	10s1	MSR  Immediate form bit20=0
+	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
+	1101	MOV     	Move value      	Rd =        Op2
+	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
+	1111	MVN     	Move Not        	Rd =    NOT Op2
+	
+010
+	PUBW	Single Data Transfer - immediate form, if Rd=PC, check
+			media instructions
+011
+	PUBW	(bit4 = 0) Single Data Transfer - register form, if Rd=PC, check
+	yyyy	(bit4 = 1) Undefined instructions - undef exception
+			(bit4 = 1) Media instructions
+100	
+	PUSW	Block Data Transfer - check
+101
+	L		B (branch, L = with link reg)
+110	
+	PUNW	LDC/STC
+111
+	0ooo	Co-processor data operations (bit4 = 0)
+	0ooo	MRC/MCR (bit4 = 1)
+	1yyy	Software interrupt
+
+
+
