@@ -2,6 +2,9 @@ Most of the info needed here was found from:
 http://www.wss.co.uk/pinknoise/ARMinstrs/ARMinstrs.html#Instructions
 Kudos!
 
+---------------------------------------
+Deciphering ARM istruction set encoding
+
 1110xxxx xxxxxxxx xxxxxxxx xxxxxxxx E    AL(Always)	      branch
 1111xxxx xxxxxxxx xxxxxxxx xxxxxxxx F    NV(Never)	      linear
 Others are true conditionals
@@ -51,25 +54,7 @@ DA	Decrement Rn After each store/load	0	0
 DB	Decrement Rn Before each store/load	1	0
 IA	Increment Rn After each store/load	0	1
 IB	Increment Rn Before each store/load	1	1
-
 The PC should not be used as the base register.
-
-If the S bit is set, the instruction is LDM and R15 is in the register list, then:
-    In 26-bit privileged modes, all 32 bits of R15 will be loaded.
-    In 26-bit user mode, the 4 flags and 24 PC bits of R15 will be loaded.
-      Bits 27, 26, 1 and 0 of the loaded value will be ignored.
-    In 32-bit modes, all 32 bits of R15 will be loaded, though note that the
-      two bottom bits are always zero, so any ones loaded to them will be ignored.
-      In addition, the SPSR of the current mode will be transferred to the CPSR;
-      since user mode does not have an SPSR, this type of instruction should not be
-      used in 32-bit user mode. 
-don't specify writeback if the base register is being loaded
-Further special cases occur if the program counter is present in the list of registers
-to load and save.
-    The PSR is always saved with the PC (in 26 bit modes) (and the PC will always
-      be 12 bytes further on, rather than the usual 8 (in all modes)).
-    On a load, only the bits of the PSR that are alterable in the current mode can be
-      affected, and then only if the S bit is set. 
 
  Software interrupt
 
@@ -112,7 +97,7 @@ Undef mode and jumps to undef exception.
 
 xxxxgggf fffyyyyy yyyyyyyy yyyyyyyy
 
-ggg ff
+classes (ggg):
 000	Data Processing Instructions - register form
 	Multiplication, R15 should not be used
 	Single Data Swap, None of Rd, Rn, and Rm may be R15
@@ -130,18 +115,21 @@ ggg ff
 111	Software interrupt
 	Co-processor data operations
 	MRC/MCR, if Rd = PC, check
-	
-gggffff
+
+The ff-bits seem to make the secondary classification
+gggffxx
 000	Data Processing Instructions - register form
 	0000	AND     	Boolean And     	Rd = Rn AND Op2
 	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
 	0010	SUB     	Subtract        	Rd = Rn  -  Op2
 	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+
 	0100	ADD     	Addition        	bit4=0
 	0101	ADC     	Add with Carry   	bit4=0
 	0110	SBC     	Subtract with carry 	bit4=0
 	0111	RSC     	Reverse sub w/carry 	bit4=0
 	01UA	Multiplication / Long Multiplication (ARM7DM) bit4=1
+
 	1000	TST     	Test bit        	bit4=0
 	1001	TEQ     	Test equality   	bit4=0
 	1010	CMP     	Compare         	bit4=0
@@ -149,6 +137,7 @@ gggffff
 	10B0	Single Data Swap bit4=1
 	10s1	MSR  Register form bit4=1
 	10s1	MRS bit4=1
+
 	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
 	1101	MOV     	Move value      	Rd =        Op2
 	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
@@ -159,15 +148,18 @@ gggffff
 	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
 	0010	SUB     	Subtract        	Rd = Rn  -  Op2
 	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+
 	0100	ADD     	Addition        	Rd = Rn  +  Op2
 	0101	ADC     	Add with Carry   	Rd = Rn  +  Op2 + C
 	0110	SBC     	Subtract with carry 	Rd = Rn  -  Op2 - (1-C)
 	0111	RSC     	Reverse sub w/carry 	Rd = Op2 -  Rn  - (1-C)
+
 	1000	TST     	Test bit        	Rn AND Op2
 	1001	TEQ     	Test equality   	bit20=1
 	1010	CMP     	Compare         	Rn  -  Op2
 	1011	CMN     	Compare Negative	bit20=1
 	10s1	MSR  Immediate form bit20=0
+
 	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
 	1101	MOV     	Move value      	Rd =        Op2
 	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
@@ -175,11 +167,10 @@ gggffff
 	
 010
 	PUBW	Single Data Transfer - immediate form, if Rd=PC, check
-			media instructions
 011
 	PUBW	(bit4 = 0) Single Data Transfer - register form, if Rd=PC, check
-	yyyy	(bit4 = 1) Undefined instructions - undef exception
-			(bit4 = 1) Media instructions
+	yyyy	(bit4 = 1) Undefined instructions - undef exception (still exist?)
+			(bit4 = 1) Media instructions (Rd = PC is not allowed or is UNPREDICTABLE)
 100	
 	PUSW	Block Data Transfer - check
 101
@@ -192,4 +183,133 @@ gggffff
 	1yyy	Software interrupt
 
 
+Branches:
+conditional branches are 'B'-branches with condition code
+31:28 = condition code
+27:25 (class) = 101
+24 = L (1 = with LR)
+23:0 = signed imm (PC-offset)
+With condition NV (1111) it becomes BLX, where bit 24 tells what?
+
+For register ops: bits 11-0 is a shifter operand:
+register: 11:7 imm, 6:5=type, 4=0, 3:0=Rm
+register-shifted: 11:8 = Rs, 7=0. 6:5=type, 4=1, 3:0=Rm operand2=Rm <type> Rs
+type:
+00 = LSL
+01 = LSR
+10 = ASR
+11 = ROR
+modified imm: 11:8 rot, 7:0 imm
+rot = number of double shifts right
+
+LDC/LDC2/STC/STC2
+110 PUNWL Rn=19:16  CRd=15:12 cpnum=11:8 wordoffset=7:0
+
+N=1 long transfer
+PUWL as with LDR/STR (no usermode access => W is always writeback), L=1:LDC (mem->Cp)
+U must equal 1 or the result is either UNDEFINED or UNPREDICTABLE
+wordoffset specifies the immediate offset that is multiplied by 4, then added to
+or subtracted from the value of Rn to form the address
+
+
+LDM/STM
+100 PUSWL Rn=19:16 reglist=15:0
+PUWL as with LDC/STC
+S: For LDMs that load the PC, the S bit indicates that the CPSR is loaded from the SPSR. For
+LDMs that do not load the PC and all STMs, the S bit indicates that when the processor is in a
+privileged mode, the User mode banked registers are transferred instead of the registers of
+the current mode.
+reglist: bit n = Register n included into the list
+The SP and PC can be in the list in ARM instructions, but not in Thumb instructions.
+if n == 15 || BitCount(registers) < 1 then UNPREDICTABLE
+
+Single data transfer:
+cond 01A op1(24:20) Rn(19:16) .... Bit4 ...
+op1 bits: PUBWL
+P=0: post indexing. P=1 offset or pre indexing (indexing = offset + writeback)
+U=offset sign (1=+, 0=-)
+W:
+  P=0: W= user mode access (1=user, 0=normal)
+  P=1: W= writeback (1=writeback)
+PW is like unit (or one field with separated bits):
+00 = postindexing, normal
+01 = usermode access, offset
+10 = offset normal
+11 = preindexing normal
+B=byte, L=direction:1=load
+
+LDR reg, LDRB reg:
+if m == 15 then UNPREDICTABLE;
+if wback && (n == 15 || n == t) then UNPREDICTABLE;
+if ArchVersion() < 6 && wback && m == n then UNPREDICTABLE
+LDRT reg, LDRTB reg:
+if PC is involved, UNPREDICTABLE
+LDR imm, LDRB imm, LDRT imm, LDRTB imm:
+Rd != PC
+A op1
+0 00000 STR imm
+0 00001 LDR imm Rn != PC
+0 00010	STRT
+0 00011 LDRT 
+0 00100 STRB imm
+0 00101 LDRB imm Rn != PC
+0 00110 STRBT
+0 00111 LDRBT
+0 01000 STR imm
+0 01001 LDR imm Rn != PC
+0 01010 STRT
+0 01011 LDRT
+0 01100 STRB imm
+0 01101 LDRB imm Rn != PC
+0 01110 STRBT
+0 01111 LDRBT
+0 10000 STR imm
+0 10001 LDR imm Rn != PC
+0 10010 STR imm
+0 10011 LDR imm Rn != PC
+0 10100 STRB imm
+0 10101 LDRB imm Rn != PC
+0 10110 STRB imm
+0 10111 LDRB imm Rn != PC
+0 11000 STR imm
+0 11001 LDR imm Rn != PC
+0 11010 STR imm
+0 11011 LDR imm Rn != PC
+0 11100 STRB imm
+0 11101 LDRB imm Rn != PC
+0 11110 STRB imm
+0 11111 LDRB imm Rn != PC
+1 00000 STR reg B=0
+1 00001 LDR reg B=0
+1 00010 STRT B=0
+1 00011 LDRT B=0
+1 00100 STRB reg B=0
+1 00101 LDRB reg B=0
+1 00110 STRBT B=0
+1 00111 LDRBT B=0
+1 01000 STR reg B=0
+1 01001 LDR reg B=0
+1 01010 STRT B=0
+1 01011 LDRT B=0
+1 01100 STRB reg B=0
+1 01101 LDRB reg B=0
+1 01110 STRBT B=0
+1 01111 LDRBT B=0
+1 10000 STR reg B=0
+1 10001 LDR reg B=0
+1 10010 STR reg B=0
+1 10011 LDR reg B=0
+1 10100 STRB reg B=0
+1 10101 LDRB reg B=0
+1 10110 STRB reg B=0
+1 10111 LDRB reg B=0
+1 11000 STR reg B=0
+1 11001 LDR reg B=0
+1 11010 STR reg B=0
+1 11011 LDR reg B=0
+1 11100 STRB reg B=0
+1 11101 LDRB reg B=0
+1 11110 STRB reg B=0
+1 11111 LDRB reg B=0
+All immediates (A=1) have bit4=0. If bit4=1 => media instruction
 

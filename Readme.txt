@@ -6,7 +6,8 @@ This will hopefully become a standalone gdb-stub for RPi2 using serial line
 for communicating with a gdb client.
 
 The idea is that this loader/debugger boots, and it could be used for uploading
-and then debugging bare metal progams on RPi2.
+and then debugging bare metal progams on RPi2. The only 'external' h-file used
+is stdint.h.
 
 I don't take any responsibility of anything that happens, if someone dares to
 try this. You can use this but totally on your own risk.
@@ -28,71 +29,75 @@ Some kind of description
 This is a rough 'conceptual' pseudocode of the program
 Here asynchronous/independent code sequences are called processes
 PROCESS loader
-	set up exceptions
-	set up serial
-	set up gdb-stub
-	reset gdb-stub
-	FOREVER
-		BKPT
-		IF program loaded THEN // loaded by gdb-stub
-			IF arguments THEN
-				CALL program with arguments (probably doesn't return)
-				notify program status (if program returns)
-				reset gdb-stub
-			ENDIF
-		ENDIF
-	ENDFOREVER
+    set up exceptions
+    set up serial
+    set up gdb-stub
+    reset gdb-stub
+    FOREVER
+        BKPT
+        IF program loaded THEN // loaded by gdb-stub
+            IF arguments THEN
+                CALL program with arguments (probably doesn't return)
+                notify program status (if program returns)
+                reset gdb-stub
+            ELSE
+                CALL program with NULL arguments (probably doesn't return)
+                notify program status (if program returns)
+                reset gdb-stub
+            ENDIF
+        ENDIF
+    ENDFOREVER
 ENDPROCESS
 
 PROCESS exception_handler (really kind of exception vector)
-	store registers
-	IF exception is reset THEN
-		START reset
-	ELSIF exception is serial tx THEN
-		START serial_output
-	ELSIF exception is serial rx THEN
-		START serial_output
-	ELSE
-		START gdb-stub
-	ENDIF
+    store registers
+    IF exception is reset THEN
+        START reset
+    ELSIF exception is serial tx THEN
+        START serial_output
+    ELSIF exception is serial rx THEN
+        START serial_output
+    ELSE
+        START gdb-stub
+    ENDIF
 ENDPROCESS
 
 PROCESS reset
-	move program to upper memory
-	START loader
+    move program to upper memory
+    START loader
 ENDPROCESS
 
 PROCESS serial_output
-	IF data to send in queue THEN
-		send data from queue
-	ENDIF
-	restore registers
-	return from exception
+    IF data to send in queue THEN
+        send data from queue
+    ENDIF
+    restore registers
+    return from exception
 ENDPROCESS
 
 PROCESS serial_input
-	IF data to receive THEN
-		receive data to queue
-		IF ctrl-C encountered THEN
-			notify gdb_stub about ctrl-C
-			set exception pending for gdb-stub
-		ENDIF
-	ENDIF
-	restore registers
-	return from exception
+    IF data to receive THEN
+        receive data to queue
+        IF ctrl-C encountered THEN
+            notify gdb_stub about ctrl-C
+            set exception pending for gdb-stub
+        ENDIF
+    ENDIF
+    restore registers
+    return from exception
 ENDPROCESS
 
 PROCESS gdb-stub
-	handle debug exception (all except reset, serial tx and serial rx)
-	handle pending status (like remove single-stepping breakpoints)
-	send pending response to gdb-client (response for s,c,...)
-	set stub_running to TRUE
-	WHILE stub_running DO
-		CALL gdb-stub command_interpreter
-		// to resume, set stub_running to FALSE and return from call
-	ENDWHILE
-	restore registers
-	return from exception
+    handle debug exception (all except reset, serial tx and serial rx)
+    handle pending status (like remove single-stepping breakpoints)
+    send pending response to gdb-client (response for s,c,...)
+    set stub_running to TRUE
+    WHILE stub_running DO
+        CALL gdb-stub command_interpreter
+        // to resume, set stub_running to FALSE and return from call
+    ENDWHILE
+    restore registers
+    return from exception
 ENDPROCESS
 
 
