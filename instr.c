@@ -160,10 +160,10 @@ void check_branching(unsigned int address, branch_info *info)
 					}
 					break;
 				default:
-						// arithmetic & locig
-						check_op_pc(instr);
-						return;
-					break
+					// arithmetic & locig
+					check_op_pc(instr);
+					return;
+					break;
 			}
 			break;
 		case INSTR_C1:
@@ -177,7 +177,6 @@ void check_branching(unsigned int address, branch_info *info)
 						info->bvaltype = INSTR_BRVAL_NONE;
 						info->bval = (unsigned int) 0;
 						return;
-						return;
 					}
 					else
 					{
@@ -186,9 +185,9 @@ void check_branching(unsigned int address, branch_info *info)
 					}
 					break;
 				default:
-						// arithmetic & locig
-						return check_op_pc(instr);
-					break
+					// arithmetic & locig
+					return check_op_pc(instr);
+					break;
 			}
 			break;
 		case INSTR_C2:
@@ -211,21 +210,33 @@ void check_branching(unsigned int address, branch_info *info)
 			// branch
 			if ((instr & INSTR_COND_MASK) == INSTR_COND_AL)
 			{
-				return INSTR_BRTYPE_BRANCH;
+				info->btype = INSTR_BRTYPE_BRANCH;
+				info->bvaltype = INSTR_BRVAL_IMM;
+				info->bval = (unsigned int) 0;
+				return;
 			}
 			else
 			{
+				info->btype = INSTR_BRTYPE_CONDBR;
+				info->bvaltype = INSTR_BRVAL_IMM;
+				info->bval = (unsigned int) 0;
 				return INSTR_BRTYPE_CONDB;
 			}
 			break;
 		case INSTR_C6:
 			// LDC/STC
+			info->btype = INSTR_BRTYPE_LINEAR;
+			info->bvaltype = INSTR_BRVAL_NONE;
+			info->bval = (unsigned int) 0;
 			return INSTR_BRTYPE_LIN;
 			break;
 		case INSTR_C7:
 			if (instr & 0x01000000)
 			{
 				// Software interrupt
+				info->btype = INSTR_BRTYPE_LINEAR;
+				info->bvaltype = INSTR_BRVAL_NONE;
+				info->bval = (unsigned int) 0;
 				return INSTR_BRTYPE_NONE;
 			}
 			else
@@ -237,6 +248,9 @@ void check_branching(unsigned int address, branch_info *info)
 				else
 				{
 					// Co-processor data operations
+					info->btype = INSTR_BRTYPE_LINEAR;
+					info->bvaltype = INSTR_BRVAL_NONE;
+					info->bval = (unsigned int) 0;
 					return INSTR_BRTYPE_LIN;
 				}
 			}
