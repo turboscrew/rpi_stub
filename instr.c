@@ -146,7 +146,11 @@ void check_branching(unsigned int address, branch_info *info)
 					if (instr & INSTR_BIT4_MASK)
 					{
 						// swap or msr/mrs
-						return INSTR_BRTYPE_LIN;
+						// swaps,mrs,msr: if d == 15 then UNPREDICTABLE
+						info->btype = INSTR_BRTYPE_LINEAR;
+						info->bvaltype = INSTR_BRVAL_NONE;
+						info->bval = (unsigned int) 0;
+						return;
 					}
 					else
 					{
@@ -169,7 +173,11 @@ void check_branching(unsigned int address, branch_info *info)
 					if (instr & INSTR_BIT4_MASK)
 					{
 						// msr imm
-						return INSTR_BRTYPE_LIN;
+						info->btype = INSTR_BRTYPE_LINEAR;
+						info->bvaltype = INSTR_BRVAL_NONE;
+						info->bval = (unsigned int) 0;
+						return;
+						return;
 					}
 					else
 					{

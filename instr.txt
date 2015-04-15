@@ -128,7 +128,7 @@ gggffxx
 	0101	ADC     	Add with Carry   	bit4=0
 	0110	SBC     	Subtract with carry 	bit4=0
 	0111	RSC     	Reverse sub w/carry 	bit4=0
-	01UA	Multiplication / Long Multiplication (ARM7DM) bit4=1
+	01UA	Multiplication bit4=1
 
 	1000	TST     	Test bit        	bit4=0
 	1001	TEQ     	Test equality   	bit4=0
