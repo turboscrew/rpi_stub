@@ -118,7 +118,7 @@ classes (ggg):
 	Co-processor data operations
 	MRC/MCR, if Rd = PC, check
 
-The ff-bits seem to make the secondary classification
+The ff-bits (and bit-4) seem to make the secondary classification
 gggffxx
 000	Data Processing Instructions - register form
 	0000	AND     	Boolean And     	Rd = Rn AND Op2
