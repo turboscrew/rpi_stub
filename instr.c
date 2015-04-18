@@ -45,6 +45,8 @@
 #define INSTR_DPI2_2 0x00400000
 #define INSTR_DPI2_3 0x00600000
 
+// place for single data transfer immediate opcode
+extern uint32_t sdt_imm;
 
 // linear doesn't have branch address
 // how can we tell which coding? T1/T2/A1/A2/...?
@@ -88,6 +90,7 @@ void check_branching(unsigned int address, branch_info *info)
 	uint32_t tmp3;
 	uint32_t tmp4;
 	uint64_t dtmp;
+	uint32_t *iptr;
 
 	instr = *((uint32_t *) address);
 
@@ -203,14 +206,22 @@ void check_branching(unsigned int address, branch_info *info)
 				{
 					tmp3 = (instr & 0x000f0000) >> 16; // Rn
 					tmp3 = rpi2_reg_context.storage[tmp3]; // (Rn)
-#if 0
+#if 1
 					tmp4 = (instr & 0xffff0fff) | (1 << 12); // edit Rd=r1
 					tmp4 = (tmp4 & 0xfff0ffff); // edit Rn=r0
+					iptr = (uint32_t *) sdt_imm;
+					*iptr = tmp4;
 					asm(
 							"push {r0, r1}\n\t"
+							"ldr r0, =tmp4\n\t"
+							"ldr r1, [r0] @ instruction\n\t"
+							"ldr r0, =sdt_imm\n\t"
+							"str r1, [r0]\n\t"
 							"ldr r0, =tmp3 @ r0 <- Rn\n\t"
-							"1: .word tmp4 @ execute instr with our registers\n\t"
-							"str r1, =tmp4 @ store result to tmp4\n\t"
+							"ldr r0, [r0]\n\t"
+							"sdt_imm: .word 0 @ execute instr with our registers\n\t"
+							"ldr r0, =tmp4\n\t"
+							"str r1, [r0] @ store result to tmp4\n\t"
 							"pop {r0, r1}\n\t"
 					);
 #else
