@@ -97,6 +97,8 @@ Undef mode and jumps to undef exception.
 
 xxxxgggf fffyyyyy yyyyyyyy yyyyyyyy
 
+xxxx: condition code
+
 classes (ggg):
 000	Data Processing Instructions - register form
 	Multiplication, R15 should not be used

@@ -53,6 +53,9 @@ extern uint32_t sdt_imm;
 // maybe it's better to execute instructions with different registers?
 // (asm needed)
 
+
+// arith & log - so many different instructions that it's better
+// to edit the instruction and execute it to find out effects
 void check_op_pc(uint32_t instr, branch_info *info)
 {
 	// if dest is PC
@@ -192,7 +195,6 @@ void check_branching(unsigned int address, branch_info *info)
 		case INSTR_C2:
 			// Single Data Transfer - imm
 			// if wback && n == t then UNPREDICTABLE
-			// TODO: usermode access
 			tmp1 = (instr & 0x00000fff); // immediate
 			tmp2 = (instr & 0x01200000); // P and W bit
 			if (!(instr & 0x00800000)) // immediate sign negative?
@@ -225,6 +227,7 @@ void check_branching(unsigned int address, branch_info *info)
 							"pop {r0, r1}\n\t"
 					);
 #else
+					// usermode access?
 					if (tmp2 == 0x01200000) //pre-indexing
 					{
 						// Value to be loaded in PC
