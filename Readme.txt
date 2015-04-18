@@ -20,8 +20,7 @@ gdb-stubs.
 
 missing:
 breakpoints and single-stepping
-exception state initializations (stacks)
-???
+
 
 --------------------------
 Some kind of description

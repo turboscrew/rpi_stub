@@ -37,6 +37,21 @@ SECTIONS
     {
         bss = .;
         *(.bss)
+        stacks = .;
+		. = . + 512;	/* fiq stack size */
+		__fiq_stack = .;
+		. = . + 1024;	/* usr & sys stack size (start-up) */
+		__usrsys_stack = .;
+		. = . + 1024;	/* irq & svc stack size (serial) */
+		__irqsvc_stack = .;
+		. = . + 512;	/* mon stack size */
+		__mon_stack = .;
+		. = . + 512;	/* hyp stack size */
+		__hyp_stack = .;
+		. = . + 512;	/* und stack size */
+		__und_stack = .;
+		. = . + 8192;	/* abrt stack size (gdb-stub) */
+		__abrt_stack = .;
     }
     __bss_end = .;
     

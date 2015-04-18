@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
 ../gdb.c \
+../instr.c \
 ../loader.c \
 ../rpi2.c \
 ../serial.c \
@@ -16,6 +17,7 @@ S_UPPER_SRCS += \
 
 OBJS += \
 ./gdb.o \
+./instr.o \
 ./loader.o \
 ./rpi2.o \
 ./serial.o \
@@ -28,6 +30,7 @@ S_UPPER_DEPS += \
 
 C_DEPS += \
 ./gdb.d \
+./instr.d \
 ./loader.d \
 ./rpi2.d \
 ./serial.d \

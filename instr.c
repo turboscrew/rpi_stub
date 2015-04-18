@@ -47,6 +47,9 @@
 
 
 // linear doesn't have branch address
+// how can we tell which coding? T1/T2/A1/A2/...?
+// maybe it's better to execute instructions with different registers?
+// (asm needed)
 
 void check_op_pc(uint32_t instr, branch_info *info)
 {
@@ -56,14 +59,12 @@ void check_op_pc(uint32_t instr, branch_info *info)
 		if ((instr & INSTR_COND_MASK) == INSTR_COND_AL)
 		{
 			info->btype = INSTR_BRTYPE_BRANCH;
-			info->bvaltype = INSTR_BRVAL_NONE;
 			info->bval = (unsigned int) 0;
 			return;
 		}
 		else
 		{
 			info->btype = INSTR_BRTYPE_CONDBR;
-			info->bvaltype = INSTR_BRVAL_NONE;
 			info->bval = (unsigned int) 0;
 			return;
 		}
@@ -71,7 +72,6 @@ void check_op_pc(uint32_t instr, branch_info *info)
 	else
 	{
 		info->btype = INSTR_BRTYPE_LINEAR;
-		info->bvaltype = INSTR_BRVAL_NONE;
 		info->bval = (unsigned int) 0;
 		return;
 	}
@@ -95,7 +95,6 @@ void check_branching(unsigned int address, branch_info *info)
 	{
 		// check unconditionals (= specials)
 		info->btype = INSTR_BRTYPE_BRANCH;
-		info->bvaltype = INSTR_BRVAL_IMM;
 		info->bval = (unsigned int) 0;
 		return;
 	}
@@ -117,20 +116,17 @@ void check_branching(unsigned int address, branch_info *info)
 						if (instr & 0x000f0000)
 						{
 							info->btype = INSTR_BRTYPE_LINEAR;
-							info->bvaltype = INSTR_BRVAL_NONE;
 							info->bval = (unsigned int) (dtmp >> 32);
 						}
 						// low dest is PC?
 						else if (instr & 0x0000f000)
 						{
 							info->btype = INSTR_BRTYPE_LINEAR;
-							info->bvaltype = INSTR_BRVAL_NONE;
 							info->bval = (unsigned int) (dtmp & 0xffffffff);
 						}
 						else
 						{
 							info->btype = INSTR_BRTYPE_LINEAR;
-							info->bvaltype = INSTR_BRVAL_NONE;
 							info->bval = (unsigned int) 0;
 						}
 						return;
@@ -148,20 +144,19 @@ void check_branching(unsigned int address, branch_info *info)
 						// swap or msr/mrs
 						// swaps,mrs,msr: if d == 15 then UNPREDICTABLE
 						info->btype = INSTR_BRTYPE_LINEAR;
-						info->bvaltype = INSTR_BRVAL_NONE;
 						info->bval = (unsigned int) 0;
 						return;
 					}
 					else
 					{
 						// arithmetic & locig
-						check_op_pc(instr);
+						check_op_pc(instr, info);
 						return;
 					}
 					break;
 				default:
 					// arithmetic & locig
-					check_op_pc(instr);
+					check_op_pc(instr, info);
 					return;
 					break;
 			}
@@ -174,24 +169,96 @@ void check_branching(unsigned int address, branch_info *info)
 					{
 						// msr imm
 						info->btype = INSTR_BRTYPE_LINEAR;
-						info->bvaltype = INSTR_BRVAL_NONE;
 						info->bval = (unsigned int) 0;
 						return;
 					}
 					else
 					{
 						// arithmetic & locig
-						return check_op_pc(instr);
+						check_op_pc(instr, info);
+						return;
 					}
 					break;
 				default:
 					// arithmetic & locig
-					return check_op_pc(instr);
+					check_op_pc(instr, info);
+					return;
 					break;
 			}
 			break;
 		case INSTR_C2:
 			// Single Data Transfer - imm
+			// if wback && n == t then UNPREDICTABLE
+			// TODO: usermode access
+			tmp1 = (instr & 0x00000fff); // immediate
+			tmp2 = (instr & 0x01200000); // P and W bit
+			if (!(instr & 0x00800000)) // immediate sign negative?
+			{
+				tmp1 = -tmp1;
+			}
+
+			if ((instr & 0x0000f000) == (15 << 12)) // if Rd = PC
+			{
+				if (instr & 0x00100000) // load
+				{
+					tmp3 = (instr & 0x000f0000) >> 16; // Rn
+					tmp3 = rpi2_reg_context.storage[tmp3]; // (Rn)
+#if 0
+					tmp4 = (instr & 0xffff0fff) | (1 << 12); // edit Rd=r1
+					tmp4 = (tmp4 & 0xfff0ffff); // edit Rn=r0
+					asm(
+							"push {r0, r1}\n\t"
+							"ldr r0, =tmp3 @ r0 <- Rn\n\t"
+							"1: .word tmp4 @ execute instr with our registers\n\t"
+							"str r1, =tmp4 @ store result to tmp4\n\t"
+							"pop {r0, r1}\n\t"
+					);
+#else
+					if (tmp2 == 0x01200000) //pre-indexing
+					{
+						// Value to be loaded in PC
+						tmp4 = *((uint32_t *)(tmp3 + tmp1));
+					}
+					else // post-indexing works after setting Rd
+					{
+						tmp4 = *((uint32_t *)tmp3);
+					}
+					if (instr & 0x00400000) // byte
+					{
+						tmp4 &= 0x000000ff;
+					}
+#endif
+					info->btype = INSTR_BRTYPE_BRANCH;
+					info->bval = (unsigned int) tmp4;
+				}
+				else // store doesn't change Rd
+				{
+					info->btype = INSTR_BRTYPE_LINEAR;
+					info->bval = (unsigned int) 0;
+				}
+				return;
+			}
+			else if ((instr & 0x000f0000) == (15 << 16)) // if Rn = PC
+			{
+				tmp3 = rpi2_reg_context.storage[15]; // PC
+				if ((!tmp2) || (tmp2 == 0x01200000)) // pre/post-indexing?
+				{
+					tmp4 = tmp3 + tmp1;
+					info->btype = INSTR_BRTYPE_BRANCH;
+					info->bval = (unsigned int) tmp4;
+				}
+				else // no effect on PC
+				{
+					info->btype = INSTR_BRTYPE_LINEAR;
+					info->bval = (unsigned int) 0;
+				}
+				return;
+			}
+			else // PC not involved
+			{
+				info->btype = INSTR_BRTYPE_LINEAR;
+				info->bval = (unsigned int) 0;
+			}
 			break;
 		case INSTR_C3:
 			if (instr & INSTR_BIT4_MASK)
@@ -201,6 +268,8 @@ void check_branching(unsigned int address, branch_info *info)
 			else
 			{
 				// Single Data Transfer - register
+				// if m == 15 then UNPREDICTABLE;
+				// if wback && (n == 15 || n == t) then UNPREDICTABLE;
 			}
 			break;
 		case INSTR_C4:
@@ -211,33 +280,29 @@ void check_branching(unsigned int address, branch_info *info)
 			if ((instr & INSTR_COND_MASK) == INSTR_COND_AL)
 			{
 				info->btype = INSTR_BRTYPE_BRANCH;
-				info->bvaltype = INSTR_BRVAL_IMM;
 				info->bval = (unsigned int) 0;
 				return;
 			}
 			else
 			{
 				info->btype = INSTR_BRTYPE_CONDBR;
-				info->bvaltype = INSTR_BRVAL_IMM;
 				info->bval = (unsigned int) 0;
-				return INSTR_BRTYPE_CONDB;
+				return;
 			}
 			break;
 		case INSTR_C6:
 			// LDC/STC
 			info->btype = INSTR_BRTYPE_LINEAR;
-			info->bvaltype = INSTR_BRVAL_NONE;
 			info->bval = (unsigned int) 0;
-			return INSTR_BRTYPE_LIN;
+			return;
 			break;
 		case INSTR_C7:
 			if (instr & 0x01000000)
 			{
 				// Software interrupt
 				info->btype = INSTR_BRTYPE_LINEAR;
-				info->bvaltype = INSTR_BRVAL_NONE;
 				info->bval = (unsigned int) 0;
-				return INSTR_BRTYPE_NONE;
+				return;
 			}
 			else
 			{
@@ -249,9 +314,8 @@ void check_branching(unsigned int address, branch_info *info)
 				{
 					// Co-processor data operations
 					info->btype = INSTR_BRTYPE_LINEAR;
-					info->bvaltype = INSTR_BRVAL_NONE;
 					info->bval = (unsigned int) 0;
-					return INSTR_BRTYPE_LIN;
+					return;
 				}
 			}
 			break;

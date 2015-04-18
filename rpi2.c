@@ -205,6 +205,7 @@ static inline void save_regs()
 			"str r1, [r0, #+13*4]\n\t"
 			"@ back to our mode\n\t"
 			"9:\n\t"
+			"@ WHOSE STACK WE PULL FROM? \n\t"
 			"ldr.w r1, [sp, #+4]! @ restore our cpsr\n\t"
 			"msr.w cpsr, r1 @ \n\t"
 			"@ restore working registers (just in case)"
