@@ -372,7 +372,7 @@ void gdb_resume(int bkptnum)
 				}
 			}
 			// ARM or THUMB mode?
-			if (rpi2_reg_context.reg.spsr & 0x20)
+			if (rpi2_reg_context.reg.cpsr & 0x20)
 			{
 				// THUMB mode
 				addr_t = (uint16_t *) gdb_step_bkpt[i].trap_address;

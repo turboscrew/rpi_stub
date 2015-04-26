@@ -13,12 +13,12 @@
 
 .section .vector
 .align 4
-	ldr pc, =0x1f000000
+	ldr pc, =_start
     ldr pc, =0 @ swi
     ldr pc, =0 @ prefetch_abort
     ldr pc, =0 @ data_abort
     ldr pc, =0 @ not_used
-    ldr pc, =_serial_irq @ irq
+    ldr pc, =0 @ irq
     ldr pc, =0 @ fiq
 
 .text
@@ -47,7 +47,7 @@ cmp r4, r5
 bmi	loop$
 
 // Set up initial stacks
-ldr r13, =__irqsvc_stack @ our stack
+ldr r13, =__irqsvc_stack @ our stack (at startup)
 
 // store our cpsr to r4
 mrs r6, cpsr

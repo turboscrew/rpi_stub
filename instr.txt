@@ -1,6 +1,14 @@
-Most of the info needed here was found from:
+This is a blog-like description of the process of figuring out
+the ARMv7-A instruction set decoding.
+
+At the end, there is some pseudocode about decoding the ARM instructions.
+
+Most of the info needed here, to get started, was found from:
 http://www.wss.co.uk/pinknoise/ARMinstrs/ARMinstrs.html#Instructions
 Kudos!
+
+The rest comes from "cross matching" ARMv7-A/R ARM, ARM ARM, ARMv8 ARM and
+Cortex-A series Programmer's Guide.
 
 ---------------------------------------
 Deciphering ARM istruction set encoding
@@ -94,7 +102,7 @@ On encountering an undefined instruction, the ARM switches to
 Undef mode and jumps to undef exception.
 
 ------------
-
+arm instruction
 xxxxgggf fffyyyyy yyyyyyyy yyyyyyyy
 
 xxxx: condition code
@@ -118,54 +126,75 @@ classes (ggg):
 	Co-processor data operations
 	MRC/MCR, if Rd = PC, check
 
-The ff-bits (and bit-4) seem to make the secondary classification
-gggffxx
+The ff-bits seem to make the secondary classification
+(for data processing instructions), because in some instructions the
+first 'x' is 'variable'. The xx-bits - especially bit-21, bit-4 and bit-20
+seem to be tertiary decoding bits for some groups of data processing instructions.
+
+The best way is probably to implement a function that returns the value of
+given bit and a function thet returns the value formed by a range of adjacent bits,
+because the order to apply the bitmasks varies depending on the group of
+instructions to tell apart.
+
+For example, MUL can be checked by main classification, bits 24-23 and bit 4.
+Bits 22 and 21 don't are "instruction internal". Bits 24-21 can be used for
+subclassification, but then MUL needs to be checked in 4 subclasses.
+
+The data processing instructions are probably best decoded by first picking
+out the 'special cases' and then decoding the rest (arith & logic) by bits 
+24-20 and then bit 4.
+
+Finding out the best way of decoding requires quite a study on the subject
+and at least a list of instruction bitpatterns - one per line.
+
+gggffhh
 000	Data Processing Instructions - register form
-	0000	AND     	Boolean And     	Rd = Rn AND Op2
-	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
-	0010	SUB     	Subtract        	Rd = Rn  -  Op2
-	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+	0000	AND     	Boolean And
+	0001	EOR     	Boolean Eor
+	0010	SUB     	Subtract
+	0011	RSB     	Reverse Subtract
 
 	0100	ADD     	Addition        	bit4=0
 	0101	ADC     	Add with Carry   	bit4=0
 	0110	SBC     	Subtract with carry 	bit4=0
 	0111	RSC     	Reverse sub w/carry 	bit4=0
-	01UA	Multiplication bit4=1
+	01UA	Multiplication 					bit4=1
 
-	1000	TST     	Test bit        	bit4=0
+	1000	TST     	Test bit        	bit4=0, bit20=1
 	1001	TEQ     	Test equality   	bit4=0
-	1010	CMP     	Compare         	bit4=0
+	1010	CMP     	Compare         	bit4=0, bit20=1
 	1011	CMN     	Compare Negative	bit4=0
-	10B0	Single Data Swap bit4=1
-	10s1	MSR  Register form bit4=1
-	10s1	MRS bit4=1
-
-	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
-	1101	MOV     	Move value      	Rd =        Op2
-	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
-	1111	MVN     	Move Not        	Rd =    NOT Op2
+	10B0	SWP(B)		Swap 				bit4=1
+	10s0	MRS 							bit4=0, bit9=1:bank, bit20=0
+	10s1	MSR  Register form 				bit4=1, bit9=1:bank
+	
+	1100	ORR     	Boolean Or
+	1101	MOV     	Move value
+	1110	BIC     	Bit clear
+	1111	MVN     	Move Not
 
 001	Data Processing Instructions - immediate form
-	0000	AND     	Boolean And     	Rd = Rn AND Op2
-	0001	EOR     	Boolean Eor     	Rd = Rn EOR Op2
-	0010	SUB     	Subtract        	Rd = Rn  -  Op2
-	0011	RSB     	Reverse Subtract	Rd = Op2 -  Rn
+	0000	AND     	Boolean And
+	0001	EOR     	Boolean Eor
+	0010	SUB     	Subtract
+	0011	RSB     	Reverse Subtract
 
-	0100	ADD     	Addition        	Rd = Rn  +  Op2
-	0101	ADC     	Add with Carry   	Rd = Rn  +  Op2 + C
-	0110	SBC     	Subtract with carry 	Rd = Rn  -  Op2 - (1-C)
-	0111	RSC     	Reverse sub w/carry 	Rd = Op2 -  Rn  - (1-C)
+	0100	ADD     	Addition
+	0101	ADC     	Add with Carry
+	0110	SBC     	Subtract with carry
+	0111	RSC     	Reverse sub w/carry
 
-	1000	TST     	Test bit        	Rn AND Op2
+	1000	TST     	Test bit			bit20=1
 	1001	TEQ     	Test equality   	bit20=1
-	1010	CMP     	Compare         	Rn  -  Op2
+	1010	CMP     	Compare				bit20=1
+	1010	MOVT		Move top			bit20=0
 	1011	CMN     	Compare Negative	bit20=1
-	10s1	MSR  Immediate form bit20=0
+	10s1	MSR  Immediate form 			bit20=0
 
-	1100	ORR     	Boolean Or      	Rd = Rn OR  Op2
-	1101	MOV     	Move value      	Rd =        Op2
-	1110	BIC     	Bit clear       	Rd = Rn AND NOT Op2
-	1111	MVN     	Move Not        	Rd =    NOT Op2
+	1100	ORR     	Boolean Or
+	1101	MOV     	Move value
+	1110	BIC     	Bit clear
+	1111	MVN     	Move Not
 	
 010
 	PUBW	Single Data Transfer - immediate form, if Rd=PC, check
@@ -191,7 +220,33 @@ conditional branches are 'B'-branches with condition code
 27:25 (class) = 101
 24 = L (1 = with LR)
 23:0 = signed imm (PC-offset)
-With condition NV (1111) it becomes BLX, where bit 24 tells what?
+With condition NV (1111) it becomes BLX, where bit 24 tells... what?
+(Probably if bit 24 = '1' switch to THUMB-mode?)
+
+Condition codes
+          Mnemonic
+cond  Meaning (integer)                  Meaning (floating-point) a               Condition flags
+          extension
+0000      EQ                Equal        Equal              Z == 1
+0001      NE                Not equal    Not equal, or unordered                  Z == 0
+0010      CS b              Carry set    Greater than, equal, or unordered        C == 1
+0011      CC c              Carry clear  Less than          C == 0
+0100      MI                Minus, negative                    Less than          N == 1
+0101      PL                Plus, positive or zero             Greater than, equal, or unordered        N == 0
+0110      VS                Overflow     Unordered          V == 1
+0111      VC                No overflow  Not unordered      V == 0
+1000      HI                Unsigned higher                    Greater than, or unordered               C == 1 and Z == 0
+1001      LS                Unsigned lower or same             Less than or equal C == 0 or Z == 1
+1010      GE                Signed greater than or equal       Greater than or equal                    N == V
+1011      LT                Signed less than                   Less than, or unordered                  N != V
+1100      GT                Signed greater than                Greater than       Z == 0 and N == V
+1101      LE                Signed less than or equal          Less than, equal, or unordered           Z == 1 or N != V
+1110      None (AL) d       Always (unconditional)             Always (unconditional)                   Any
+
+    a. Unordered means at least one NaN operand.
+    b. HS (unsigned higher or same) is a synonym for CS.
+    c. LO (unsigned lower) is a synonym for CC.
+    d. AL is an optional mnemonic extension for always, except in IT instructions. For details see IT on page A8-390.
 
 For register ops: bits 11-0 is a shifter operand:
 register: 11:7 imm, 6:5=type, 4=0, 3:0=Rm
@@ -248,6 +303,7 @@ LDRT reg, LDRTB reg:
 if PC is involved, UNPREDICTABLE
 LDR imm, LDRB imm, LDRT imm, LDRTB imm:
 Rd != PC
+(A5.3           Load/store word and unsigned byte)
 A op1
 0 00000 STR imm
 0 00001 LDR imm Rn != PC
@@ -315,3 +371,335 @@ A op1
 1 11111 LDRB reg B=0
 All immediates (A=1) have bit4=0. If bit4=1 => media instruction
 
+---------
+
+get instr at PC (in register structure)
+get T-bit from cpsr (in register structure)
+// remember to set our T-bit before executing inferior's instructions.
+if (T) get_thumb_info(PC)
+else get_arm_info(PC)
+
+----------
+
+arm mode:
+I learned from gdbserver sources that condition code checking is so small
+thing that it should be done at the same time: just matching the condition
+code against the status flags. Then we need only one breakpoint address.
+
+
+instruction bits:
+xxxxgggf fyyyyyyy yyyyyyyy yyyyyyyy
+where xxxx is the condition code and gggg the 'new' class code.
+
+condition code: 
+if xxxx is NV special instruction (Unconditionals)
+if xxxx is AL no branch
+if xxxx matches cpsr then branch (only flags NZCV are involved)
+else no branch
+
+if no branch (operation is NOP) next address is PC + 4
+else decode
+
+Here is one way of ARM instruction decoding as pseudocode.
+Seeing all the bit patterns of instructions at once might reveal better ways.
+
+// This might be useful - there is no ^^ in C.
+inline int log_xor(int val1, int val2)
+{
+	return ((val1 && (!val2)) || ((!val1) && val2));
+}
+
+
+PROCEDURE decode
+	get bits 31 to 28 from the instruction (the condition-field)
+	IF bits 31 to 28 THEN
+		CALL Decode_Unconditional_instructions
+		RETURN
+	ENDIF
+	get bits 27 to 25 from the instruction
+	CASEOF (bits 27 to 25)
+		CASE 0
+			get bits 24 to 23 from the instruction
+			get bit 4 from the instruction
+			CASEOF (bits 24 to 23)
+				CASE 1
+					IF bit 4 is '1' THEN
+						decode MULT
+					ELSE
+						CALL decode_arith_logic_reg
+					ENDIF
+				ENDCASE
+				
+				CASE 2
+					IF bit 4 is '1' THEN
+						get bit 21 from the instruction
+						IF bit 21 is '1' THEN
+							decode MSR
+						ELSE
+							decode SWP(B)
+						ENDIF
+					ELSE
+						get bit 20 from the instruction
+						IF bit 20 is '0' THEN
+							decode MRS
+						ELSE
+							CALL decode_arith_logic_reg
+						ENDIF
+					ENDIF
+				ENDCASE
+				
+				OTHER
+					CALL decode_arith_logic_reg
+				ENDCASE
+			ENDCASEOF
+		ENDCASE
+		
+		CASE 1
+			get bits 21 and 20 from the instruction
+			IF bit 21 is '1' AND bit 20 is '0' THEN
+				CALL decode_MSR_imm_and_hints
+			ELSIF bit21 is '0' AND bit 20 is '0' THEN
+				decode MOVT
+			ELSE
+				CALL decode_arith_logic_imm
+			ENDIF
+		ENDCASE
+		
+		CASE 2
+			decode Single Data Transfer - immediate form
+		ENDCASE
+		
+		CASE 3
+			get bit 4 from the instruction
+			IF bit 4 is '1' THEN
+				decode Media instructions
+			ELSE
+				decode Single Data Transfer (reg)
+			ENDIF			
+		ENDCASE
+		
+		CASE 4
+			decode Block Data Transfer
+		ENDCASE
+		
+		CASE 5
+			decode Branch
+		ENDCASE
+		
+		CASE 6
+			decode LDC/STC
+		ENDCASE
+		
+		CASE 7
+			get bit 24 from the instruction
+			IF bit 24 is '0' THEN
+				get bit 4 from the instruction
+				IF bit 4 is '1' THEN
+					decode MRC/MCR
+				ELSE
+					decode Co-processor data operations
+				ENDIF
+			ELSE
+				decode Software Interrupt
+			ENDIF			
+		ENDCASE
+		
+		OTHER
+			// logically impossible
+		ENDCASE
+	ENDCASEOF
+ENDPROC
+
+PROCEDURE decode_MSR_imm_and_hints
+	get bits 19 to 16 from the instruction // 'mask'-field
+	IF bits 19 to 16 are all zeros THEN
+		decode hints (bits 7 to 0)
+		get bits 7 to 0 from the instruction
+		CASEOF bits 7 to 0
+			CASE 0
+				NOP
+			ENDCASE
+			
+			CASE 1
+				YIELD
+			ENDCASE
+			
+			CASE 2
+				WFE
+			ENDCASE
+			
+			CASE 3
+				WFI
+			ENDCASE
+			
+			CASE 4
+				SEV
+			ENDCASE
+			
+			OTHER
+				decode debug hint
+			ENDCASE
+		ENDCASEOF
+	ELSE
+		decode MSR imm
+	ENDIF
+ENDPROC
+
+PROCEDURE decode_arith_logic_reg
+	CALL decode_arith_logic
+	decode register operands
+ENDPROC
+
+PROCEDURE decode_arith_logic_imm
+	CALL decode_arith_logic
+	decode immediate operands
+ENDPROC
+
+PROCEDURE decode_arith_logic
+	get bits 24 to 21 from the instruction
+	get bit 4 from the instruction
+	// the 'specials' are already picked
+	CASEOF bits 24 to 21
+		CASE 0
+			AND
+		ENDCASE
+		
+		CASE 1
+			EOR
+		ENDCASE
+		
+		CASE 2
+			SUB
+		ENDCASE
+		
+		CASE 3
+			RSB
+		ENDCASE
+		
+		CASE 4
+			ADD
+		ENDCASE
+		
+		CASE 5
+			ADC
+		ENDCASE
+		
+		CASE 6
+			SBC
+		ENDCASE
+		
+		CASE 7
+			RSC
+		ENDCASE
+		
+		CASE 8
+			TST
+		ENDCASE
+		
+		CASE 9
+			TEQ
+		ENDCASE
+		
+		CASE 10
+			CMP
+		ENDCASE
+		
+		CASE 11
+			CMN
+		ENDCASE
+		
+		CASE 12
+			ORR
+		ENDCASE
+		
+		CASE 13
+			MOV
+		ENDCASE
+		
+		CASE 14
+			BIC
+		ENDCASE
+		
+		CASE 15
+			MVN
+		ENDCASE
+		
+		OTHER
+			// logically impossible
+		ENDCASE
+	ENDCASEOF
+ENCPROC
+
+PROCEDURE Decode_Unconditional_instructions
+	get bit 27 from the instruction
+	IF bit 27 is '0' THEN
+		decode memory hints, advanced SIMD and miscellaneous instructions
+	ELSE
+		get bits 26 to 25 from the instruction
+		get bit 20 from the instruction		
+		CASEOF bits 26 to 25
+			CASE 0
+				IF bit 20 is '1' THEN
+					decode RFE
+				ELSE
+					decode SRS
+				ENDIF
+			ENDCASE
+			
+			CASE 1
+				decode BL/BLX imm
+			ENDCASE
+			
+			CASE 2
+				get bits 24 to 21 from the instruction
+				IF bit20 is '1' THEN
+					CASEOF bits 24 to 21
+						CASE 0
+							handle Undef
+						ENDCASE
+						
+						CASE 2
+							decode MRRC/MRRC2
+						ENDCASE
+						
+						OTHER
+							// bits 19-16 (Rn) = 15 => lit else imm
+							decode LDC/LDC2
+						ENDCASE
+					ENDCASEOF
+				ELSE
+					CASEOF bits 24 to 21
+						CASE 0
+							handle Undef
+						ENDCASE
+						
+						CASE 2
+							decode MCRR/MCRR2
+						ENDCASE
+						
+						OTHER
+							decode STC/STC2
+						ENDCASE
+					ENDCASEOF
+				ENDIF
+			ENDCASE
+			
+			CASE 3
+				get bit 4 from the instruction
+				IF bit 4 is '1' THEN
+					IF bit 20 is '1' THEN
+						decode MRC/MRC2
+					ELSE
+						decode MCR/MCR2
+					ENDIF
+				ELSE
+					decode CDP/CDP2
+				ENDIF
+			ENDCASE
+			
+			OTHER
+				// logically impossible
+			ENDCASE
+		ENDCASEOF
+	ENDIF
+ENCPROC

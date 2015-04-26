@@ -40,7 +40,7 @@ all: loader.elf
 loader.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C Linker'
-	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -mthumb -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Xlinker --gc-sections -Wl,-Map,"loader.map" -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -mthumb -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Wl,-Map,"loader.map" -ffreestanding -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

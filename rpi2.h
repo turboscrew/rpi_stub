@@ -57,7 +57,7 @@ extern volatile union {
 		unsigned int r13; // SP
 		unsigned int r14; // LR
 		unsigned int r15; // PC
-		unsigned int spsr; // saved cpsr
+		unsigned int cpsr;
 	} reg;
 } rpi2_reg_context;
 

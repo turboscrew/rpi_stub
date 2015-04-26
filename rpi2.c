@@ -398,4 +398,5 @@ void rpi2_init()
 	 * and.w r1, r0
 	 * mcr p14, 0, r1, 0, 1, 0
 	 */
+	rpi2_set_vectable();
 }

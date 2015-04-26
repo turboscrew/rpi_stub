@@ -8,18 +8,12 @@
 #ifndef INSTR_H_
 #define INSTR_H_
 
-#define INSTR_BRTYPE_LINEAR 0
-#define INSTR_BRTYPE_BRANCH 1
-#define INSTR_BRTYPE_CONDBR 2
-#define INSTR_BRTYPE_NONE 3
-
-// Note that linear instruction doesn't have branch address
-typedef struct {
-	int btype; // branch type
-	unsigned int bval; // branch value
-} branch_info;
+// marker: address can't be resolved here - like exceptions
+#define INSTR_ADDR_NONE 0xfffffffff
+// marker: address can't be used
+#define INSTR_ADDR_UNDEF 0xfffffffe
 
 // finds out the branch info about the instruction at address
-void check_branching(unsigned int address, branch_info *info);
+unsigned int check_branching(unsigned int address);
 
 #endif /* INSTR_H_ */
