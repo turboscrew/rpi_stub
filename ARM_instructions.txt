@@ -1,0 +1,532 @@
+This list is generated with a simple awk-script, so it may still contain errors.
+The source was ARMv7-A/R ARM, and the corresponding chapter number is in the beginning
+of each description. The listing should contain both A1 and A2 encodings.
+
+A8.8.1	cond      0 0 1 0 1 0 1 S            Rn          Rd                 imm12	ADC{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.2	cond      0 0 0 0 1 0 1 S            Rn          Rd          imm5    type 0  Rm	ADC{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.3	cond      0 0 0 0 1 0 1 S            Rn          Rd          Rs    0 type 1  Rm	ADC{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.5	cond      0 0 1 0 1 0 0 S            Rn          Rd                 imm12	ADD{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.7	cond      0 0 0 0 1 0 0 S            Rn          Rd          imm5    type 0  Rm	ADD{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.8	cond      0 0 0 0 1 0 0 S            Rn          Rd          Rs    0 type 1  Rm	ADD{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.9	cond      0 0 1 0 1 0 0 S 1 1 0 1                Rd                 imm12	ADD{S}<c> <Rd>, SP, #<const> 	A1
+
+A8.8.11	cond      0 0 0 0 1 0 0 S 1 1 0 1                Rd          imm5    type 0  Rm	ADD{S}<c> <Rd>, SP, <Rm>{, <shift>} 	A1
+
+A8.8.12	cond      0 0 1 0 1 0 0 0 1 1 1 1                Rd                 imm12	ADR<c> <Rd>, <label>	  <label> after current instruction 	A1
+
+A8.8.12	cond      0 0 1 0 0 1 0 0 1 1 1 1                Rd                 imm12	ADR<c> <Rd>, <label>	  <label> before current instruction	SUB <Rd>, PC, #0		  Special case for subtraction of zero 	A2
+
+A8.8.13	cond      0 0 1 0 0 0 0 S            Rn          Rd                 imm12	AND{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.14	cond      0 0 0 0 0 0 0 S            Rn          Rd          imm5    type 0  Rm	AND{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.15	cond      0 0 0 0 0 0 0 S            Rn          Rd          Rs    0 type 1  Rm	AND{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.16	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          imm5    1 0 0   Rm	ASR{S}<c> <Rd>, <Rm>, #<imm> 	A1
+
+A8.8.17	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          Rm    0 1 0 1    Rn	ASR{S}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.18	cond      1 0 1 0	           imm24	B<c> <label> 	A1
+
+A8.8.19	cond      0 1 1 1 1 1 0            msb           Rd           lsb    0 0 1 1 1 1 1	BFC<c> <Rd>, #<lsb>, #<width> 	A1
+
+A8.8.20	cond      0 1 1 1 1 1 0            msb           Rd           lsb    0 0 1    Rn	BFI<c> <Rd>, <Rn>, #<lsb>, #<width> 	A1
+
+A8.8.21	cond      0 0 1 1 1 1 0 S            Rn          Rd                 imm12	BIC{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.22	cond      0 0 0 1 1 1 0 S            Rn          Rd          imm5    type 0  Rm	BIC{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.23	cond      0 0 0 1 1 1 0 S            Rn          Rd          Rs    0 type 1  Rm	BIC{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.24	cond      0 0 0 1 0 0 1 0                      imm12               0 1 1 1   imm4	BKPT #<imm16> 	A1
+
+A8.8.25	cond      1 0 1 1	           imm24	BL<c> <label> 	A1
+
+A8.8.25	 1 1 1 1 1 0 1 H	               imm24	BLX <label> 	A2
+
+A8.8.26	cond      0 0 0 1 0 0 1 0 (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) 0 0 1 1 Rm	BLX<c> <Rm> 	A1
+
+A8.8.27	cond      0 0 0 1 0 0 1 0 (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) 0 0 0 1 Rm	BX<c> <Rm> 	A1
+
+A8.8.28	cond      0 0 0 1 0 0 1 0 (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) 0 0 1 0 Rm	BXJ<c> <Rm> 	A1
+
+A8.8.32	1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 1 (1) (1) (1) (1)	CLREX 	A1
+
+A8.8.33	cond      0 0 0 1 0 1 1 0 (1) (1) (1) (1)        Rd      (1) (1) (1) (1) 0 0 0 1 Rm	CLZ<c> <Rd>, <Rm> 	A1
+
+A8.8.34	cond      0 0 1 1 0 1 1 1            Rn      (0) (0) (0) (0)        imm12	CMN<c> <Rn>, #<const> 	A1
+
+A8.8.35	cond      0 0 0 1 0 1 1 1            Rn      (0) (0) (0) (0) imm5    type 0  Rm	CMN<c> <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.36	cond      0 0 0 1 0 1 1 1            Rn      (0) (0) (0) (0) Rs    0 type 1  Rm	CMN<c> <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.37	cond      0 0 1 1 0 1 0 1            Rn      (0) (0) (0) (0)        imm12	CMP<c> <Rn>, #<const> 	A1
+
+A8.8.38	cond      0 0 0 1 0 1 0 1            Rn      (0) (0) (0) (0) imm5    type 0  Rm	CMP<c> <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.39	cond      0 0 0 1 0 1 0 1            Rn      (0) (0) (0) (0) Rs    0 type 1  Rm	CMP<c> <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.42	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 1 1 1 1    option	DBG<c> #<option> 	A1
+
+A8.8.43	 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 0 1 option	DMB <option> 	A1
+
+A8.8.44	 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 0 0 option	DSB <option> 	A1
+
+A8.8.46	cond      0 0 1 0 0 0 1 S            Rn          Rd                 imm12	EOR{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.47	cond      0 0 0 0 0 0 1 S            Rn          Rd          imm5    type 0  Rm	EOR{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.48	cond      0 0 0 0 0 0 1 S            Rn          Rd          Rs    0 type 1  Rm	EOR{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.53	1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 1 0 option	ISB <option> 	A1
+
+A8.8.58	cond      1 0 0 0 1 0 W 1            Rn                        register_list	LDM<c> <Rn>{!}, <registers> 	A1
+
+A8.8.59	cond      1 0 0 0 0 0 W 1            Rn                        register_list	LDMDA<c> <Rn>{!}, <registers> 	A1
+
+A8.8.60	cond      1 0 0 1 0 0 W 1            Rn                        register_list	LDMDB<c> <Rn>{!}, <registers> 	A1
+
+A8.8.61	cond      1 0 0 1 1 0 W 1            Rn                        register_list	LDMIB<c> <Rn>{!}, <registers> 	A1
+
+A8.8.63	cond      0 1 0 P U 0 W 1            Rn          Rt                 imm12	LDR<c> <Rt>, [<Rn>{, #+/-<imm12>}]	LDR<c> <Rt>, [<Rn>], #+/-<imm12>	LDR<c> <Rt>, [<Rn>, #+/-<imm12>]! 	A1
+
+A8.8.64	cond      0 1 0 P U 0 W 1 1 1 1 1                Rt                 imm12	LDR<c> <Rt>, <label>	LDR<c> <Rt>, [PC, #-0]	 Special case 	A1
+
+A8.8.66	cond      0 1 1 P U 0 W 1            Rn          Rt          imm5    type 0  Rm	LDR<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!}	LDR<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A1
+
+A8.8.68	cond      0 1 0 P U 1 W 1            Rn          Rt                 imm12	LDRB<c> <Rt>, [<Rn>{, #+/-<imm12>}]	LDRB<c> <Rt>, [<Rn>], #+/-<imm12>	LDRB<c> <Rt>, [<Rn>, #+/-<imm12>]! 	A1
+
+A8.8.69	cond      0 1 0 P U 1 W 1 1 1 1 1                Rt                 imm12	LDRB<c> <Rt>, <label>	LDRB<c> <Rt>, [PC, #-0]	                  Special case 	A1
+
+A8.8.70	cond      0 1 1 P U 1 W 1            Rn          Rt          imm5    type 0  Rm	LDRB<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!}	LDRB<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A1
+
+A8.8.71	cond      0 1 0 0 U 1 1 1            Rn          Rt                 imm12	LDRBT<c> <Rt>, [<Rn>], #+/-<imm12> 	A1
+
+A8.8.71	cond      0 1 1 0 U 1 1 1            Rn          Rt          imm5    type 0  Rm	LDRBT<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A2
+
+A8.8.72	cond      0 0 0 P U 1 W 0            Rn          Rt        imm4H   1 1 0 1  imm4L	LDRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm8>}]	LDRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm8>	LDRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.73	cond      0 0 0 (1) U 1 (0) 0 1 1 1 1            Rt        imm4H   1 1 0 1  imm4L	LDRD<c> <Rt>, <Rt2>, <label>	LDRD<c> <Rt>, <Rt2>, [PC, #-0]	            Special case 	A1
+
+A8.8.74	cond      0 0 0 P U 0 W 0            Rn          Rt      (0) (0) (0) (0) 1 1 0 1 Rm	LDRD<c> <Rt>, <Rt2>, [<Rn>,+/-<Rm>]{!}	LDRD<c> <Rt>, <Rt2>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.75	cond      0 0 0 1 1 0 0 1            Rn          Rt      (1) (1) (1) (1) 1 0 0 1 (1) (1) (1) (1)	LDREX<c> <Rt>, [<Rn>] 	A1
+
+A8.8.76	cond      0 0 0 1 1 1 0 1            Rn          Rt      (1) (1) (1) (1) 1 0 0 1 (1) (1) (1) (1)	LDREXB<c> <Rt>, [<Rn>] 	A1
+
+A8.8.77	cond      0 0 0 1 1 0 1 1            Rn          Rt      (1) (1) (1) (1) 1 0 0 1 (1) (1) (1) (1)	LDREXD<c> <Rt>, <Rt2>, [<Rn>] 	A1
+
+A8.8.78	cond      0 0 0 1 1 1 1 1            Rn          Rt      (1) (1) (1) (1) 1 0 0 1 (1) (1) (1) (1)	LDREXH<c> <Rt>, [<Rn>] 	A1
+
+A8.8.80	cond      0 0 0 P U 1 W 1            Rn          Rt        imm4H   1 0 1 1  imm4L	LDRH<c> <Rt>, [<Rn>{, #+/-<imm8>}]	LDRH<c> <Rt>, [<Rn>], #+/-<imm8>	LDRH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.81	cond      0 0 0 P U 1 W 1 1 1 1 1                Rt        imm4H   1 0 1 1  imm4L	LDRH<c> <Rt>, <label>	LDRH<c> <Rt>, [PC, #-0]	Special case 	A1
+
+A8.8.82	cond      0 0 0 P U 0 W 1            Rn          Rt      (0) (0) (0) (0) 1 0 1 1 Rm	LDRH<c> <Rt>, [<Rn>,+/-<Rm>]{!}	LDRH<c> <Rt>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.83	cond      0 0 0 0 U 1 1 1            Rn          Rt        imm4H   1 0 1 1  imm4L	LDRHT<c> <Rt>, [<Rn>] {, #+/-<imm8>} 	A1
+
+A8.8.83	cond      0 0 0 0 U 0 1 1            Rn          Rt      (0) (0) (0) (0) 1 0 1 1 Rm	LDRHT<c> <Rt>, [<Rn>], +/-<Rm> 	A2
+
+A8.8.84	cond      0 0 0 P U 1 W 1            Rn          Rt        imm4H   1 1 0 1  imm4L	LDRSB<c> <Rt>, [<Rn>{, #+/-<imm8>}]	LDRSB<c> <Rt>, [<Rn>], #+/-<imm8>	LDRSB<c> <Rt>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.85	cond      0 0 0 P U 1 W 1 1 1 1 1                Rt        imm4H   1 1 0 1  imm4L	LDRSB<c> <Rt>, <label>	LDRSB<c> <Rt>, [PC, #-0]	                 Special case 	A1
+
+A8.8.86	cond      0 0 0 P U 0 W 1            Rn          Rt      (0) (0) (0) (0) 1 1 0 1 Rm	LDRSB<c> <Rt>, [<Rn>,+/-<Rm>]{!}	LDRSB<c> <Rt>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.87	cond      0 0 0 0 U 1 1 1            Rn          Rt        imm4H   1 1 0 1  imm4L	LDRSBT<c> <Rt>, [<Rn>] {, #+/-<imm8>} 	A1
+
+A8.8.87	cond      0 0 0 0 U 0 1 1            Rn          Rt      (0) (0) (0) (0) 1 1 0 1 Rm	LDRSBT<c> <Rt>, [<Rn>], +/-<Rm> 	A2
+
+A8.8.88	cond      0 0 0 P U 1 W 1            Rn          Rt        imm4H   1 1 1 1  imm4L	LDRSH<c> <Rt>, [<Rn>{, #+/-<imm8>}]	LDRSH<c> <Rt>, [<Rn>], #+/-<imm8>	LDRSH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.89	cond      0 0 0 P U 1 W 1 1 1 1 1                Rt        imm4H   1 1 1 1  imm4L	LDRSH<c> <Rt>, <label>	LDRSH<c> <Rt>, [PC, #-0]	                 Special case 	A1
+
+A8.8.90	cond      0 0 0 P U 0 W 1            Rn          Rt      (0) (0) (0) (0) 1 1 1 1 Rm	LDRSH<c> <Rt>, [<Rn>,+/-<Rm>]{!}	LDRSH<c> <Rt>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.91	cond      0 0 0 0 U 1 1 1            Rn          Rt        imm4H   1 1 1 1  imm4L	LDRSHT<c> <Rt>, [<Rn>] {, #+/-<imm8>} 	A1
+
+A8.8.91	cond      0 0 0 0 U 0 1 1            Rn          Rt      (0) (0) (0) (0) 1 1 1 1 Rm	LDRSHT<c> <Rt>, [<Rn>], +/-<Rm> 	A2
+
+A8.8.92	cond      0 1 0 0 U 0 1 1            Rn          Rt                 imm12	LDRT<c> <Rt>, [<Rn>] {, #+/-<imm12>} 	A1
+
+A8.8.92	cond      0 1 1 0 U 0 1 1            Rn          Rt          imm5    type 0  Rm	LDRT<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A2
+
+A8.8.94	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          imm5    0 0 0   Rm	LSL{S}<c> <Rd>, <Rm>, #<imm5> 	A1
+
+A8.8.95	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          Rm    0 0 0 1    Rn	LSL{S}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.96	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          imm5    0 1 0   Rm	LSR{S}<c> <Rd>, <Rm>, #<imm> 	A1
+
+A8.8.97	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          Rm    0 0 1 1    Rn	LSR{S}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.100	cond      0 0 0 0 0 0 1 S            Rd          Ra          Rm    1 0 0 1    Rn	MLA{S}<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.101	cond      0 0 0 0 0 1 1 0            Rd          Ra          Rm    1 0 0 1    Rn	MLS<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.102	cond      0 0 1 1 1 0 1 S (0) (0) (0) (0)        Rd                 imm12	MOV{S}<c> <Rd>, #<const> 	A1
+
+A8.8.102	cond      0 0 1 1 0 0 0 0           imm4         Rd                 imm12	MOVW<c> <Rd>, #<imm16> 	A2
+
+A8.8.104	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd       0 0 0 0 0 0 0 0    Rm	MOV{S}<c> <Rd>, <Rm> 	A1
+
+A8.8.106	cond      0 0 1 1 0 1 0 0           imm4         Rd                 imm12	MOVT<c> <Rd>, #<imm16> 	A1
+
+A8.8.109	cond      0 0 0 1 0 0 0 0 (1) (1) (1) (1)        Rd      (0) (0) 0 (0) 0 0 0 0 (0) (0) (0) (0)	MRS<c> <Rd>, <spec_reg> 	A1
+
+A8.8.111	cond      0 0 1 1 0 0 1 0 mask 0 0 (1) (1) (1) (1)                  imm12	MSR<c> <spec_reg>, #<const> 	A1
+
+A8.8.112	cond      0 0 0 1 0 0 1 0 mask 0 0 (1) (1) (1) (1) (0) (0) 0 (0) 0 0 0 0      Rn	MSR<c> <spec_reg>, <Rn> 	A1
+
+A8.8.114	cond      0 0 0 0 0 0 0 S            Rd      (0) (0) (0) (0) Rm    1 0 0 1    Rn	MUL{S}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.115	cond      0 0 1 1 1 1 1 S (0) (0) (0) (0)        Rd                 imm12	MVN{S}<c> <Rd>, #<const> 	A1
+
+A8.8.116	cond      0 0 0 1 1 1 1 S (0) (0) (0) (0)        Rd          imm5    type 0  Rm	MVN{S}<c> <Rd>, <Rm>{, <shift>} 	A1
+
+A8.8.117	cond      0 0 0 1 1 1 1 S (0) (0) (0) (0)        Rd          Rs    0 type 1  Rm	MVN{S}<c> <Rd>, <Rm>, <type> <Rs> 	A1
+
+A8.8.119	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 0 0	NOP<c> 	A1
+
+A8.8.122	cond      0 0 1 1 1 0 0 S            Rn          Rd                 imm12	ORR{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.123	cond      0 0 0 1 1 0 0 S            Rn          Rd          imm5    type 0  Rm	ORR{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.124	cond      0 0 0 1 1 0 0 S            Rn          Rd          Rs    0 type 1  Rm	ORR{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.125	cond      0 1 1 0 1 0 0 0            Rn          Rd          imm5    tb 0 1  Rm	PKHBT<c> <Rd>, <Rn>, <Rm>{, LSL #<imm>}	PKHTB<c> <Rd>, <Rn>, <Rm>{, ASR #<imm>} 	A1
+
+A8.8.126	1 1 1 1 0 1 0 1 U R 0 1                 Rn      (1) (1) (1) (1)        imm12	  ARMv7 with MP Extensions for PLDW	PLD{W} [<Rn>, #+/-<imm12>] 	A1
+
+A8.8.127	1 1 1 1 0 1 0 1 U (1) 0 1 1 1 1 1 (1) (1) (1) (1)                      imm12	PLD <label>	PLD [PC, #-0]		   Special case 	A1
+
+A8.8.128	 1 1 1 1 0 1 1 1 U R 0 1                Rn      (1) (1) (1) (1) imm5    type 0  Rm	ARMv7 with MP Extensions for PLDW	PLD{W} [<Rn>,+/-<Rm>{, <shift>}] 	A1
+
+A8.8.129	1 1 1 1 0 1 0 0 U 1 0 1                 Rn      (1) (1) (1) (1)        imm12	PLI [<Rn>, #+/-<imm12>]	PLI <label>	PLI [PC, #-0]		     Special case 	A1
+
+A8.8.130	1 1 1 1 0 1 1 0 U 1 0 1                 Rn      (1) (1) (1) (1) imm5    type 0  Rm	PLI [<Rn>,+/-<Rm>{, <shift>}] 	A1
+
+A8.8.132	cond      1 0 0 0 1 0 1 1 1 1 0 1	     register_list	POP<c> <registers>	                  <registers> contains more than one register 	A1
+
+A8.8.132	cond      0 1 0 0 1 0 0 1 1 1 0 1                Rt       0 0 0 0 0 0 0 0 0 1 0 0	POP<c> <registers>	                  <registers> contains one register, <Rt> 	A2
+
+A8.8.133	cond      1 0 0 1 0 0 1 0 1 1 0 1	     register_list	PUSH<c> <registers>	                 <registers> contains more than one register 	A1
+
+A8.8.133	cond      0 1 0 1 0 0 1 0 1 1 0 1                Rt       0 0 0 0 0 0 0 0 0 1 0 0	PUSH<c> <registers>	                 <registers> contains one register, <Rt> 	A2
+
+A8.8.134	cond      0 0 0 1 0 0 0 0            Rn          Rd      (0) (0) (0) (0) 0 1 0 1 Rm	QADD<c> <Rd>, <Rm>, <Rn> 	A1
+
+A8.8.135	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	QADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.136	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	QADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.137	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	QASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.138	cond      0 0 0 1 0 1 0 0            Rn          Rd      (0) (0) (0) (0) 0 1 0 1 Rm	QDADD<c> <Rd>, <Rm>, <Rn> 	A1
+
+A8.8.139	cond      0 0 0 1 0 1 1 0            Rn          Rd      (0) (0) (0) (0) 0 1 0 1 Rm	QDSUB<c> <Rd>, <Rm>, <Rn> 	A1
+
+A8.8.140	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	QSAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.141	cond      0 0 0 1 0 0 1 0            Rn          Rd      (0) (0) (0) (0) 0 1 0 1 Rm	QSUB<c> <Rd>, <Rm>, <Rn> 	A1
+
+A8.8.142	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	QSUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.143	cond      0 1 1 0 0 0 1 0            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	QSUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.144	cond      0 1 1 0 1 1 1 1 (1) (1) (1) (1)        Rd      (1) (1) (1) (1) 0 0 1 1 Rm	RBIT<c> <Rd>, <Rm> 	A1
+
+A8.8.145	cond      0 1 1 0 1 0 1 1 (1) (1) (1) (1)        Rd      (1) (1) (1) (1) 0 0 1 1 Rm	REV<c> <Rd>, <Rm> 	A1
+
+A8.8.146	cond      0 1 1 0 1 0 1 1 (1) (1) (1) (1)        Rd      (1) (1) (1) (1) 1 0 1 1 Rm	REV16<c> <Rd>, <Rm> 	A1
+
+A8.8.147	cond      0 1 1 0 1 1 1 1 (1) (1) (1) (1)        Rd      (1) (1) (1) (1) 1 0 1 1 Rm	REVSH<c> <Rd>, <Rm> 	A1
+
+A8.8.149	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          imm5    1 1 0   Rm	ROR{S}<c> <Rd>, <Rm>, #<imm> 	A1
+
+A8.8.150	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd          Rm    0 1 1 1    Rn	ROR{S}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.151	cond      0 0 0 1 1 0 1 S (0) (0) (0) (0)        Rd       0 0 0 0 0 1 1 0    Rm	RRX{S}<c> <Rd>, <Rm> 	A1
+
+A8.8.152	cond      0 0 1 0 0 1 1 S            Rn          Rd                 imm12	RSB{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.153	cond      0 0 0 0 0 1 1 S            Rn          Rd          imm5    type 0  Rm	RSB{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.154	cond      0 0 0 0 0 1 1 S            Rn          Rd          Rs    0 type 1  Rm	RSB{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.155	cond      0 0 1 0 1 1 1 S            Rn          Rd                 imm12	RSC{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.156	cond      0 0 0 0 1 1 1 S            Rn          Rd          imm5    type 0  Rm	RSC{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.157	cond      0 0 0 0 1 1 1 S            Rn          Rd          Rs    0 type 1  Rm	RSC{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.158	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	SADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.159	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	SADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.160	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	SASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.161	cond      0 0 1 0 1 1 0 S            Rn          Rd                 imm12	SBC{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.162	cond      0 0 0 0 1 1 0 S            Rn          Rd          imm5    type 0  Rm	SBC{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.163	cond      0 0 0 0 1 1 0 S            Rn          Rd          Rs    0 type 1  Rm	SBC{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.164	cond      0 1 1 1 1 0 1          widthm1         Rd           lsb    1 0 1    Rn	SBFX<c> <Rd>, <Rn>, #<lsb>, #<width> 	A1
+
+A8.8.165	cond      0 1 1 1 0 0 0 1            Rd      (1) (1) (1) (1) Rm    0 0 0 1    Rn	SDIV<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.166	cond      0 1 1 0 1 0 0 0            Rn          Rd      (1) (1) (1) (1) 1 0 1 1 Rm	SEL<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.167	1 1 1 1 0 0 0 1 0 0 0 0 (0) (0) (0) 1 (0) (0) (0) (0) (0) (0) E (0) 0 0 0 0 (0) (0) (0) (0)	SETEND <endian_specifier>	               Cannot be conditional 	A1
+
+A8.8.168	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 1 0 0	SEV<c> 	A1
+
+A8.8.169	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	SHADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.170	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	SHADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.171	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	SHASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.172	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	SHSAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.173	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	SHSUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.174	cond      0 1 1 0 0 0 1 1            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	SHSUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.176	cond      0 0 0 1 0 0 0 0            Rd          Ra          Rm    1 M N 0    Rn	SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.177	cond      0 1 1 1 0 0 0 0            Rd          Ra          Rm    0 0 M 1    Rn	SMLAD{X}<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.178	cond      0 0 0 0 1 1 1 S           RdHi        RdLo         Rm    1 0 0 1    Rn	SMLAL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.179	cond      0 0 0 1 0 1 0 0           RdHi        RdLo         Rm    1 M N 0    Rn	SMLAL<x><y><c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.180	cond      0 1 1 1 0 1 0 0           RdHi        RdLo         Rm    0 0 M 1    Rn	SMLALD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.181	cond      0 0 0 1 0 0 1 0            Rd          Ra          Rm    1 M 0 0    Rn	SMLAW<y><c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.182	cond      0 1 1 1 0 0 0 0            Rd          Ra          Rm    0 1 M 1    Rn	SMLSD{X}<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.183	cond      0 1 1 1 0 1 0 0           RdHi        RdLo         Rm    0 1 M 1    Rn	SMLSLD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.184	cond      0 1 1 1 0 1 0 1            Rd          Ra          Rm    0 0 R 1    Rn	SMMLA{R}<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.185	cond      0 1 1 1 0 1 0 1            Rd          Ra          Rm    1 1 R 1    Rn	SMMLS{R}<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.186	cond      0 1 1 1 0 1 0 1            Rd       1 1 1 1        Rm    0 0 R 1    Rn	SMMUL{R}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.187	cond      0 1 1 1 0 0 0 0            Rd       1 1 1 1        Rm    0 0 M 1    Rn	SMUAD{X}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.188	cond      0 0 0 1 0 1 1 0            Rd      (0) (0) (0) (0) Rm    1 M N 0    Rn	SMUL<x><y><c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.189	cond      0 0 0 0 1 1 0 S           RdHi        RdLo         Rm    1 0 0 1    Rn	SMULL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.190	cond      0 0 0 1 0 0 1 0            Rd      (0) (0) (0) (0) Rm    1 M 1 0    Rn	SMULW<y><c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.191	cond      0 1 1 1 0 0 0 0            Rd       1 1 1 1        Rm    0 1 M 1    Rn	SMUSD{X}<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.193	cond      0 1 1 0 1 0 1          sat_imm         Rd          imm5    sh 0 1   Rn	SSAT<c> <Rd>, #<imm>, <Rn>{, <shift>} 	A1
+
+A8.8.194	cond      0 1 1 0 1 0 1 0 sat_imm                Rd      (1) (1) (1) (1) 0 0 1 1 Rn	SSAT16<c> <Rd>, #<imm>, <Rn> 	A1
+
+A8.8.195	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	SSAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.196	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	SSUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.197	cond      0 1 1 0 0 0 0 1            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	SSUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.199	cond      1 0 0 0 1 0 W 0            Rn                        register_list	STM<c> <Rn>{!}, <registers> 	A1
+
+A8.8.200	cond      1 0 0 0 0 0 W 0            Rn                        register_list	STMDA<c> <Rn>{!}, <registers> 	A1
+
+A8.8.201	cond      1 0 0 1 0 0 W 0            Rn                        register_list	STMDB<c> <Rn>{!}, <registers> 	A1
+
+A8.8.202	cond      1 0 0 1 1 0 W 0            Rn                        register_list	STMIB<c> <Rn>{!}, <registers> 	A1
+
+A8.8.204	cond      0 1 0 P U 0 W 0            Rn          Rt                 imm12	STR<c> <Rt>, [<Rn>{, #+/-<imm12>}]	STR<c> <Rt>, [<Rn>], #+/-<imm12>	STR<c> <Rt>, [<Rn>, #+/-<imm12>]! 	A1
+
+A8.8.205	cond      0 1 1 P U 0 W 0            Rn          Rt          imm5    type 0  Rm	STR<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!}	STR<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A1
+
+A8.8.207	cond      0 1 0 P U 1 W 0            Rn          Rt                 imm12	STRB<c> <Rt>, [<Rn>{, #+/-<imm12>}]	STRB<c> <Rt>, [<Rn>], #+/-<imm12>	STRB<c> <Rt>, [<Rn>, #+/-<imm12>]! 	A1
+
+A8.8.208	cond      0 1 1 P U 1 W 0            Rn          Rt          imm5    type 0  Rm	STRB<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!}	STRB<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A1
+
+A8.8.209	cond      0 1 0 0 U 1 1 0            Rn          Rt                 imm12	STRBT<c> <Rt>, [<Rn>], #+/-<imm12> 	A1
+
+A8.8.209	cond      0 1 1 0 U 1 1 0            Rn          Rt          imm5    type 0  Rm	STRBT<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A2
+
+A8.8.210	cond      0 0 0 P U 1 W 0            Rn          Rt        imm4H   1 1 1 1  imm4L	STRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm8>}]	STRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm8>	STRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.211	cond      0 0 0 P U 0 W 0            Rn          Rt      (0) (0) (0) (0) 1 1 1 1 Rm	STRD<c> <Rt>, <Rt2>, [<Rn>,+/-<Rm>]{!}	STRD<c> <Rt>, <Rt2>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.212	cond      0 0 0 1 1 0 0 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rt	STREX<c> <Rd>, <Rt>, [<Rn>] 	A1
+
+A8.8.213	cond      0 0 0 1 1 1 0 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rt	STREXB<c> <Rd>, <Rt>, [<Rn>] 	A1
+
+A8.8.214	cond      0 0 0 1 1 0 1 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rt	STREXD<c> <Rd>, <Rt>, <Rt2>, [<Rn>] 	A1
+
+A8.8.215	cond      0 0 0 1 1 1 1 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rt	STREXH<c> <Rd>, <Rt>, [<Rn>] 	A1
+
+A8.8.217	cond      0 0 0 P U 1 W 0            Rn          Rt        imm4H   1 0 1 1  imm4L	STRH<c> <Rt>, [<Rn>{, #+/-<imm8>}]	STRH<c> <Rt>, [<Rn>], #+/-<imm8>	STRH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	A1
+
+A8.8.218	cond      0 0 0 P U 0 W 0            Rn          Rt      (0) (0) (0) (0) 1 0 1 1 Rm	STRH<c> <Rt>, [<Rn>,+/-<Rm>]{!}	STRH<c> <Rt>, [<Rn>],+/-<Rm> 	A1
+
+A8.8.219	cond      0 0 0 0 U 1 1 0            Rn          Rt        imm4H   1 0 1 1  imm4L	STRHT<c> <Rt>, [<Rn>] {, #+/-<imm8>} 	A1
+
+A8.8.219	cond      0 0 0 0 U 0 1 0            Rn          Rt      (0) (0) (0) (0) 1 0 1 1 Rm	STRHT<c> <Rt>, [<Rn>], +/-<Rm> 	A2
+
+A8.8.220	cond      0 1 0 0 U 0 1 0            Rn          Rt                 imm12	STRT<c> <Rt>, [<Rn>] {, +/-<imm12>} 	A1
+
+A8.8.220	cond      0 1 1 0 U 0 1 0            Rn          Rt          imm5    type 0  Rm	STRT<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>} 	A2
+
+A8.8.222	cond      0 0 1 0 0 1 0 S            Rn          Rd                 imm12	SUB{S}<c> <Rd>, <Rn>, #<const> 	A1
+
+A8.8.223	cond      0 0 0 0 0 1 0 S            Rn          Rd          imm5    type 0  Rm	SUB{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.224	cond      0 0 0 0 0 1 0 S            Rn          Rd          Rs    0 type 1  Rm	SUB{S}<c> <Rd>, <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.225	cond      0 0 1 0 0 1 0 S 1 1 0 1                Rd                 imm12	SUB{S}<c> <Rd>, SP, #<const> 	A1
+
+A8.8.226	cond      0 0 0 0 0 1 0 S 1 1 0 1                Rd          imm5    type 0  Rm	SUB{S}<c> <Rd>, SP, <Rm>{, <shift>} 	A1
+
+A8.8.228	cond      1 1 1 1	           imm24	SVC<c> #<imm24> 	A1
+
+A8.8.229	cond      0 0 0 1 0 B 0 0            Rn          Rt      (0) (0) (0) (0) 1 0 0 1 Rt2	SWP{B}<c> <Rt>, <Rt2>, [<Rn>] 	A1
+
+A8.8.230	cond      0 1 1 0 1 0 1 0            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	SXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.231	cond      0 1 1 0 1 0 0 0            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	SXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.232	cond      0 1 1 0 1 0 1 1            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	SXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.233	cond      0 1 1 0 1 0 1 0 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	SXTB<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.234	cond      0 1 1 0 1 0 0 0 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	SXTB16<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.235	cond      0 1 1 0 1 0 1 1 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	SXTH<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.237	cond      0 0 1 1 0 0 1 1            Rn      (0) (0) (0) (0)        imm12	TEQ<c> <Rn>, #<const> 	A1
+
+A8.8.238	cond      0 0 0 1 0 0 1 1            Rn      (0) (0) (0) (0) imm5    type 0  Rm	TEQ<c> <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.239	cond      0 0 0 1 0 0 1 1            Rn      (0) (0) (0) (0) Rs    0 type 1  Rm	TEQ<c> <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.240	cond      0 0 1 1 0 0 0 1            Rn      (0) (0) (0) (0)        imm12	TST<c> <Rn>, #<const> 	A1
+
+A8.8.241	cond      0 0 0 1 0 0 0 1            Rn      (0) (0) (0) (0) imm5    type 0  Rm	TST<c> <Rn>, <Rm>{, <shift>} 	A1
+
+A8.8.242	cond      0 0 0 1 0 0 0 1            Rn      (0) (0) (0) (0) Rs    0 type 1  Rm	TST<c> <Rn>, <Rm>, <type> <Rs> 	A1
+
+A8.8.243	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	UADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.244	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	UADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.245	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	UASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.246	cond      0 1 1 1 1 1 1          widthm1         Rd           lsb    1 0 1    Rn	UBFX<c> <Rd>, <Rn>, #<lsb>, #<width> 	A1
+
+A8.8.247	1 1 1 0 0 1 1 1 1 1 1 1	  imm12               1 1 1 1   imm4	UDF<c> #<imm16> 	A1
+
+A8.8.248	cond      0 1 1 1 0 0 1 1            Rd      (1) (1) (1) (1) Rm    0 0 0 1    Rn	UDIV<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.249	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	UHADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.250	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	UHADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.251	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	UHASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.252	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	UHSAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.253	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	UHSUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.254	cond      0 1 1 0 0 1 1 1            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	UHSUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.255	cond      0 0 0 0 0 1 0 0           RdHi        RdLo         Rm    1 0 0 1    Rn	UMAAL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.256	cond      0 0 0 0 1 0 1 S           RdHi        RdLo         Rm    1 0 0 1    Rn	UMLAL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.257	cond      0 0 0 0 1 0 0 S           RdHi        RdLo         Rm    1 0 0 1    Rn	UMULL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	A1
+
+A8.8.258	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 0 0 0 1 Rm	UQADD16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.259	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 1 0 0 1 Rm	UQADD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.260	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 0 0 1 1 Rm	UQASX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.261	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	UQSAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.262	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	UQSUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.263	cond      0 1 1 0 0 1 1 0            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	UQSUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.264	cond      0 1 1 1 1 0 0 0            Rd       1 1 1 1        Rm    0 0 0 1    Rn	USAD8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.265	cond      0 1 1 1 1 0 0 0            Rd          Ra          Rm    0 0 0 1    Rn	USADA8<c> <Rd>, <Rn>, <Rm>, <Ra> 	A1
+
+A8.8.266	cond      0 1 1 0 1 1 1          sat_imm         Rd          imm5    sh 0 1   Rn	USAT<c> <Rd>, #<imm5>, <Rn>{, <shift>} 	A1
+
+A8.8.267	cond      0 1 1 0 1 1 1 0 sat_imm                Rd      (1) (1) (1) (1) 0 0 1 1 Rn	USAT16<c> <Rd>, #<imm4>, <Rn> 	A1
+
+A8.8.268	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 0 1 0 1 Rm	USAX<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.269	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 0 1 1 1 Rm	USUB16<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.270	cond      0 1 1 0 0 1 0 1            Rn          Rd      (1) (1) (1) (1) 1 1 1 1 Rm	USUB8<c> <Rd>, <Rn>, <Rm> 	A1
+
+A8.8.271	cond      0 1 1 0 1 1 1 0            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	UXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.272	cond      0 1 1 0 1 1 0 0            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	UXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.273	cond      0 1 1 0 1 1 1 1            Rn          Rd      rotate (0) (0) 0 1 1 1 Rm	UXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	A1
+
+A8.8.274	cond      0 1 1 0 1 1 1 0 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	UXTB<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.275	cond      0 1 1 0 1 1 0 0 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	UXTB16<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.276	cond      0 1 1 0 1 1 1 1 1 1 1 1                Rd      rotate (0) (0) 0 1 1 1 Rm	UXTH<c> <Rd>, <Rm>{, <rotation>} 	A1
+
+A8.8.424	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 1 0	WFE<c> 	A1
+
+A8.8.425	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 1 1	WFI<c> 	A1
+
+A8.8.426	cond      0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 0 1	YIELD<c> 	A1
+
+B9.3.2	 1 1 1 1 0 0 0 1 0 0 0 0 imod M 0 (0) (0) (0) (0) (0) (0) (0) A I F 0          mode	CPS<effect> <iflags>{, #<mode>}	CPS #<mode> 	A1
+
+B9.3.3	cond      0 0 0 1 0 1 1 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) 0 1 1 0 (1) (1) (1) (0)	ERET<c> 	A1
+
+B9.3.4	cond      0 0 0 1 0 1 0 0                      imm12               0 1 1 1   imm4	HVC #<imm> 	A1
+
+B9.3.5	cond      1 0 0 P U 1 W 1            Rn       1                 register_list	LDM{<amode>}<c> <Rn>{!}, <registers_with_pc>^ 	A1
+
+B9.3.6	cond      1 0 0 P U 1 (0) 1          Rn       0                 register_list	LDM{<amode>}<c> <Rn>, <registers_without_pc>^ 	A1
+
+B9.3.8	cond      0 0 0 1 0 R 0 0 (1) (1) (1) (1)        Rd      (0) (0) 0 (0) 0 0 0 0 (0) (0) (0) (0)	MRS<c> <Rd>, <spec_reg> 	A1
+
+B9.3.9	cond      0 0 0 1 0 R 0 0            M1          Rd      (0) (0) 1 M 0 0 0 0 (0) (0) (0) (0)	MRS<c> <Rd>, <banked_reg> 	A1
+
+B9.3.10	cond      0 0 0 1 0 R 1 0            M1      (1) (1) (1) (1) (0) (0) 1 M 0 0 0 0 Rn	MSR<c> <banked_reg>, <Rn> 	A1
+
+B9.3.11	cond      0 0 1 1 0 R 1 0           mask     (1) (1) (1) (1)        imm12	MSR<c> <spec_reg>, #<const> 	A1
+
+B9.3.12	cond      0 0 0 1 0 R 1 0           mask     (1) (1) (1) (1) (0) (0) 0 (0) 0 0 0 0 Rn	MSR<c> <spec_reg>, <Rn> 	A1
+
+B9.3.13	1 1 1 1 1 0 0 P U 0 W 1                 Rn      (0) (0) (0) (0) (1) (0) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0)	RFE{<amode>} <Rn>{!} 	A1
+
+B9.3.14	cond      0 0 0 1 0 1 1 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) 0 1 1 1 imm4	SMC<c> #<imm4> 	A1
+
+B9.3.16	 1 1 1 1 1 0 0 P U 1 W 0 (1) (1) (0) (1) (0) (0) (0) (0) (0) (1) (0) (1) (0) (0) (0) mode	SRS{<amode>} SP{!}, #<mode> 	A1
+
+B9.3.17	cond      1 0 0 P U 1 (0) 0          Rn                        register_list	STM{<amode>}<c> <Rn>, <registers>^ 	A1
+
+B9.3.20	cond      0 0 1     opcode     1     Rn       1 1 1 1               imm12	<opc1>S<c> PC, <Rn>, #<const>	<opc2>S<c> PC, #<const> 	A1
+
+B9.3.20	cond      0 0 0     opcode     1     Rn       1 1 1 1        imm5    type 0  Rm	<opc1>S<c> PC, <Rn>, <Rm>{, <shift>}	<opc2>S<c> PC, <Rm>{, <shift>}	<opc3>S<c> PC, <Rn>, #<const>	RRXS<c> PC, <Rn> 	A2
+
