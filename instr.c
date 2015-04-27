@@ -304,6 +304,83 @@ unsigned int check_single_data_xfer_imm(uint32_t instr)
 	return new_pc;
 }
 
+unsigned int check_media_instr(uint32_t instr)
+{
+	unsigned int new_pc;
+	switch (bits(instr, 24, 23))
+	{
+	case 0: // parallel add&subtr
+		// unsigned
+		switch (bits(instr, 21, 20))
+		{
+		case 1:
+			switch (bits(instr, 7, 5))
+			{
+			case 0: // SADD/UADD
+				// if bit 22 = 1, unsigned
+				break;
+			case 1: //
+
+				break;
+			case 2: //
+
+				break;
+			case 3: //
+
+				break;
+			case 4: //
+
+				break;
+			case 5: //
+
+				break;
+			case 6: //
+
+				break;
+			case 7: //
+
+				break;
+			default:
+				// Undefined
+				break;
+			}
+			break;
+		case 2:
+			break;
+		case 3:
+			break;
+		default:
+			// Undefined
+			break;
+		}
+		break;
+	case 1: // packing, saturation, reversal
+		break;
+	case 2: // signed multiply
+		break;
+	case 3:
+		switch (bits(instr, 22, 21))
+		{
+		case 0:
+			// USAD(A)8
+			break;
+		case 1:
+			// SBFX
+			break;
+		case 2:
+			// BFC/BFI
+			break;
+		case 3:
+			// UBFX/UDF
+			break;
+		}
+		break;
+	default:
+		// logically impossible
+		break;
+	}
+	return new_pc;
+}
 unsigned int check_branching(unsigned int address)
 {
 
@@ -464,6 +541,7 @@ unsigned int check_branching(unsigned int address)
 			if (instr & INSTR_BIT4_MASK)
 			{
 				// Media instructions / undef
+				new_pc= check_media_instr(instr);
 			}
 			else
 			{
