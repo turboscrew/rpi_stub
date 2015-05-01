@@ -57,12 +57,19 @@
 // places for opcodes that we need to actually execute
 extern uint32_t sdt_imm;
 extern uint32_t mrs_regb;
-
+extern uint32_t media_paraddsub;
+extern uint32_t media_signext;
+extern uint32_t executed_instruction;
 // some scratchpads
 uint32_t tmp1;
 uint32_t tmp2;
 uint32_t tmp3;
 uint32_t tmp4;
+int32_t itmp1;
+int32_t itmp2;
+int16_t  htmp1;
+int16_t  htmp2;
+uint16_t uhtmp;
 uint64_t dtmp;
 uint32_t *iptr;
 
@@ -170,6 +177,47 @@ int will_branch(uint32_t instr)
 	}
 	return 0;
 }
+
+// execute instruction with edited registers
+// registers used are r0, r1, r2 and r3
+// the original registers are given in the parameters
+// r0 is the number of the register whose content goes to r0 etc.
+// the register
+// The way they are used is upto the edited instruction
+// the used registers are returned in the 'tmp'-variables
+// r0 -> tmp1, r1->tmp2, ...
+void exec_instr(uint32_t instr, uint32_t r0, uint32_t r1,
+			uint32_t r2, uint32_t r3)
+{
+	tmp1 = rpi2_reg_context.storage[r0]; // r0
+	tmp2 = rpi2_reg_context.storage[r1]; // r1
+	tmp3 = rpi2_reg_context.storage[r2]; // r2
+	tmp4 = rpi2_reg_context.storage[r3]; // r3
+	iptr = (uint32_t *) executed_instruction;
+	*iptr = tmp4;
+	asm(
+		"push {r0, r1, r2, r3, r4}\n\t"
+		"ldr r4, =tmp1\n\t"
+		"ldr r0, [r4]\n\t"
+		"ldr r4, =tmp2\n\t"
+		"ldr r1, [r4]\n\t"
+		"ldr r4, =tmp3\n\t"
+		"ldr r2, [r4]\n\t"
+		"ldr r4, =tmp4\n\t"
+		"ldr r3, [r4]\n\t"
+		"executed_instruction: .word 0 @ execute instr with our registers\n\t"
+		"ldr r4, =tmp1\n\t"
+		"str r0, [r4] @ return results to tmps\n\t"
+		"ldr r4, =tmp2\n\t"
+		"str r1, [r4] @ return results to tmps\n\t"
+		"ldr r4, =tmp3\n\t"
+		"str r2, [r4] @ return results to tmps\n\t"
+		"ldr r4, =tmp4\n\t"
+		"str r3, [r4] @ return results to tmps\n\t"
+		"pop {r0, r1, r2, r3, r4}\n\t"
+		);
+}
+
 
 // arith & log - so many different instructions that it's better
 // to edit the instruction and execute it to find out effects
@@ -304,57 +352,350 @@ unsigned int check_single_data_xfer_imm(uint32_t instr)
 	return new_pc;
 }
 
+// next address for media instructions
 unsigned int check_media_instr(uint32_t instr)
 {
-	unsigned int new_pc;
+	unsigned int new_pc = rpi2_reg_context.reg.r15;
+
+	// These need to be decoded far enough to tell whether instruction is
+	// one of these or not. If not, it causes UND-exception.
 	switch (bits(instr, 24, 23))
 	{
-	case 0: // parallel add&subtr
-		// unsigned
-		switch (bits(instr, 21, 20))
+	case 0: // parallel add&subtr (Rd: bits 15-12, Rn:19-16, Rm:3-0)
+		// unify all these with execution (if Rd = PC)
+		// bit 22=1: unsigned, bits 21,20: 00=undef, 01=basic, 10=Q and 11=H
+		// SADD16/UADD16/QADD16/UQADD16/SHADD16/UHADD16
+		// SASX/UASX/QASX/UQASX/SHASX/UHASX
+		// SSAX/USAX/QSAX/UQSAX/SHSAX/UHSAX
+		// SSUB16/USUB16/QSUB16/UQSUB16/SHSUB16/UHSUB16
+		// SADD8/UADD8/QADD8/UQADD8/SHADD8/UHADD8
+		// SSUB8/USUB8/QSUB8/UQSUB8/SHSUB8/UHSUB8
+		if(bits(instr, 21, 20) == 0)
 		{
-		case 1:
-			switch (bits(instr, 7, 5))
-			{
-			case 0: // SADD/UADD
-				// if bit 22 = 1, unsigned
-				break;
-			case 1: //
-
-				break;
-			case 2: //
-
-				break;
-			case 3: //
-
-				break;
-			case 4: //
-
-				break;
-			case 5: //
-
-				break;
-			case 6: //
-
-				break;
-			case 7: //
-
-				break;
-			default:
-				// Undefined
-				break;
-			}
+			new_pc = INSTR_ADDR_UNDEF;
 			break;
-		case 2:
+		}
+		/*
+		if (bits(instr, 11, 8) != 1)
+		{
+			new_pc = INSTR_ADDR_UNPRED;
+		}
+		*/
+		if ((bits(instr, 7, 5) == 5) || (bits(instr, 7, 5) == 6))
+		{
+			new_pc = INSTR_ADDR_UNDEF;
 			break;
-		case 3:
-			break;
-		default:
-			// Undefined
-			break;
+		}
+		if (bits(instr, 15, 12) == 15) // Rd is PC
+		{
+			// media_paraddsub
+			// privileged mode - both reg and banked reg
+			tmp1 = rpi2_reg_context.storage[bits(instr, 19, 16)]; // Rn
+			tmp2 = rpi2_reg_context.storage[bits(instr, 15, 12)]; // Rd
+			tmp3 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // Rm
+			tmp4 = (instr & 0xfff00ff0) | (1 << 12); // edit Rd = r1, Rn = r0
+			tmp4 = instr | 2; // edit Rm = r2
+			iptr = (uint32_t *) media_paraddsub;
+			*iptr = tmp4;
+			asm(
+				"push {r0, r1, r2, r3}\n\t"
+				"ldr r3, =tmp1 @ Rn\n\t"
+				"ldr r0, [r3]\n\t"
+				"ldr r3, =tmp2 @ Rd\n\t"
+				"ldr r1, [r3]\n\t"
+				"ldr r3, =tmp3 @ Rm\n\t"
+				"ldr r2, [r3]\n\t"
+				"media_paraddsub: .word 0 @ execute instr with our registers\n\t"
+				"ldr r0, =tmp4\n\t"
+				"str r1, [r0] @ store result to tmp4\n\t"
+				"pop {r0, r1, r2, r3}\n\t"
+				);
+			new_pc = (unsigned int) tmp4;
 		}
 		break;
 	case 1: // packing, saturation, reversal
+		if (bits(instr, 7, 5) == 3)
+		{
+			// Instructions handled here:
+			// SXTAB16, SXTAH, UXTAB16, UXTAB, UXTAH
+			// SXTB16, SXTB, SXTH, UXTB16, UXTB, UXTH
+			/*
+			if (bits(instr, 9, 8) != 0)
+			{
+				new_pc = INSTR_ADDR_UNPRED;
+				break;
+			}
+			*/
+			switch (bits(instr, 22, 20))
+			{
+			case 1:
+			case 5:
+				new_pc = INSTR_ADDR_UNDEF;
+				break;
+			case 2:
+				if (bits(instr, 19, 16) != 15)
+				{
+					new_pc = INSTR_ADDR_UNDEF;
+					break;
+				}
+				// fallthrough
+			case 0:
+			case 3:
+			case 4:
+			case 6:
+			case 7:
+				if (bits(instr, 15, 12) != 15) // Rd is not PC
+				{
+					break;
+				}
+				// here Rn can't be PC. Instead it's a different instruction
+				if  (bits(instr, 19, 16) == 15)
+				{
+					tmp4 = (instr & 0xffff0ff0) | (1 << 12); // edit Rd = r1, no Rn
+				}
+				else
+				{
+					tmp4 = (instr & 0xfff00ff0) | (1 << 12); // edit Rd = r1, Rn = r0
+				}
+				tmp4 = instr | 2; // edit Rm = r2
+				tmp1 = rpi2_reg_context.storage[bits(instr, 19, 16)]; // Rn
+				tmp2 = rpi2_reg_context.storage[bits(instr, 15, 12)]; // Rd
+				tmp3 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // Rm
+				iptr = (uint32_t *) media_signext;
+				*iptr = tmp4;
+				asm(
+					"push {r0, r1, r2, r3}\n\t"
+					"ldr r3, =tmp1 @ Rn, not used in all instructions\n\t"
+					"ldr r0, [r3]\n\t"
+					"ldr r3, =tmp2 @ Rd\n\t"
+					"ldr r1, [r3]\n\t"
+					"ldr r3, =tmp3 @ Rm\n\t"
+					"ldr r2, [r3]\n\t"
+					"media_signext: .word 0 @ execute instr with our registers\n\t"
+					"ldr r0, =tmp4\n\t"
+					"str r1, [r0] @ store result to tmp4\n\t"
+					"pop {r0, r1, r2, r3}\n\t"
+					);
+				new_pc = tmp4;
+				break;
+			default:
+				// logically impossible
+				break;
+			}
+		}
+		else if (bits(instr, 6, 5) == 1)
+		{
+			switch (bits(instr, 22, 20))
+			{
+			case 0: // SEL
+				if (bit(instr, 7) == 0)
+				{
+					new_pc = INSTR_ADDR_UNDEF;
+					break;
+				}
+
+				if ((bits(instr, 19, 16) != 0xf) || bits(instr, 11, 8 != 0xf))
+				{
+					new_pc = INSTR_ADDR_UNPRED;
+					break;
+				}
+
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+					/*
+					tmp1 = bits(instr, 19, 16); // Rn
+					tmp2 = bits(instr, 15, 12); // Rd
+					tmp3 = bits(instr, 3, 0); // Rm
+					tmp4 = 0; // not used
+					instr &= 0xfff00ff0; // edit our registers into the instruction
+					instr |= 1 << 12; // Rn = r0, Rd = r1
+					instr |= 2; // Rm = r2
+					exec_instr(instr, tmp1, tmp2, tmp3, tmp4);
+					new_pc = tmp2;
+					*/
+					tmp1 = rpi2_reg_context.storage[bits(instr, 19, 16)];
+					tmp2 = rpi2_reg_context.storage[bits(instr, 3, 0)];
+					tmp3 = rpi2_reg_context.reg.cpsr;
+					tmp4 = 0;
+					tmp4 |= ((bit(tmp3,19)?tmp1:tmp2) & 0xff000000);
+					tmp4 |= ((bit(tmp3,18)?tmp1:tmp2) & 0x00ff0000);
+					tmp4 |= ((bit(tmp3,17)?tmp1:tmp2) & 0x0000ff00);
+					tmp4 |= ((bit(tmp3,16)?tmp1:tmp2) & 0x000000ff);
+					new_pc = (unsigned int) tmp4;
+				}
+				break;
+			case 2: // SSAT16
+				if (bit(instr, 7) == 1)
+				{
+					new_pc = INSTR_ADDR_UNDEF;
+					break;
+				}
+
+				if (bits(instr, 11, 8) != 0xf)
+				{
+					new_pc = INSTR_ADDR_UNPRED;
+					break;
+
+				}
+
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+					htmp1 = (int16_t)(1 << (bits(instr, 19, 16) - 1)); // 2^(n-1)
+					tmp1 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+
+					// upper half
+					htmp2 = (int16_t)((tmp1 & 0xffff0000) >> 16);
+					if (htmp2 > (htmp1 - 1)) htmp2 = htmp1 - 1;
+					else if (htmp2 < -htmp1) htmp2 = -htmp1;
+					// 16-bit signed as a bit field into 32-bit unsigned
+					tmp2 = (uint32_t)(uint16_t) htmp2;
+					tmp2 <<= 16; // back to the place
+					new_pc = tmp2;
+
+					// lower half
+					htmp2 = (int16_t)(tmp1 & 0x0000ffff);
+					if (htmp2 > (htmp1 - 1)) htmp2 = htmp1 - 1;
+					else if (htmp2 < -htmp1) htmp2 = -htmp1;
+					// 16-bit signed as a bit field into 32-bit unsigned
+					tmp2 = (uint32_t)(uint16_t) htmp2;
+					tmp2 &= 0xffff;
+					new_pc |= tmp2;
+				}
+				break;
+			case 3: // REV/REV16
+				if ((bits(instr, 19, 16) != 0xf) || bits(instr, 11, 8 != 0xf))
+				{
+					new_pc = INSTR_ADDR_UNPRED;
+					break;
+				}
+
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+					tmp1 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rm)
+					if (bit(instr, 7) == 0)
+					{
+						// REV
+						tmp2 = (tmp1 & 0xff000000)  >> 24; // result lowest
+						tmp2 |= (tmp1 & 0x00ff0000) >> 8;
+						tmp2 |= (tmp1 & 0x0000ff00) << 8;
+						tmp2 |= (tmp1 & 0x000000ff) << 24; // result highest
+					}
+					else
+					{
+						// REV16
+						tmp2 = (tmp1 & 0xff000000)  >> 8;
+						tmp2 |= (tmp1 & 0x00ff0000) << 8; // result highest
+						tmp2 |= (tmp1 & 0x0000ff00) >> 8; // result lowest
+						tmp2 |= (tmp1 & 0x000000ff) << 8;
+					}
+					new_pc = tmp2;
+				}
+				break;
+			case 6: // USAT16
+				if (bit(instr, 7) == 1)
+				{
+					new_pc = INSTR_ADDR_UNDEF;
+					break;
+				}
+
+				if (bits(instr, 11, 8) != 0xf)
+				{
+					new_pc = INSTR_ADDR_UNPRED;
+					break;
+
+				}
+
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+					htmp1 = (int16_t)(1 << (bits(instr, 19, 16) - 1)); // 2^(n-1)
+					tmp1 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+
+					htmp2 = (int16_t)((tmp1 & 0xffff0000) >> 16);
+					if (htmp2 > (htmp1 - 1))  htmp2 = htmp1 - 1;
+					else if (htmp2 < 0) htmp2 = 0;
+					tmp2 = (uint32_t)(uint16_t)htmp2;
+					new_pc = tmp2 << 16; // back to the place
+
+					htmp2 = (int16_t)(tmp1 & 0x0000ffff);
+					if (htmp2 > (htmp1 - 1))  htmp2 = htmp1 - 1;
+					else if (htmp2 < 0) htmp2 = 0;
+					tmp2 = (uint32_t)(uint16_t)htmp2;
+					new_pc |= tmp2 & 0xffff; // back to the place
+				}
+				break;
+			case 7: // RBIT/REVSH
+				if ((bits(instr, 19, 16) != 0xf) || bits(instr, 11, 8 != 0xf))
+				{
+					new_pc = INSTR_ADDR_UNPRED;
+					break;
+				}
+
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+					if (bit(instr, 7) == 0)
+					{
+						// RBIT
+						tmp1 = rpi2_reg_context.reg.r15;
+						// swap odd and even bits
+						tmp1 = ((tmp1 & 0xaaaaaaaa) >> 1) | ((tmp1 & 0x55555555) << 1);
+						// swap bit pairs
+						tmp1 = ((tmp1 & 0xcccccccc) >> 2) | ((tmp1 & 0x33333333) << 2);
+						// swap nibbles
+						tmp1 = ((tmp1 & 0xf0f0f0f0) >> 4) | ((tmp1 & 0x0f0f0f0f) << 4);
+						// swap bytes
+						tmp1 = ((tmp1 & 0xff00ff00) >> 8) | ((tmp1 & 0x00ff00ff) << 8);
+						// swap half words
+						tmp1 = ((tmp1 & 0xffff0000) >> 16) | ((tmp1 & 0x0000ffff) << 16);
+						new_pc = tmp1;
+					}
+					else
+					{
+						// REVSH
+						// Rm[15:8] -> Rd[7:0], Rm[7:0] -> Rd[31:8](sign extended)
+					}
+				}
+				break;
+			default:
+				// undef
+				new_pc = INSTR_ADDR_UNDEF;
+				break;
+			}
+		}
+		else if (bit(instr, 5) == 0)
+		{
+			if (bits(instr, 22, 20) == 0)
+			{
+				// PKHBT
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+
+				}
+			}
+			else if (bits(instr, 22, 21) == 1)
+			{
+				// SSAT
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+
+				}
+			}
+			else if (bits(instr, 22, 21) == 3)
+			{
+				// USAT
+				if (bits(instr, 11, 8) == 15) // Rd = PC
+				{
+
+				}
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
+		}
+		else
+		{
+			new_pc = INSTR_ADDR_UNDEF;
+		}
 		break;
 	case 2: // signed multiply
 		break;
@@ -381,6 +722,8 @@ unsigned int check_media_instr(uint32_t instr)
 	}
 	return new_pc;
 }
+
+// get next PC value after executing the instruction in this address
 unsigned int check_branching(unsigned int address)
 {
 
