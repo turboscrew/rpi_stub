@@ -348,7 +348,7 @@ unsigned int check_single_data_xfer_imm(uint32_t instr)
 // next address for media instructions
 unsigned int check_media_instr(uint32_t instr)
 {
-	unsigned int new_pc = rpi2_reg_context.reg.r15;
+	uint32_t new_pc = rpi2_reg_context.reg.r15;
 
 	// These need to be decoded far enough to tell whether instruction is
 	// one of these or not. If not, it causes UND-exception.
@@ -829,16 +829,6 @@ unsigned int check_media_instr(uint32_t instr)
 			{
 				if (bits(instr, 19, 16) == 15) // Rd = PC
 				{
-					/*
-					if SInt(R[m]) == 0 then
-						if IntegerZeroDivideTrappingEnabled() then
-							GenerateIntegerZeroDivide();
-						else
-							result = 0;
-					else
-						result = RoundTowardsZero(SInt(R[n]) / SInt(R[m]));
-					R[d] = result<31:0>;
-					*/
 					// Check for division by zero
 					tmp1 = rpi2_reg_context.storage[bits(instr, 11, 8)]; // (Rm)
 					if (tmp1 == 0)
@@ -858,27 +848,6 @@ unsigned int check_media_instr(uint32_t instr)
 						new_pc = tmp1;
 					}
 
-/*
-					itmp1 = (int32_t)rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
-					itmp2 = (int32_t)rpi2_reg_context.storage[bits(instr, 11, 8)]; // (Rm)
-					if (itmp2 == 0)
-					{
-						// division by zero
-						new_pc = INSTR_ADDR_NONE;
-					}
-					else
-					{
-						// not to lose bits when made signed
-						// shifted to make rounding possible
-						lltmp = (((int64_t)itmp1)<<16);
-						// ERROR: undefined reference to `__aeabi_ldivmod'
-						lltmp /= ((int64_t)itmp2);
-						// round towards zero
-						if (lltmp > (int64_t)0) lltmp -= (int64_t)0x8000;
-						else lltmp += (int64_t)0x8000;
-						new_pc = (uint32_t)((lltmp >> 16) & 0xffffffff);
-					}
-*/
 				}
 			}
 			else
@@ -909,26 +878,6 @@ unsigned int check_media_instr(uint32_t instr)
 						exec_instr(tmp4, tmp3, tmp1, tmp2, tmp2);
 						new_pc = tmp1;
 					}
-/*
-					tmp1 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
-					tmp2 = rpi2_reg_context.storage[bits(instr, 11, 8)]; // (Rm)
-					if (tmp2 == 0)
-					{
-						// division by zero
-						new_pc = INSTR_ADDR_NONE;
-					}
-					else
-					{
-						// not to lose bits when made signed
-						// shifted to make rounding possible
-						lltmp = (int64_t)(((uint64_t)tmp1)<<16);
-						// ERROR: undefined reference to `__aeabi_ldivmod'
-						lltmp /= ((int64_t)(uint64_t) tmp2);
-						// round towards zero
-						lltmp -= (int64_t)0x8000;
-						new_pc = (uint32_t)(lltmp >> 16);
-					}
-*/
 				}
 			}
 			else
@@ -1011,17 +960,130 @@ unsigned int check_media_instr(uint32_t instr)
 	case 3:
 		switch (bits(instr, 22, 21))
 		{
-		case 0:
-			// USAD(A)8
+		case 0: // USAD(A)8
+			if ((bit(instr, 20) == 0) && (bits(instr, 7, 5) == 0))
+			{
+				if (bits(instr, 19, 16) == 15) // PC
+				{
+					tmp1 = rpi2_reg_context.storage[bits(instr, 11, 8)]; // (Rm)
+					tmp2 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+					// Rn - Rm
+					// absolute differences
+					tmp3 = 0;
+					for (tmp4 = 0; tmp4 < 4; tmp4++)
+					{
+						htmp1 = (int16_t)(uint16_t)((tmp1 >> (8*tmp4)) & 0xff);
+						htmp2 = (int16_t)(uint16_t)((tmp2 >> (8*tmp4)) & 0xff);
+						if (htmp2 < htmp1) htmp1 -= htmp2;
+						else htmp1 = htmp2 - htmp1;
+						tmp3 += (uint32_t)(uint16_t) htmp1;
+					}
+
+					if (bits(instr, 15, 12) != 15)
+					{
+						// USADA8 (=USAD8 with Ra)
+						tmp1 = rpi2_reg_context.storage[bits(instr, 15, 12)]; // (Ra)
+						tmp3 += tmp1;
+					}
+					new_pc = tmp3;
+				}
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
 			break;
 		case 1:
 			// SBFX
+			if (bits(instr, 6, 5) == 2)
+			{
+				if (bits(instr, 15,12) == 15) // Rd = PC
+				{
+					tmp1 = bits(instr, 20, 16); // width
+					tmp2 = bits(instr, 11, 7); // lsb
+					tmp1 += tmp2; // msb
+					tmp3 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+					tmp4 = bits(tmp3, tmp1, tmp2);
+					// sign extend
+					if (bit(tmp3, tmp1) == 1)
+					{
+						// for all bits above msb
+						for (tmp2 = 31; tmp2 > tmp1; tmp2--)
+						{
+							tmp4 |= (1 << tmp2);
+						}
+					}
+					new_pc = tmp4;
+				}
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
 			break;
 		case 2:
 			// BFC/BFI
+			if (bits(instr, 6, 5) == 0)
+			{
+				if (bits(instr, 15, 12) == 15) // Rd = PC
+				{
+					tmp1 = bits(instr, 20, 16); // msb
+					tmp2 = bits(instr, 11, 7); // lsb
+					if (tmp2 > tmp1)
+					{
+						new_pc = INSTR_ADDR_UNPRED;
+						break;
+					}
+					// make bitmask
+					tmp3 = (~0) << (tmp1 - tmp2);
+					tmp3 = (~tmp3) << tmp2; // bitmask
+					// clear bits in Rd
+					tmp4 = rpi2_reg_context.storage[bits(instr, 15, 12)]; // (Rn)
+					tmp4 &= (~tmp3); // result of BFC
+
+					if (bits(instr, 3, 0) != 15) // BFI
+					{
+						tmp1 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+						tmp1 &= tmp3;
+						tmp4 |= tmp1;
+					}
+					new_pc = tmp4;
+				}
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
 			break;
 		case 3:
 			// UBFX/UDF
+			if (bits(instr, 6, 5) == 2)
+			{
+				// UBFX
+				if (bits(instr, 15, 12) == 15) // Rd = PC
+				{
+					tmp1 = bits(instr, 20, 16); // width
+					tmp2 = bits(instr, 11, 7); // lsb
+					tmp1 += tmp2; // msb
+					if (tmp2 > tmp1)
+					{
+						new_pc = INSTR_ADDR_UNPRED;
+						break;
+					}
+					tmp3 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
+					new_pc = bits(tmp3, tmp1, tmp2);
+				}
+			}
+			else if (bit(instr, 20) && (bits(instr, 7, 5) == 7)
+					&& (bits(instr, 31, 28) == 14))
+			{
+				// UDF - Permanently Undefined
+				new_pc = INSTR_ADDR_UNDEF;
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
 			break;
 		}
 		break;
@@ -1029,7 +1091,7 @@ unsigned int check_media_instr(uint32_t instr)
 		// logically impossible
 		break;
 	}
-	return new_pc;
+	return (unsigned int) new_pc;
 }
 
 // get next PC value after executing the instruction in this address
