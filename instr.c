@@ -346,6 +346,8 @@ unsigned int check_single_data_xfer_imm(uint32_t instr)
 }
 
 // next address for media instructions
+// TODO: maybe this should be broken into smaller functions
+// first level cases with instruction groups are good candidates
 unsigned int check_media_instr(uint32_t instr)
 {
 	uint32_t new_pc = rpi2_reg_context.reg.r15;
@@ -967,7 +969,6 @@ unsigned int check_media_instr(uint32_t instr)
 				{
 					tmp1 = rpi2_reg_context.storage[bits(instr, 11, 8)]; // (Rm)
 					tmp2 = rpi2_reg_context.storage[bits(instr, 3, 0)]; // (Rn)
-					// Rn - Rm
 					// absolute differences
 					tmp3 = 0;
 					for (tmp4 = 0; tmp4 < 4; tmp4++)
@@ -1105,7 +1106,7 @@ unsigned int check_branching(unsigned int address)
 
 	if ((instr & INSTR_COND_MASK) == INSTR_COND_NV)
 	{
-		// check unconditionals (= specials)
+		// check specials (condition code NV)
 		return new_pc;
 	}
 
@@ -1117,6 +1118,7 @@ unsigned int check_branching(unsigned int address)
 
 	switch (instr & INSTR_CLASS_MASK)
 	{
+		// TODO: lots of LD-instructions missing (LDRD, LDREX, ...)
 		case INSTR_C0:
 			switch (instr & INSTR_SC_MASK)
 			{

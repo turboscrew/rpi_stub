@@ -41,8 +41,8 @@ loop$:
 ldr r7,[r4]
 str	r7,[r6]
 
-add	r4, r4, #1
-add	r6, r6, #1
+add	r4, r4, #4
+add	r6, r6, #4
 cmp r4, r5
 bmi	loop$
 
