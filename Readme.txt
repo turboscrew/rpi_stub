@@ -1,3 +1,5 @@
+WORK IN PROGRESS - DOESN'T WORK YET.
+
 This is my very first RPi(2) project ever, and first ever project that
 I have to deal with ARM core (and assembly).
 This project started in the first days of april 2015.
