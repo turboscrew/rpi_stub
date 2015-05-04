@@ -389,7 +389,7 @@ code against the status flags. Then we need only one breakpoint address.
 
 instruction bits:
 xxxxgggf fyyyyyyy yyyyyyyy yyyyyyyy
-where xxxx is the condition code and gggg the 'new' class code.
+where xxxx is the condition code and ggg the class code.
 
 condition code: 
 if xxxx is NV special instruction (Unconditionals)
@@ -403,6 +403,18 @@ else decode
 Here is one way of ARM instruction decoding as pseudocode.
 Seeing all the bit patterns of instructions at once might reveal better ways.
 
+UPDATE: After creating a table of all ARM instruction encodings, the table showed
+	that the pseudocode derived from the above doesn't work!
+	
+	The bits 27 - 25 (and only them) run as constants through the whole instruction
+	table They are the only bits that can be counted on in all situations.
+	if bits 27 - 25 = 0, the only 'constant' bit running through the whole subset
+	is bit 4. If bit 4 = 0, then bit 24 is the only 'constant' (excluding instructions
+	in ARMv7-A/R ARM B9.3.20).
+	
+	The old pseudocode is replaced by a new one that's based on the instruction table.
+	
+
 // This might be useful - there is no ^^ in C.
 inline int log_xor(int val1, int val2)
 {
@@ -410,296 +422,205 @@ inline int log_xor(int val1, int val2)
 }
 
 
-PROCEDURE decode
-	get bits 31 to 28 from the instruction (the condition-field)
-	IF bits 31 to 28 THEN
-		CALL Decode_Unconditional_instructions
-		RETURN
-	ENDIF
-	get bits 27 to 25 from the instruction
-	CASEOF (bits 27 to 25)
-		CASE 0
-			get bits 24 to 23 from the instruction
-			get bit 4 from the instruction
-			CASEOF (bits 24 to 23)
-				CASE 1
-					IF bit 4 is '1' THEN
-						decode MULT
-					ELSE
-						CALL decode_arith_logic_reg
-					ENDIF
-				ENDCASE
-				
-				CASE 2
-					IF bit 4 is '1' THEN
-						get bit 21 from the instruction
-						IF bit 21 is '1' THEN
-							decode MSR
-						ELSE
-							decode SWP(B)
-						ENDIF
-					ELSE
-						get bit 20 from the instruction
-						IF bit 20 is '0' THEN
-							decode MRS
-						ELSE
-							CALL decode_arith_logic_reg
-						ENDIF
-					ENDIF
-				ENDCASE
-				
-				OTHER
-					CALL decode_arith_logic_reg
-				ENDCASE
-			ENDCASEOF
-		ENDCASE
-		
-		CASE 1
-			get bits 21 and 20 from the instruction
-			IF bit 21 is '1' AND bit 20 is '0' THEN
-				CALL decode_MSR_imm_and_hints
-			ELSIF bit21 is '0' AND bit 20 is '0' THEN
-				decode MOVT
-			ELSE
-				CALL decode_arith_logic_imm
-			ENDIF
-		ENDCASE
-		
-		CASE 2
-			decode Single Data Transfer - immediate form
-		ENDCASE
-		
-		CASE 3
-			get bit 4 from the instruction
-			IF bit 4 is '1' THEN
-				decode Media instructions
-			ELSE
-				decode Single Data Transfer (reg)
-			ENDIF			
-		ENDCASE
-		
-		CASE 4
-			decode Block Data Transfer
-		ENDCASE
-		
-		CASE 5
-			decode Branch
-		ENDCASE
-		
-		CASE 6
-			decode LDC/STC
-		ENDCASE
-		
-		CASE 7
-			get bit 24 from the instruction
-			IF bit 24 is '0' THEN
-				get bit 4 from the instruction
-				IF bit 4 is '1' THEN
-					decode MRC/MCR
-				ELSE
-					decode Co-processor data operations
-				ENDIF
-			ELSE
-				decode Software Interrupt
-			ENDIF			
-		ENDCASE
-		
-		OTHER
-			// logically impossible
-		ENDCASE
-	ENDCASEOF
-ENDPROC
+ARM instruction decoding
+When instruction is found, the "unnecessary" bits still need to be checked.
+The decoding (nor encoding) is not complete (all bit patterns are not "in use").
+Like in CLREX/DSB/DMB/ISB: They all must have bits 24 - 20 = 1 0 1 1 1.
 
-PROCEDURE decode_MSR_imm_and_hints
-	get bits 19 to 16 from the instruction // 'mask'-field
-	IF bits 19 to 16 are all zeros THEN
-		decode hints (bits 7 to 0)
-		get bits 7 to 0 from the instruction
-		CASEOF bits 7 to 0
-			CASE 0
-				NOP
+PROC decode
+	IF (condition code == NV) THEN
+		CASEOF (bits 27 - 25)
+			CASE 0:
+				// CPS/SETEND
 			ENDCASE
 			
-			CASE 1
-				YIELD
+			CASE 2:
+				IF (bit 21 == 0) THEN
+					// PLI/PLD
+				ELSE
+					// CLREX/DSB/DMB/ISB
+					// bits 7 - 4
+				ENDIF
 			ENDCASE
 			
-			CASE 2
-				WFE
+			CASE 3:
+				// PLI/PLD
 			ENDCASE
 			
-			CASE 3
-				WFI
+			CASE 4:
+				// RFE/SRS
 			ENDCASE
 			
-			CASE 4
-				SEV
+			CASE 5:
+				// BLX
 			ENDCASE
 			
-			OTHER
-				decode debug hint
+			OTHER:
+				// empty
 			ENDCASE
 		ENDCASEOF
 	ELSE
-		decode MSR imm
-	ENDIF
-ENDPROC
-
-PROCEDURE decode_arith_logic_reg
-	CALL decode_arith_logic
-	decode register operands
-ENDPROC
-
-PROCEDURE decode_arith_logic_imm
-	CALL decode_arith_logic
-	decode immediate operands
-ENDPROC
-
-PROCEDURE decode_arith_logic
-	get bits 24 to 21 from the instruction
-	get bit 4 from the instruction
-	// the 'specials' are already picked
-	CASEOF bits 24 to 21
-		CASE 0
-			AND
-		ENDCASE
-		
-		CASE 1
-			EOR
-		ENDCASE
-		
-		CASE 2
-			SUB
-		ENDCASE
-		
-		CASE 3
-			RSB
-		ENDCASE
-		
-		CASE 4
-			ADD
-		ENDCASE
-		
-		CASE 5
-			ADC
-		ENDCASE
-		
-		CASE 6
-			SBC
-		ENDCASE
-		
-		CASE 7
-			RSC
-		ENDCASE
-		
-		CASE 8
-			TST
-		ENDCASE
-		
-		CASE 9
-			TEQ
-		ENDCASE
-		
-		CASE 10
-			CMP
-		ENDCASE
-		
-		CASE 11
-			CMN
-		ENDCASE
-		
-		CASE 12
-			ORR
-		ENDCASE
-		
-		CASE 13
-			MOV
-		ENDCASE
-		
-		CASE 14
-			BIC
-		ENDCASE
-		
-		CASE 15
-			MVN
-		ENDCASE
-		
-		OTHER
-			// logically impossible
-		ENDCASE
-	ENDCASEOF
-ENCPROC
-
-PROCEDURE Decode_Unconditional_instructions
-	get bit 27 from the instruction
-	IF bit 27 is '0' THEN
-		decode memory hints, advanced SIMD and miscellaneous instructions
-	ELSE
-		get bits 26 to 25 from the instruction
-		get bit 20 from the instruction		
-		CASEOF bits 26 to 25
-			CASE 0
-				IF bit 20 is '1' THEN
-					decode RFE
-				ELSE
-					decode SRS
-				ENDIF
-			ENDCASE
-			
-			CASE 1
-				decode BL/BLX imm
-			ENDCASE
-			
-			CASE 2
-				get bits 24 to 21 from the instruction
-				IF bit20 is '1' THEN
-					CASEOF bits 24 to 21
-						CASE 0
-							handle Undef
+		CASEOF (bits 27 - 25)
+			CASE 0:
+				// Arith&log + LD/ST (reg)
+				IF (bit 4 == 0) THEN
+					CASEOF (bits 24-23)
+						CASE 0:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
 						ENDCASE
 						
-						CASE 2
-							decode MRRC/MRRC2
+						CASE 1:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
 						ENDCASE
 						
-						OTHER
-							// bits 19-16 (Rn) = 15 => lit else imm
-							decode LDC/LDC2
+						CASE 2:
+							IF (bit 20 == 0) THEN
+								// specials
+							ELSE
+								// TST/TEQ/CMP/CMN (bits 22,21)
+							ENDIF
+						ENDCASE
+
+						CASE 3:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
 						ENDCASE
 					ENDCASEOF
 				ELSE
-					CASEOF bits 24 to 21
-						CASE 0
-							handle Undef
+					IF (bit 7 = 0) THEN
+						// reg shifted reg
+						CASEOF (bits 24-23)
+							CASE 0:
+								// Arith&logic
+								CASEOF (bits 22, 21)
+								ENDCASEOF
+							ENDCASE
+							
+							CASE 1:
+								// Arith&logic
+								CASEOF (bits 22, 21)
+								ENDCASEOF
+							ENDCASE
+							
+							CASE 2:
+								IF (bit 20 == 0) THEN
+									// specials
+								ELSE
+									// TST/TEQ/CMP/CMN (bits 22,21)
+								ENDIF
+							ENDCASE
+
+							CASE 3:
+								// Arith&logic
+								CASEOF (bits 22, 21)
+								ENDCASEOF
+							ENDCASE
+						ENDCASEOF
+					ELSE
+						CASEOF (bits 6 - 5)
+							CASE 0:
+								// specials: Multiply/STREX/LDREX
+							ENDCASE
+
+							CASE 1:
+								// LDRH/STRH
+							ENDCASE
+
+							CASE 2:
+								// LDRD/LDRS
+							ENDCASE
+
+							CASE 3:
+								// STRD/STRS
+							ENDCASE
+						ENDCASEOF
+					ENDIF
+				ENDIF
+			ENDCASE
+
+			CASE 1:
+				// Arith&log (imm) + specials + hints
+				CASEOF (bits 24, 23)
+						CASE 0:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
 						ENDCASE
 						
-						CASE 2
-							decode MCRR/MCRR2
+						CASE 1:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
 						ENDCASE
 						
-						OTHER
-							decode STC/STC2
+						CASE 2:
+							IF (bit 20 == 0) THEN
+								// specials
+							ELSE
+								// TST/TEQ/CMP/CMN (bits 22,21)
+							ENDIF
+						ENDCASE
+						
+						CASE 3:
+							// Arith&logic
+							CASEOF (bits 22, 21)
+							ENDCASEOF
+						ENDCASE
+				ENDCASEOF
+			ENDCASE
+
+			CASE 2:
+				// LDR/STR (imm) (bits 24 - 20 = P U B W L)
+			ENDCASE
+
+			CASE 3:
+				IF (bit 4 == 0) THEN
+					// LDR/STR (reg shifted) (bits 24 - 20 = P U B W L)
+				ELSE
+					// Media Instructions
+					CASEOF (bits 24 - 21)
+						...
+						CASE 15:
+							// UBFX/UDF
 						ENDCASE
 					ENDCASEOF
 				ENDIF
 			ENDCASE
-			
-			CASE 3
-				get bit 4 from the instruction
-				IF bit 4 is '1' THEN
-					IF bit 20 is '1' THEN
-						decode MRC/MRC2
-					ELSE
-						decode MCR/MCR2
-					ENDIF
+
+			CASE 4:
+				// LD/ST multiple
+				IF (bit 22 == 1) THEN
+					// with amode
 				ELSE
-					decode CDP/CDP2
+					// normal
 				ENDIF
 			ENDCASE
-			
-			OTHER
-				// logically impossible
+
+			CASE 5:
+				// Branch
+				IF (bit 24 == 0) THEN
+					// without link register
+				ELSE
+					// with link register
+				ENDIF
+			ENDCASE
+
+			CASE 6:
+				// empty
+			ENDCASE
+
+			CASE 7:
+				IF (bit 24 == 1) THEN
+					SVC
+				ELSE
+					// empty
+				ENDIF
 			ENDCASE
 		ENDCASEOF
 	ENDIF
-ENCPROC
+ENDPROC
