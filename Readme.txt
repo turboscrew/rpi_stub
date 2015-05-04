@@ -20,6 +20,11 @@ this in any way.
 Hopefully this is useful reading material for those that want to learn about
 gdb-stubs.
 
+As a by-product I put together a spreadsheet table (OpenOffice Calc) of both
+ARM and Thumb instructions to help figuring out the decoding. I couldn't find
+them anywhere in the net - not even in text format.
+Feel free to download them and play with them.
+
 missing:
 breakpoints and single-stepping
 
