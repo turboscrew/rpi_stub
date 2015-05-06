@@ -460,32 +460,25 @@ PROC decode
 			ENDCASE
 		ENDCASEOF
 	ELSE
-		CASEOF (bits 27 - 25)
+		CASEOF (bits 27 - 25) // main classification
 			CASE 0:
 				// Arith&log + LD/ST (reg)
 				IF (bit 4 == 0) THEN
 					CASEOF (bits 24-23)
-						CASE 0:
-							// Arith&logic
-							CASEOF (bits 22, 21)
-							ENDCASEOF
-						ENDCASE
-						
-						CASE 1:
-							// Arith&logic
-							CASEOF (bits 22, 21)
-							ENDCASEOF
-						ENDCASE
-						
 						CASE 2:
 							IF (bit 20 == 0) THEN
 								// specials
+								IF (bit 7 == 0) THEN
+									// 6,5,21 (22)
+								ELSE
+									// 22, 21 (5)
+								ENDIF
 							ELSE
 								// TST/TEQ/CMP/CMN (bits 22,21)
 							ENDIF
 						ENDCASE
-
-						CASE 3:
+						
+						OTHER:
 							// Arith&logic
 							CASEOF (bits 22, 21)
 							ENDCASEOF
@@ -495,27 +488,15 @@ PROC decode
 					IF (bit 7 = 0) THEN
 						// reg shifted reg
 						CASEOF (bits 24-23)
-							CASE 0:
-								// Arith&logic
-								CASEOF (bits 22, 21)
-								ENDCASEOF
-							ENDCASE
-							
-							CASE 1:
-								// Arith&logic
-								CASEOF (bits 22, 21)
-								ENDCASEOF
-							ENDCASE
-							
 							CASE 2:
 								IF (bit 20 == 0) THEN
-									// specials
+									// specials: first bits 6,5 then 22,21
 								ELSE
 									// TST/TEQ/CMP/CMN (bits 22,21)
 								ENDIF
 							ENDCASE
 
-							CASE 3:
+							OTHER:
 								// Arith&logic
 								CASEOF (bits 22, 21)
 								ENDCASEOF
@@ -525,18 +506,137 @@ PROC decode
 						CASEOF (bits 6 - 5)
 							CASE 0:
 								// specials: Multiply/STREX/LDREX
+								CASEOF (bits 24 - 23)
+									CASE 0:
+										CASEOF (bits 22 - 21)
+											CASE 0:
+												// MULS
+											ENDCASE
+											
+											CASE 1:
+												// MLAS
+											ENDCASE
+											
+											CASE 2:
+												// UMAAL
+											ENDCASE
+											
+											CASE 3:
+												// MLS
+											ENDCASE
+										ENDCASEOF
+									ENDCASE
+									
+									CASE 1:
+										CASEOF (bits 22 - 21)
+											CASE 0:
+												// UMULL
+											ENDCASE
+											
+											CASE 1:
+												// UMLAL
+											ENDCASE
+											
+											CASE 2:
+												// SMULL
+											ENDCASE
+											
+											CASE 3:
+												// SMLAL
+											ENDCASE
+										ENDCASEOF
+									ENDCASE
+									
+									CASE 2:
+										// SWP(B)
+									ENDCASE
+									
+									CASE 3:
+										CASEOF (bits 22 - 20)
+											CASE 0:
+												// STREX
+											ENDCASE
+											
+											CASE 1:
+												// LDREX
+											ENDCASE
+											
+											CASE 2:
+												// STREXD
+											ENDCASE
+											
+											CASE 3:
+												// LDREXD
+											ENDCASE
+											CASE 4:
+												// STREXB
+											ENDCASE
+											
+											CASE 5:
+												// LDREXB
+											ENDCASE
+											
+											CASE 6:
+												// STREXH
+											ENDCASE
+											
+											CASE 7:
+												// LDREXH
+											ENDCASE
+										ENDCASEOF
+									ENDCASE
+								ENDCASEOF
 							ENDCASE
 
 							CASE 1:
 								// LDRH/STRH
+								IF bit 20 == 0 THEN
+									IF bit 22 == 0 THEN
+										// STRHT/STRH reg
+									ELSE
+										// STRHT/STRH imm										
+									ENDIF
+								ELSE
+									IF bit 22 == 0 THEN
+										//LDRHT/LDRH reg
+									ELSE
+										//LDRHT/LDRH imm
+									ENDIF
+								ENDIF
 							ENDCASE
 
 							CASE 2:
 								// LDRD/LDRS
+								IF bit 20 == 0 THEN
+									IF bit 22 == 0 THEN
+										// LDRD reg
+									ELSE
+										// LDRD imm
+									ENDIF
+								ELSE
+									IF bit 22 == 0 THEN
+										// LDRSBT/LDRSB reg
+									ELSE
+										// LDRSBT/LDRSB imm
+									ENDIF
+								ENDIF
 							ENDCASE
 
 							CASE 3:
 								// STRD/STRS
+								IF bit 20 == 0 THEN
+									IF bit 22 == 0 THEN
+										// STRD reg
+									ELSE
+										// STRD imm
+									ENDIF
+								ELSE
+									IF bit 22 == 0 THEN
+										// LDRST/LDRS reg
+									ELSE
+										// LDRST/LDRS imm
+									ENDIF
+								ENDIF
 							ENDCASE
 						ENDCASEOF
 					ENDIF
@@ -546,27 +646,57 @@ PROC decode
 			CASE 1:
 				// Arith&log (imm) + specials + hints
 				CASEOF (bits 24, 23)
-						CASE 0:
-							// Arith&logic
-							CASEOF (bits 22, 21)
-							ENDCASEOF
-						ENDCASE
-						
-						CASE 1:
-							// Arith&logic
-							CASEOF (bits 22, 21)
-							ENDCASEOF
-						ENDCASE
-						
 						CASE 2:
 							IF (bit 20 == 0) THEN
 								// specials
+								IF (bit 21 == 0) THEN
+									IF (bit 22 == 0) THEN
+										// MOVW
+									ELSE
+										// MOVT
+									ENDIF
+								ELSE
+									// if R=0 and mask = 0 then hint instead of MSR
+									IF ((bit 22 == 0) && (bits 19 - 16 == 0 0 0 0)) THEN
+										CASEOF (bits 7 - 0)
+											CASE 0:
+												// NOP
+											ENDCASE
+											
+											CASE 1:
+												// YIELD
+											ENDCASE
+											
+											CASE 2:
+												// WFE
+											ENDCASE
+											
+											CASE 3:
+												// WFI
+											ENDCASE
+											
+											CASE 4:
+												// SEV
+											ENDCASE
+											
+											OTHER:
+												IF (bits 7 - 4 == 0xf) THEN
+													// DBG
+												ELSE
+													// empty
+												ENDIF
+											ENDCASE
+										ENDCASEOF
+									ELSE
+										// MSR imm
+									ENDIF
+								ENDIF
 							ELSE
 								// TST/TEQ/CMP/CMN (bits 22,21)
 							ENDIF
 						ENDCASE
 						
-						CASE 3:
+						OTHER:
 							// Arith&logic
 							CASEOF (bits 22, 21)
 							ENDCASEOF

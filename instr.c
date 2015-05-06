@@ -370,12 +370,12 @@ unsigned int check_media_instr(uint32_t instr)
 			new_pc = INSTR_ADDR_UNDEF;
 			break;
 		}
-		/*
+
 		if (bits(instr, 11, 8) != 1)
 		{
 			new_pc = INSTR_ADDR_UNPRED;
 		}
-		*/
+
 		if ((bits(instr, 7, 5) == 5) || (bits(instr, 7, 5) == 6))
 		{
 			new_pc = INSTR_ADDR_UNDEF;
@@ -400,13 +400,13 @@ unsigned int check_media_instr(uint32_t instr)
 			// Instructions handled here:
 			// SXTAB16, SXTAH, UXTAB16, UXTAB, UXTAH
 			// SXTB16, SXTB, SXTH, UXTB16, UXTB, UXTH
-			/*
+
 			if (bits(instr, 9, 8) != 0)
 			{
 				new_pc = INSTR_ADDR_UNPRED;
 				break;
 			}
-			*/
+
 			switch (bits(instr, 22, 20))
 			{
 			case 1:
@@ -1106,7 +1106,194 @@ unsigned int check_branching(unsigned int address)
 
 	if ((instr & INSTR_COND_MASK) == INSTR_COND_NV)
 	{
-		// check specials (condition code NV)
+		switch (bits(instr, 27, 25))
+		{
+		case 0:
+			// CPS/SETEND
+			if (bits(instr, 24, 20) == 16)
+			{
+				if (bit(instr, 16) == 0)
+				{
+					// CPS
+					if ((bits(instr, 15, 9) == 0) && (bit(instr, 5) == 0))
+					{
+						// check only if user mode (for now)
+						// TODO: add current mode/mode update checks
+						if (bits(rpi2_reg_context.reg.cpsr, 4, 0) == 0x10)
+						{
+							new_pc = INSTR_ADDR_UNPRED;
+						}
+						// Otherwise no effect on PC
+					}
+					else
+					{
+						new_pc = INSTR_ADDR_UNDEF;
+					}
+				}
+				else
+				{
+					// SETEND (bit 9 = E)
+					if (instr & 0x000efdff != 0)
+					{
+						new_pc = INSTR_ADDR_UNDEF;
+					}
+					// Doesn't affect PC just yet
+					// the NEXT instruction is THUMB and may be 16-bits
+				}
+			}
+			else
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
+			break;
+		case 2:
+			if (bit(instr, 21) == 0)
+			{
+				// PLI/PLD
+				// "These instructions are memory system hints,
+				// and the effect of each instruction is IMPLEMENTATION DEFINED"
+				// these instructions don't affect PC
+				// just check the rest of the "fixed" bits
+				if (bit(instr, 24) == 0)
+				{
+					// PLI
+					if (!(bits(instr, 22, 20) == 5) || !(bits(instr, 15, 12) == 15))
+					{
+						new_pc = INSTR_ADDR_UNDEF;
+					}
+					// PLI doesn't affect PC
+				}
+				else
+				{
+					// PLD
+					if (bits(instr, 19, 16) == 15)
+					{
+						// label
+						if (!(bits(instr, 22, 20) == 5) || !(bits(instr, 15, 12) == 15))
+						{
+							new_pc = INSTR_ADDR_UNDEF;
+						}
+					}
+					else
+					{
+						// register
+						if (!(bits(instr, 21, 20) == 1) || !(bits(instr, 15, 12) == 15))
+						{
+							new_pc = INSTR_ADDR_UNDEF;
+						}
+					}
+				}
+			}
+			else
+			{
+				// CLREX/DSB/DMB/ISB
+				// these instructions don't affect PC
+				// just check the rest of the "fixed" bits
+				if (bits(instr, 24, 8) != 0x17ff0)
+				{
+					new_pc = INSTR_ADDR_UNDEF;
+				}
+				switch (bits(instr, 7, 4))
+				{
+				case 1: // CLREX
+					if (bits(instr, 3, 0) != 0xf)
+					{
+						new_pc = INSTR_ADDR_UNDEF;
+					}
+					break;
+				case 4: // DSB
+				case 5: // DMB
+				case 6: // ISB
+					// fully decoded
+					break;
+				default:
+					new_pc = INSTR_ADDR_UNDEF;
+					break;
+				}
+			}
+			break;
+		case 3:
+			// PLI/PLD
+			// "These instructions are memory system hints,
+			// and the effect of each instruction is IMPLEMENTATION DEFINED"
+			// these instructions don't affect PC
+			// just check the rest of the "fixed" bits
+			if (!(bits(instr, 21, 20) == 1) || !(bits(instr, 15, 12) == 15)
+					|| !(bit(instr, 4) == 0))
+			{
+				new_pc = INSTR_ADDR_UNDEF;
+			}
+			// nothing more to decode
+			break;
+		case 4:
+			// RFE/SRS
+			if (bits(rpi2_reg_context.reg.cpsr, 4, 0) == 0x10)
+			{
+				// user mode
+				new_pc = INSTR_ADDR_UNPRED;
+			}
+			else if (bits(rpi2_reg_context.reg.cpsr, 4, 0) == 0x1a)
+			{
+				// hyp mode
+				new_pc = INSTR_ADDR_UNDEF;
+			}
+			else
+			{
+				if (bit(instr, 20) == 0)
+				{
+					// SRS
+					// UNDEFINED in hyp mode
+					// UNPREDICTABLE in User or System mode
+					// TODO: Add the rest of restrictions
+					if (bits(rpi2_reg_context.reg.cpsr, 4, 0) == 0x1f)
+					{
+						// sys mode
+						new_pc = INSTR_ADDR_UNPRED;
+					}
+					else
+					{
+						// just check the rest of the "fixed" bits
+						if (!(bit(instr, 22) == 0) || !(bits(instr, 19, 5) == 0x6828))
+						{
+							new_pc = INSTR_ADDR_UNDEF;
+						}
+						// doesn't affect PC
+					}
+				}
+				else
+				{
+					// RFE - Return from exception
+					// UNDEFINED in hyp mode
+					// UNPREDICTABLE in User mode
+					// TODO: Add the rest of restrictions
+					if ((bit(instr, 22) == 0) && (bits(instr, 15, 0) == 0x00a0))
+					{
+						// return from exception
+						new_pc = INSTR_ADDR_NONE;
+					}
+					else
+					{
+						new_pc = INSTR_ADDR_UNDEF;
+					}
+				}
+			}
+			break;
+		case 5:
+			// BLX
+			tmp1 = bits(instr, 23, 0); // label
+			if (bit(instr, 23))
+			{
+				// negative offset - sign extend to 30 bits
+				tmp1 |= 0x3f000000;
+			}
+			tmp1 <<= 2; // to 32-bits
+			tmp1 |= bit(instr, 24) << 1; // Add 'H' bit for Thumb address
+			new_pc = tmp1;
+			break;
+		default:
+			new_pc = INSTR_ADDR_UNDEF;
+			break;
+		}
 		return new_pc;
 	}
 
@@ -1120,31 +1307,270 @@ unsigned int check_branching(unsigned int address)
 	{
 		// TODO: lots of LD-instructions missing (LDRD, LDREX, ...)
 		case INSTR_C0:
-			switch (instr & INSTR_SC_MASK)
+			// Arith&log + LD/ST (reg)
+			if (bit(instr, 4) == 0)
 			{
-				case INSTR_SC_1:
+				// bits 24 and 23
+				switch (instr & INSTR_SC_MASK)
+				{
+					case INSTR_SC_2:
+						if (bit(instr, 20) == 0) // specials
+						{
+							// bit 7
+							if (bit(instr, 7) == 0)
+							{
+								switch (instr, 6, 5)
+								{
+								case 0:
+									// bit 21 (0=MRS, 1=MSR), bit 9 (1=banked)
+									// MSR - Rn not altered, changes to state
+									// are taken into account at next instruction
+									// no effect on PC
+									// mrs,msr: if d == 15 then UNPREDICTABLE
+									// bit 4 = 1
+									if (bit(instr, 20) == 0)
+									{
+										// make a function
+
+										// MRS - reg + banked
+										// only changes the Rd
+										if (bits(instr, 15, 12) == 15) // Rd = PC
+										{
+											new_pc = check_msr_reg(instr);
+										}
+										else // Rd is not PC
+										{
+											// no effect on PC
+										}
+									}
+									break;
+								case 1:
+									// BXJ
+									break;
+								case 2:
+									// empty
+									break;
+								case 3:
+									// ERET
+									break;
+								}
+							}
+							else // bit(instr, 7) == 1
+							{
+								switch (instr, 22, 21)
+								{
+								case 0:
+									// SMLA
+									break;
+								case 1:
+									if (bit(instr, 5) == 0)
+									{
+										// SMLAW
+									}
+									else
+									{
+										// SMULW
+									}
+									break;
+								case 2:
+									// SMLAL
+									break;
+								case 3:
+									// SMUL
+									break;
+								}
+							}
+						}
+						else // tests
+						{
+							switch (bits(instr, 22, 21))
+							{
+							case 0: // TST
+								break;
+							case 1: // TEQ
+								break;
+							case 2: // CMP
+								break;
+							case 3: // CMN
+								break;
+							default:
+								// logically impossible
+								break;
+							}
+						}
+						break;
+					default:
+						// arithmetic & logic
+						new_pc = check_arith(instr);
+						break;
+				}
+			}
+			else // bit(instr, 4) == 1
+			{
+				if (bit(instr, 7) == 0)
+				{
+					// bits 24 and 23
+					switch (instr & INSTR_SC_MASK)
+					{
+						case INSTR_SC_2:
+							if (bit(instr, 20) == 0)
+							{
+								// spec first bits 6,5 then 22,21
+								switch (bits(instr, 6, 5))
+								{
+								case 0:
+									if (bit(instr, 22) == 0)
+									{
+										//BX
+									}
+									else
+									{
+										//CLZ
+									}
+									break;
+								case 1:
+									// BLX
+									break;
+								case 2:
+									switch (bits(instr, 22, 21))
+									{
+									case 0:
+										// QADD
+										break;
+									case 1:
+										// QSUB
+										break;
+									case 2:
+										// QDADD
+										break;
+									case 3:
+										// QDSUB
+										break;
+									default:
+										// logically impossible
+										break;
+									}
+									break;
+								case 3:
+									switch (bits(instr, 22, 21))
+									{
+									case 0:
+										break;
+									case 1:
+										// BKPT
+										break;
+									case 2:
+										// HVC
+										break;
+									case 3:
+										// SMC
+										break;
+									default:
+										// logically impossible
+										break;
+									}
+									break;
+								}
+							}
+							else
+							{
+								// TST ...
+								switch (bits(instr, 22, 21))
+								{
+								case 0: // TST
+									break;
+								case 1: // TEQ
+									break;
+								case 2: // CMP
+									break;
+								case 3: // CMN
+									break;
+								default:
+									// logically impossible
+									break;
+								}
+							}
+							break;
+						default:
+							// arithmetic & logic
+							new_pc = check_arith(instr);
+							break;
+					}
+
+#if 0
 					if (instr & INSTR_BIT4_MASK) // mult
 					{
 						new_pc = check_mult(instr);
+					}
+					// bit 4 = 1
+					if (bit(instr, 20) == 0)
+					{
+						// make a function
+
+						// MRS - reg + banked
+						// only changes the Rd
+						if (bits(instr, 15, 12) == 15) // Rd = PC
+						{
+							new_pc = check_msr_reg(instr);
+						}
+						else // Rd is not PC
+						{
+							// no effect on PC
+						}
 					}
 					else
 					{
 						// arithmetic & logic
 						new_pc = check_arith(instr);
 					}
-					break;
-				case INSTR_SC_2:
-					// swaps,mrs,msr: if d == 15 then UNPREDICTABLE
-					if (instr & INSTR_BIT4_MASK)
+#endif
+				}
+				else // bit(instr, 7) == 1
+				{
+					switch(bits(instr, 6, 5))
 					{
-						if (bit(instr, 21))
+					case 0:
+						switch (bits(instr, 24, 23))
 						{
-							// MSR - Rn not altered, changes to state
-							// are taken into account at next instruction
-							// no effect on PC
-						}
-						else
-						{
+						case 0:
+							switch (bits(instr, 22, 21))
+							{
+							case 0:
+								// MULS
+								break;
+							case 1:
+								// MLAS
+								break;
+							case 2:
+								// UMAAL
+								break;
+							case 3:
+								// MLS
+								break;
+							}
+							break;
+						case 1:
+							switch (bits(instr, 22, 21))
+							{
+							case 0:
+								// UMULL
+								new_pc = check_mult(instr);
+								break;
+							case 1:
+								// UMLAL
+								new_pc = check_mult(instr);
+								break;
+							case 2:
+								// SMULL
+								new_pc = check_mult(instr);
+								break;
+							case 3:
+								// SMLAL
+								new_pc = check_mult(instr);
+								break;
+							}
+							break;
+						case 2:
 							// SWP(B) (if PC is involved, UNPREDICTABLE)
 							// Rn and Rt2 don't change
 							if (bits(instr,15,12) == 15) // Rt = PC
@@ -1167,36 +1593,113 @@ unsigned int check_branching(unsigned int address)
 							{
 								// no effect on PC
 							}
+							break;
+						case 3:
+							switch (bits(instr, 22, 20))
+							{
+							case 0:
+								// STREX
+								break;
+							case 1:
+								// LDREX
+								break;
+							case 2:
+								// STREXD
+								break;
+							case 3:
+								// LDREXD
+								break;
+							case 4:
+								// STREXB
+								break;
+							case 5:
+								// LDREXB
+								break;
+							case 6:
+								// STREXH
+								break;
+							case 7:
+								// LDREXH
+								break;
+							}
+							break;
 						}
-					}
-					else
-					{
+						break;
+					case 1:
+						// LDRH/STRH
 						if (bit(instr, 20) == 0)
 						{
-							// make a function
-
-							// MRS - reg + banked
-							// only changes the Rd
-							if (bits(instr, 15, 12) == 15) // Rd = PC
+							if (bit(instr, 22) == 0)
 							{
-								new_pc = check_msr_reg(instr);
+								// STRHT/STRH reg
 							}
-							else // Rd is not PC
+							else
 							{
-								// no effect on PC
+								// STRHT/STRH imm
 							}
 						}
 						else
 						{
-							// arithmetic & logic
-							new_pc = check_arith(instr);
+							if (bit(instr, 22) == 0)
+							{
+								// LDRHT/LDRH reg
+							}
+							else
+							{
+								// LDRHT/LDRH imm
+							}
 						}
+						break;
+					case 2:
+						if (bit(instr, 20) == 0)
+						{
+							if (bit(instr, 22) == 0)
+							{
+								// LDRD reg
+							}
+							else
+							{
+								// LDRD imm
+							}
+						}
+						else
+						{
+							if (bit(instr, 22) == 0)
+							{
+								// LDRSBT/LDRSB reg
+							}
+							else
+							{
+								// LDRSBT/LDRSB imm
+							}
+						}
+						break;
+					case 3:
+						if (bit(instr, 20) == 0)
+						{
+							if (bit(instr, 22) == 0)
+							{
+								// STRD reg
+							}
+							else
+							{
+								// STRD imm
+							}
+						}
+						else
+						{
+							if (bit(instr, 22) == 0)
+							{
+								// LDRST/LDRS reg
+							}
+							else
+							{
+								// LDRST/LDRS imm
+							}
+						}
+						break;
 					}
-					break;
-				default:
-					// arithmetic & logic
-					new_pc = check_arith(instr);
-					break;
+				}
 			}
 			break;
 		case INSTR_C1:
