@@ -465,22 +465,154 @@ PROC decode
 				// Arith&log + LD/ST (reg)
 				IF (bit 4 == 0) THEN
 					CASEOF (bits 24-23)
+						case 0:
+							// Arith&logic  <Rd>,<Rn>,<Rm>{,<sift>}
+							CASEOF (bits 22, 21)
+								CASE 0:
+									// AND
+								ENDCASE
+								
+								CASE 1:
+									// EOR
+								ENDCASE
+								
+								CASE 2:
+									// SUB
+								ENDCASE
+								
+								CASE 3:
+									// RBS
+								ENDCASE
+							ENDCASEOF
+						ENDCASE
+						
+						case 1:
+							// Arith&logic  <Rd>,<Rn>,<Rm>{,<sift>}
+							CASEOF (bits 22, 21)
+								CASE 0:
+									// ADD
+								ENDCASE
+								
+								CASE 1:
+									// ADC
+								ENDCASE
+								
+								CASE 2:
+									// SBC
+								ENDCASE
+								
+								CASE 3:
+									// RSC
+								ENDCASE
+							ENDCASEOF
+						ENDCASE
+						
 						CASE 2:
 							IF (bit 20 == 0) THEN
 								// specials
 								IF (bit 7 == 0) THEN
-									// 6,5,21 (22)
-								ELSE
+									IF (bit 21 == 0) THEN
+										// MRS, bit 9 = banked
+									ELSE
+										IF (bit 5 == 0) THEN
+											// MSR, bit 9 = banked
+										ELSE
+											IF (bit 6 == 0) THEN
+												// BXJ
+											ELSE
+												// ERET
+											ENDIF
+										ENDIF
+									ENDIF
+								ELSE // bit 7 == 1
 									// 22, 21 (5)
+									CASEOF (bits 22 - 21)
+										CASE 0:
+											// SMLA
+										ENDCASE
+										
+										CASE 1:
+											IF (bit 5 == 0) THEN
+												// SMLAW
+											ELSE
+												// SMULW
+											ENDIF
+										ENDCASE
+										
+										CASE 2:
+											// SMLAL
+										ENDCASE
+										
+										CASE 3:
+											// SMUL
+										ENDCASE
+									ENDCASEOF
 								ENDIF
 							ELSE
-								// TST/TEQ/CMP/CMN (bits 22,21)
+								CASEOF (bits 22 - 21)
+									CASE 0:
+										// TST
+									ENDCASE
+									
+									CASE 1:
+										// TEQ
+									ENDCASE
+									
+									CASE 2:
+										// CMP
+									ENDCASE
+									
+									CASE 3:
+										// CMN
+									ENDCASE
+								ENDCASEOF
 							ENDIF
 						ENDCASE
 						
-						OTHER:
+						case 3:
 							// Arith&logic
 							CASEOF (bits 22, 21)
+								CASE 0:
+									// ORR
+								ENDCASE
+								
+								// <Rd>,<Rn>,<Rm>{,<sift>}
+								CASE 1:
+									// <Rd>,<Rm>,#<imm5>
+									CASEOF (bits 6 -5)
+										CASE 0:
+											IF (bits 11 - 7 == 0) THEN
+												// MOV
+											ELSE
+												// LSL
+											ENDIF
+										ENDCASE
+										
+										CASE 1:
+											// LSR
+										ENDCASE
+										
+										CASE 2:
+											// ASR
+										ENDCASE
+										
+										CASE 3:
+											IF (bits 11 - 7 == 0) THEN
+												// RRX
+											ELSE
+												// ROR
+											ENDIF
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+								
+								CASE 2:
+									// BIC
+								ENDCASE
+								
+								CASE 3:
+									// MVN <Rd>,<Rm>{,<sift>}
+								ENDCASE
 							ENDCASEOF
 						ENDCASE
 					ENDCASEOF
@@ -488,17 +620,160 @@ PROC decode
 					IF (bit 7 = 0) THEN
 						// reg shifted reg
 						CASEOF (bits 24-23)
+							CASE 0:
+								// Arith&logic <Rd>,<Rn>,<Rm>,<type>,<Rs>
+								CASEOF (bits 22, 21)
+									CASE 0:
+										// AND
+									ENDCASE
+									
+									CASE 1:
+										// EOR
+									ENDCASE
+									
+									CASE 2:
+										// SUB
+									ENDCASE
+									
+									CASE 3:
+										// RSB
+									ENDCASE
+								ENDCASEOF
+							ENDCASE
+							
+							CASE 1:
+								// Arith&logic <Rd>,<Rn>,<Rm>,<type>,<Rs>
+								CASEOF (bits 22, 21)
+									CASE 0:
+										// ADD
+									ENDCASE
+									
+									CASE 1:
+										// ADC
+									ENDCASE
+									
+									CASE 2:
+										// SBC
+									ENDCASE
+									
+									CASE 3:
+										// RSC
+									ENDCASE
+								ENDCASEOF
+							ENDCASE
+							
 							CASE 2:
 								IF (bit 20 == 0) THEN
 									// specials: first bits 6,5 then 22,21
+									CASEOF (bits 6 - 5)
+										CASE 0:
+											IF (bit 22 == 0) THEN
+												// BX
+											ELSE
+												// CLZ
+											ENDIF
+										ENDCASE
+										
+										CASE 1:
+											// BLX
+										ENDCASE
+										
+										CASE 2:
+											CASEOF (bits 22 - 21)
+												CASE 0:
+													// QADD
+												ENDCASE
+												
+												CASE 1:
+													// QSUB
+												ENDCASE
+												
+												CASE 2:
+													// QDADD
+												ENDCASE
+												
+												CASE 3:
+													// QDSUB
+												ENDCASE
+											ENDCASEOF
+										ENDCASE
+										
+										CASE 3:
+											CASEOF (bits 22 - 21)
+												CASE 0:
+													// empty
+												ENDCASE
+												
+												CASE 1:
+													// BKPT
+												ENDCASE
+												
+												CASE 2:
+													// HVC
+												ENDCASE
+												
+												CASE 3:
+													// SMC
+												ENDCASE
+											ENDCASEOF											
+										ENDCASE
+									ENDCASEOF
 								ELSE
-									// TST/TEQ/CMP/CMN (bits 22,21)
+									CASEOF (bits 22 - 21)
+										CASE 0:
+											// TST
+										ENDCASE
+										
+										CASE 1:
+											// TEQ
+										ENDCASE
+										
+										CASE 2:
+											// CMP
+										ENDCASE
+										
+										CASE 3:
+											// CMN
+										ENDCASE
+									ENDCASEOF
 								ENDIF
 							ENDCASE
 
-							OTHER:
-								// Arith&logic
+							CASE 3:
+								// Arith&logic <Rd>,<Rn>,<Rm>,<type>,<Rs>
 								CASEOF (bits 22, 21)
+									CASE 0:
+										// ORR
+									ENDCASE
+									
+									CASE 1:
+										//  <Rd>,<Rn>,<Rm>
+										CASEOF (bits 6 - 5)
+											CASE 0:
+												// LSL
+											ENDCASE
+											
+											CASE 1:
+												// LSR
+											ENDCASE
+											
+											CASE 2:
+												// ASR
+											ENDCASE
+											
+											CASE 3:
+												// ROR
+											ENDCASE
+										ENDCASEOF
+									ENDCASE
+									
+									CASE 2:
+										// BIC
+									ENDCASE
+									
+									CASE 3:
+										// MVN
+									ENDCASE
 								ENDCASEOF
 							ENDCASE
 						ENDCASEOF
@@ -705,7 +980,8 @@ PROC decode
 			ENDCASE
 
 			CASE 2:
-				// LDR/STR (imm) (bits 24 - 20 = P U B W L)
+				// Single data transfer (imm) (bits 24 - 20 = P U B W L)
+				// Completely decoded
 			ENDCASE
 
 			CASE 3:
@@ -713,10 +989,407 @@ PROC decode
 					// LDR/STR (reg shifted) (bits 24 - 20 = P U B W L)
 				ELSE
 					// Media Instructions
-					CASEOF (bits 24 - 21)
-						...
-						CASE 15:
-							// UBFX/UDF
+					CASEOF (bits 24 - 23)
+						CASE 0:
+							// parallel add & sub
+							CASEOF (bits 22 - 20)
+								CASE 0:
+									// empty
+								ENDCASE
+
+								CASE 1:
+									// signed add & sub
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// SADD16
+										ENDCASE
+
+										CASE 1:
+											// SASX
+										ENDCASE
+
+										CASE 2:
+											// SSAX
+										ENDCASE
+
+										CASE 3:
+											// SSUB16
+										ENDCASE
+
+										CASE 4:
+											// SADD8
+										ENDCASE
+
+										CASE 7:
+											// SSUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+
+								CASE 2:
+									// signed saturating
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// QADD16
+										ENDCASE
+
+										CASE 1:
+											// QASX
+										ENDCASE
+
+										CASE 2:
+											// QSAX
+										ENDCASE
+
+										CASE 3:
+											// QSUB16
+										ENDCASE
+
+										CASE 4:
+											// QADD8
+										ENDCASE
+
+										CASE 7:
+											// QSUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+								
+								CASE 3:
+									// signed halving
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// SHADD16
+										ENDCASE
+
+										CASE 1:
+											// SHASX
+										ENDCASE
+
+										CASE 2:
+											// SHSAX
+										ENDCASE
+
+										CASE 3:
+											// SHSUB16
+										ENDCASE
+
+										CASE 4:
+											// SHADD8
+										ENDCASE
+
+										CASE 7:
+											// SHSUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+
+								CASE 4:
+									// empty
+								ENDCASE
+
+								CASE 5:
+									// unsigned add & sub
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// UADD16
+										ENDCASE
+
+										CASE 1:
+											// UASX
+										ENDCASE
+
+										CASE 2:
+											// USAX
+										ENDCASE
+
+										CASE 3:
+											// USUB16
+										ENDCASE
+
+										CASE 4:
+											// UADD8
+										ENDCASE
+
+										CASE 7:
+											// USUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+
+								CASE 6:
+									// signed saturating
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// UQADD16
+										ENDCASE
+
+										CASE 1:
+											// UQASX
+										ENDCASE
+
+										CASE 2:
+											// UQSAX
+										ENDCASE
+
+										CASE 3:
+											// UQSUB16
+										ENDCASE
+
+										CASE 4:
+											// UQADD8
+										ENDCASE
+
+										CASE 7:
+											// UQSUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+
+								CASE 7:
+									// unsigned halving
+									CASEOF (bits 7 - 5)
+										CASE 0:
+											// UHADD16
+										ENDCASE
+
+										CASE 1:
+											// UHASX
+										ENDCASE
+
+										CASE 2:
+											// UHSAX
+										ENDCASE
+
+										CASE 3:
+											// UHSUB16
+										ENDCASE
+
+										CASE 4:
+											// UHADD8
+										ENDCASE
+
+										CASE 7:
+											// UHSUB8
+										ENDCASE
+
+										OTHER:
+											// empty
+										ENDCASE
+									ENDCASEOF
+								ENDCASE
+							ENDCASEOF
+						ENDCASE
+						
+						CASE 1:
+							// pack / sat / rev
+							IF (bit 5 == 0) THEN
+								CASEOF (bits 22 - 20)
+									CASE 0:
+										IF (bit 6 == 0) THEN
+											// SEL
+										ELSE
+											IF (bits 19 - 16) == 1 1 1 1) THEN
+												// SXTB16
+											ELSE
+												// SXTAB16
+											ENDIF
+										ENDIF
+									ENDCASE
+	
+									CASE 2:
+										IF (bit 6 == 0) THEN
+											// SSAT16
+										ELSE
+											IF (bits 19 - 16) == 1 1 1 1) THEN
+												// SXTB
+											ELSE
+												// SXTAB
+											ENDIF
+										ENDIF
+									ENDCASE
+	
+									CASE 3:
+										IF (bit 6 == 0) THEN
+											IF (bit 7 == 0) THEN
+												// REV
+											ELSE
+												// REV16
+											ENDIF
+										ELSE
+											IF (bits 19 - 16) == 1 1 1 1) THEN
+												// SXTH
+											ELSE
+												// SXTAH
+											ENDIF
+										ENDIF
+									ENDCASE
+	
+									CASE 4:
+										IF (bits 19 - 16) == 1 1 1 1) THEN
+											// UXTB16
+										ELSE
+											// UXTAB16
+										ENDIF
+									ENDCASE
+	
+									CASE 6:
+										IF (bit 6 == 0) THEN
+											// USAT16
+										ELSE
+											IF (bits 19 - 16) == 1 1 1 1) THEN
+												// UXTB
+											ELSE
+												// UXTAB
+											ENDIF
+										ENDIF
+									ENDCASE
+	
+									CASE 7:
+										IF (bit 6 == 0) THEN
+											IF (bit 7 == 0) THEN
+												// RBIT
+											ELSE
+												// REVSH
+											ENDIF
+										ELSE
+											IF (bits 19 - 16) == 1 1 1 1) THEN
+												// UXTH
+											ELSE
+												// UXTAH
+											ENDIF
+										ENDIF
+									ENDCASE
+									
+									OTHER:
+										// empty
+									ENDCASE
+								ENDCASEOF
+							ELSE
+								CASEOF (bits 22 - 21)
+									CASE 0:
+										// PKHBT
+									ENDCASE
+									
+									CASE 1:
+										// SSAT
+									ENDCASE
+									
+									CASE 2:
+										// empty
+									ENDCASE
+									
+									CASE 3:
+										// USAT
+									ENDCASE
+								ENDCASEOF
+							ENDIF							
+						ENDCASE
+						
+						CASE 2:
+							// mul & div
+							CASEOF (bits 22 - 20)
+								CASE 0:
+									IF (bit 6 == 0) THEN
+										IF (bits 15 - 12 == 15) THEN
+											// SMUAD
+										ELSE
+											// SMLAD
+										ENDIF
+									ELSE
+										IF (bits 15 - 12 == 15) THEN
+											// SMUSD
+										ELSE
+											// SMLSD
+										ENDIF
+									ENDIF
+								ENDCASE
+								
+								CASE 1:
+									// SDIV
+								ENDCASE
+								
+								CASE 3:
+									// UDIV
+								ENDCASE
+								
+								CASE 4:
+									IF (bit 6 == 0) THEN
+										// SMLALD
+									ELSE
+										// SMLSLD
+									ENDIF
+								ENDCASE
+								
+								CASE 5:
+									IF (bit 6 == 0) THEN
+										IF (bits 15 - 12 == 15) THEN
+											// SMMUL
+										ELSE
+											// SMMLA
+										ENDIF
+									ELSE
+										// SMMLS
+									ENDIF
+								ENDCASE
+								
+								OTHER:
+									// empty
+								ENDCASE
+							ENDCASEOF
+						ENDCASE
+						
+						CASE 3:
+							// diff sum & bits
+							CASEOF (bits 22 - 21)
+								CASE 0:
+									IF (bits 15 - 12 == 15) THEN
+										// USAD8
+									ELSE
+										// USADA8
+									ENDIF
+								ENDCASE
+								
+								CASE 1:
+									// SBFX
+								ENDCASE
+								
+								CASE 2:
+									IF (bits 3 - 0 == 15) THEN
+										// BFC
+									ELSE
+										// BFI
+									ENDIF
+								ENDCASE
+								
+								CASE 3:
+									IF (bit 5 == 0) THEN
+										// UBFX
+									ELSE
+										// UDF
+									ENDIF
+								ENDCASE
+							ENDCASEOF
 						ENDCASE
 					ENDCASEOF
 				ENDIF
