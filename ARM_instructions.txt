@@ -1,7 +1,7 @@
 This list is generated with a simple awk-script, so it may still contain errors.
 The source was ARMv7-A/R ARM, and the corresponding chapter number is in the beginning
 of each description. The listing should contain both A1 and A2 encodings.
-1 1 1 0 0 1 1 1 1 1 1 1 x x x x x x x x x x x x 1 1 1 1 x x x x	 UDF<c>_#<x x x x x x x x x x x x x x x x> A1 A8.8.247
+1 1 1 0 0 1 1 1 1 1 1 1 x x x x x x x x x x x x 1 1 1 1 x x x x	 UDF<c>_#<imm12> A1 A8.8.247
 1 1 1 1 0 0 0 1 0 0 0 0 (0) (0) (0) 1 (0) (0) (0) (0) (0) (0) E (0) 0 0 0 0 (0) (0) (0) (0)	 SETEND_<endian_specifier> A1 A8.8.167
 1 1 1 1 0 0 0 1 0 0 0 0 f f M 0 (0) (0) (0) (0) (0) (0) (0) A I F 0 m m m m m	 CPS<effect>_<iflags>{,_#<mode>}_CPS_#<mode> A1 B9.3.2
 1 1 1 1 0 0 1 0 0 D 0 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 VAND<c>_<Qd>,_<Qn>,_<Qm>_VAND<c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.287
@@ -15,8 +15,10 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 0 1 0 0 D 1 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m	 VSUB<c>.F32_<Qd>,_<Qn>,_<Qm>_VSUB<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.415
 1 1 1 1 0 0 1 0 0 D 1 z n n n n d d d d 1 1 1 1 N Q M 1 m m m m	 VRSQRTS<c>.F32_<Qd>,_<Qn>,_<Qm>_VRSQRTS<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.392
 1 1 1 1 0 0 1 0 0 D f z n n n n d d d d 1 1 0 0 N Q M 1 m m m m	 VFM<y><c>.F32_<Qd>,_<Qn>,_<Qm>_VFM<y><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.317
-1 1 1 1 0 0 1 0 0 D f z n n n n d d d d 1 1 0 1 N Q M 1 m m m m	 V<op><c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.337
-1 1 1 1 0 0 1 0 0 D f z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 V<op><c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.335
+1 1 1 1 0 0 1 0 0 D 0 z n n n n d d d d 1 1 0 1 N Q M 1 m m m m	 VMLA<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.337
+1 1 1 1 0 0 1 0 0 D 1 z n n n n d d d d 1 1 0 1 N Q M 1 m m m m	 VMLS<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.337
+1 1 1 1 0 0 1 0 0 D 0 z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 VMAX<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.335
+1 1 1 1 0 0 1 0 0 D 1 z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 VMIN<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.335
 1 1 1 1 0 0 1 0 0 D z z n n n n d d d d 1 0 0 0 N Q M 0 m m m m	 VADD<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VADD<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.282
 1 1 1 1 0 0 1 0 0 D z z n n n n d d d d 1 0 0 0 N Q M 1 m m m m	 VTST<c>.<size>_<Qd>,_<Qn>,_<Qm>_VTST<c>.<size>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.421
 1 1 1 1 0 0 1 0 0 D z z n n n n d d d d 1 0 1 1 N Q M 0 m m m m	 VQDMULH<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VQDMULH<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.372
@@ -27,9 +29,11 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 0 1 0 1 D x x x x x x d d d d 1 0 0 0 0 1 M 1 m m m m	 VRSHRN<c>.I<size>_<Dd>,_<Qm>,_#<imm> T1/A1 A8.8.390
 1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 0 1 0 0 N 0 M 0 m m m m	 VADDHN<c>.<dt>_<Dd>,_<Qn>,_<Qm> T1/A1 A8.8.284
 1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 0 1 1 0 N 0 M 0 m m m m	 VSUBHN<c>.<dt>_<Dd>,_<Qn>,_<Qm> T1/A1 A8.8.416
-1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 0 f 1 1 N 1 M 0 m m m m	 VQD<op><c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.371
+1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 0 0 1 1 N 1 M 0 m m m m	 VQDMLAL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.371
+1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 0 1 1 1 N 1 M 0 m m m m	 VQDMLSL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.371
 1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 1 0 1 1 N 1 M 0 m m m m	 VQDMULL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.373
-1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 1 0 f 1 N 0 M 0 m m m m	 VQD<op><c>.<dt>_<Qd>,_<Dn>,_<Dm> T1/A1 A8.8.371
+1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 1 0 0 1 N 0 M 0 m m m m	 VQDMLAL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T1/A1 A8.8.371
+1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 1 0 1 1 N 0 M 0 m m m m	 VQDMLSL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T1/A1 A8.8.371
 1 1 1 1 0 0 1 0 1 D z z n n n n d d d d 1 1 0 1 N 0 M 0 m m m m	 VQDMULL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T1/A1 A8.8.373
 1 1 1 1 0 0 1 1 0 D 0 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 VEOR<c>_<Qd>,_<Qn>,_<Qm>_VEOR<c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.315
 1 1 1 1 0 0 1 1 0 D 0 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m	 VPADD<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.363
@@ -37,13 +41,18 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 0 1 1 0 D 0 z n n n n d d d d 1 1 1 0 N Q M 0 m m m m	 VCGE<c>.F32_<Qd>,_<Qn>,_<Qm>_VCGE<c>.F32_<Dd>,_<Dn>,_<Dm> T2/A2 A8.8.293
 1 1 1 1 0 0 1 1 0 D 1 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m	 VABD<c>.F32_<Qd>,_<Qn>,_<Qm>_VABD<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.279
 1 1 1 1 0 0 1 1 0 D 1 z n n n n d d d d 1 1 1 0 N Q M 0 m m m m	 VCGT<c>.F32_<Qd>,_<Qn>,_<Qm>_VCGT<c>.F32_<Dd>,_<Dn>,_<Dm> T2/A2 A8.8.295
-1 1 1 1 0 0 1 1 0 D f f n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 V<op><c>_<Qd>,_<Qn>,_<Qm>_V<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.290
-1 1 1 1 0 0 1 1 0 D f z n n n n d d d d 1 1 1 0 N Q M 1 m m m m	 V<op><c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.281
-1 1 1 1 0 0 1 1 0 D f z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 VP<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.366
+1 1 1 1 0 0 1 1 0 D 0 1 n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 VBSL<c>_<Qd>,_<Qn>,_<Qm>_V<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.290
+1 1 1 1 0 0 1 1 0 D 1 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 VBIT<c>_<Qd>,_<Qn>,_<Qm>_V<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.290
+1 1 1 1 0 0 1 1 0 D 1 1 n n n n d d d d 0 0 0 1 N Q M 1 m m m m	 VBIF<c>_<Qd>,_<Qn>,_<Qm>_V<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.290
+1 1 1 1 0 0 1 1 0 D 0 z n n n n d d d d 1 1 1 0 N Q M 1 m m m m	 VACGE<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.281
+1 1 1 1 0 0 1 1 0 D 1 z n n n n d d d d 1 1 1 0 N Q M 1 m m m m	 VACGT<c>.F32_<Qd>,_<Qn>,_<Qm>_V<op><c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.281
+1 1 1 1 0 0 1 1 0 D 0 z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 VPMAX<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.366
+1 1 1 1 0 0 1 1 0 D 1 z n n n n d d d d 1 1 1 1 N Q M 0 m m m m	 VPMIN<c>.F32_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.366
 1 1 1 1 0 0 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 0 m m m m	 VSUB<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VSUB<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.414
-1 1 1 1 0 0 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 1 m m m m	 VCEQ<c>.<dt>_<Qd>,_<Qn>,_<Qm> _VCEQ<c>.<dt>_<Dd>,_<Dn>,_<Dm>  T1/A1 A8.8.291
+1 1 1 1 0 0 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 1 m m m m	 VCEQ<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VCEQ<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.291
 1 1 1 1 0 0 1 1 0 D z z n n n n d d d d 1 0 1 1 N Q M 0 m m m m	 VQRDMULH<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VQRDMULH<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.376
-1 1 1 1 0 0 1 1 1 D 1 1 n n n n d d d d 1 0 len N f M 0 m m m m	 V<op><c>.8_<Dd>,_<list>,_<Dm> T1/A1 A8.8.419
+1 1 1 1 0 0 1 1 1 D 1 1 n n n n d d d d 1 0 z z N 0 M 0 m m m m	 VTBL<c>.8_<Dd>,_<list>,_<Dm> T1/A1 A8.8.419
+1 1 1 1 0 0 1 1 1 D 1 1 n n n n d d d d 1 0 z z N 1 M 0 m m m m	 VTBX<c>.8_<Dd>,_<list>,_<Dm> T1/A1 A8.8.419
 1 1 1 1 0 0 1 1 1 D 1 1 x x x x d d d d 1 1 0 0 0 Q M 0 m m m m	 VDUP<c>.<size>_<Qd>,_<Dm[x]>_VDUP<c>.<size>_<Dd>,_<Dm[x]> T1/A1 A8.8.313
 1 1 1 1 0 0 1 1 1 D 1 1 z z 0 0 d d d d 0 0 0 f f Q M 0 m m m m	 VREV<n><c>.<size>_<Qd>,_<Qm>_VREV<n><c>.<size>_<Dd>,_<Dm> T1/A1 A8.8.386
 1 1 1 1 0 0 1 1 1 D 1 1 z z 0 0 d d d d 0 0 1 0 f Q M 0 m m m m	 VPADDL<c>.<dt>_<Qd>,_<Qm>_VPADDL<c>.<dt>_<Dd>,_<Dm> T1/A1 A8.8.364
@@ -76,24 +85,28 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 0 1 1 1 D x x x x x x d d d d 0 1 0 1 L Q M 1 m m m m	 VSLI<c>.<size>_<Qd>,_<Qm>,_#<imm>_VSLI<c>.<size>_<Dd>,_<Dm>,_#<imm> T1/A1 A8.8.400
 1 1 1 1 0 0 1 1 1 D z z n n n n d d d d 0 1 0 0 N 0 M 0 m m m m	 VRADDHN<c>.<dt>_<Dd>,_<Qn>,_<Qm> T1/A1 A8.8.383
 1 1 1 1 0 0 1 1 1 D z z n n n n d d d d 0 1 1 0 N 0 M 0 m m m m	 VRSUBHN<c>.<dt>_<Dd>,_<Qn>,_<Qm> T1/A1 A8.8.394
-1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 0 f 0 F N 1 M 0 m m m m	 V<op><c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T1/A1 A8.8.338
+1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 0 0 0 F N 1 M 0 m m m m	 VMLA<c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T1/A1 A8.8.338
+1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 0 1 0 F N 1 M 0 m m m m	 VMLS<c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T1/A1 A8.8.338
 1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 1 0 0 F N 1 M 0 m m m m	 VMUL<c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_VMUL<c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T1/A1 A8.8.352
 1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 1 1 0 0 N 1 M 0 m m m m	 VQDMULH<c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_VQDMULH<c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.372
 1 1 1 1 0 0 1 Q 1 D z z n n n n d d d d 1 1 0 1 N 1 M 0 m m m m	 VQRDMULH<c>.<dt>_<Qd>,_<Qn>,_<Dm[x]>_VQRDMULH<c>.<dt>_<Dd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.376
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 0 0 N Q M 1 m m m m	 VQADD<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VQADD<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.370
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 0 1 N Q M 0 m m m m	 VRHADD<c>_<Qd>,_<Qn>,_<Qm>_VRHADD<c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.387
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 0 N Q M 1 m m m m	 VQSUB<c>.<type><size>_<Qd>,_<Qn>,_<Qm>_VQSUB<c>.<type><size>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.382
-1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 1 N Q M 0 m m m m	 VCGT<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VCGT<c>.<dt>_<Dd>,_<Dn>,_<Dm>  T1/A1 A8.8.295
-1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 1 N Q M 1 m m m m	 VCGE<c>.<dt>_<Qd>,_<Qn>,_<Qm> _VCGE<c>.<dt>_<Dd>,_<Dn>,_<Dm>  T1/A1 A8.8.293
-1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 f 0 N Q M 0 m m m m	 VH<op><c>_<Qd>,_<Qn>,_<Qm>_VH<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.319
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 1 N Q M 0 m m m m	 VCGT<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VCGT<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.295
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 1 N Q M 1 m m m m	 VCGE<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VCGE<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.293
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 0 0 N Q M 0 m m m m	 VHADD<c>_<Qd>,_<Qn>,_<Qm>_VH<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.319
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 0 1 0 N Q M 0 m m m m	 VHSUB<c>_<Qd>,_<Qn>,_<Qm>_VH<op><c>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.319
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 0 0 N Q M 0 m m m m	 VSHL<c>.<type><size>_<Qd>,_<Qm>,_<Qn>_VSHL<c>.<type><size>_<Dd>,_<Dm>,_<Dn> T1/A1 A8.8.396
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 0 0 N Q M 1 m m m m	 VQSHL<c>.<type><size>_<Qd>,_<Qm>,_<Qn>_VQSHL<c>.<type><size>_<Dd>,_<Dm>,_<Dn> T1/A1 A8.8.379
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 0 1 N Q M 0 m m m m	 VRSHL<c>.<type><size>_<Qd>,_<Qm>,_<Qn>_VRSHL<c>.<type><size>_<Dd>,_<Dm>,_<Dn> T1/A1 A8.8.388
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 0 1 N Q M 1 m m m m	 VQRSHL<c>.<type><size>_<Qd>,_<Qm>,_<Qn>_VQRSHL<c>.<type><size>_<Dd>,_<Dm>,_<Dn> T1/A1 A8.8.377
-1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 1 0 N Q M f m m m m	 V<op><c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.334
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 1 0 N Q M 0 m m m m	 VMAX<c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.334
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 1 0 N Q M 1 m m m m	 VMIN<c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.334
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 1 1 N Q M 0 m m m m	 VABD<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VABD<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.278
 1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 0 1 1 1 N Q M 1 m m m m	 VABA<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VABA<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.277
-1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 1 0 1 0 N Q M f m m m m	 VP<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.365
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 1 0 1 0 N Q M 0 m m m m	 VPMAX<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.365
+1 1 1 1 0 0 1 U 0 D z z n n n n d d d d 1 0 1 0 N Q M 1 m m m m	 VPMIN<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.365
 1 1 1 1 0 0 1 U 1 D x x x 0 0 0 d d d d 1 0 1 0 0 0 M 1 m m m m	 VMOVL<c>.<dt>_<Qd>,_<Dm> T1/A1 A8.8.346
 1 1 1 1 0 0 1 U 1 D x x x x x x d d d d 0 0 0 0 L Q M 1 m m m m	 VSHR<c>.<type><size>_<Qd>,_<Qm>,_#<imm>_VSHR<c>.<type><size>_<Dd>,_<Dm>,_#<imm> T1/A1 A8.8.398
 1 1 1 1 0 0 1 U 1 D x x x x x x d d d d 0 0 0 1 L Q M 1 m m m m	 VSRA<c>.<type><size>_<Qd>,_<Qm>,_#<imm>_VSRA<c>.<type><size>_<Dd>,_<Dm>,_#<imm> T1/A1 A8.8.402
@@ -108,15 +121,18 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 0 1 f N 0 M 0 m m m m	 VSUBL<c>.<dt>_<Qd>,_<Dn>,_<Dm>_VSUBW<c>.<dt>_<Qd>,_<Qn>,_<Dm> T1/A1 A8.8.417
 1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 1 0 1 N 0 M 0 m m m m	 VABAL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.277
 1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 1 1 1 N 0 M 0 m m m m	 VABDL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.278
-1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 f 1 0 N 1 M 0 m m m m	 V<op>L<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.338
+1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 0 1 0 N 1 M 0 m m m m	 VMLAL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.338
+1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 0 1 1 0 N 1 M 0 m m m m	 VMLSL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.338
 1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 1 0 1 0 N 1 M 0 m m m m	 VMULL<c>.<dt>_<Qd>,_<Dn>,_<Dm[x]> T2/A2 A8.8.352
-1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 1 0 f 0 N 0 M 0 m m m m	 V<op>L<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.336
+1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 1 0 0 0 N 0 M 0 m m m m	 VMLAL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.336
+1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 1 0 1 0 N 0 M 0 m m m m	 VMLSL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.336
 1 1 1 1 0 0 1 U 1 D z z n n n n d d d d 1 1 f 0 N 0 M 0 m m m m	 VMULL<c>.<dt>_<Qd>,_<Dn>,_<Dm> T2/A2 A8.8.350
 1 1 1 1 0 0 1 i 1 D 0 0 0 x x x d d d d M M M M 0 Q 0 1 x x x x	 VORR<c>.<dt>_<Qd>,_#<imm>_VORR<c>.<dt>_<Dd>,_#<imm> T1/A1 A8.8.359
 1 1 1 1 0 0 1 i 1 D 0 0 0 x x x d d d d M M M M 0 Q 1 1 x x x x	 VBIC<c>.<dt>_<Qd>,_#<imm>_VBIC<c>.<dt>_<Dd>,_#<imm> T1/A1 A8.8.288
 1 1 1 1 0 0 1 i 1 D 0 0 0 x x x d d d d M M M M 0 Q 1 1 x x x x	 VMVN<c>.<dt>_<Qd>,_#<imm>_VMVN<c>.<dt>_<Dd>,_#<imm> T1/A1 A8.8.353
 1 1 1 1 0 0 1 i 1 D 0 0 0 x x x d d d d M M M M 0 Q f 1 x x x x	 VMOV<c>.<dt>_<Qd>,_#<imm>_VMOV<c>.<dt>_<Dd>,_#<imm> T1/A1 A8.8.339
-1 1 1 1 0 0 1 f 0 D z z n n n n d d d d 1 0 0 1 N Q M 0 m m m m	 V<op><c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.336
+1 1 1 1 0 0 1 0 0 D z z n n n n d d d d 1 0 0 1 N Q M 0 m m m m	 VMLA<c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.336
+1 1 1 1 0 0 1 1 0 D z z n n n n d d d d 1 0 0 1 N Q M 0 m m m m	 VMLS<c>.<dt>_<Qd>,_<Qn>,_<Qm>_V<op><c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.336
 1 1 1 1 0 0 1 f 0 D z z n n n n d d d d 1 0 0 1 N Q M 1 m m m m	 VMUL<c>.<dt>_<Qd>,_<Qn>,_<Qm>_VMUL<c>.<dt>_<Dd>,_<Dn>,_<Dm> T1/A1 A8.8.350
 1 1 1 1 0 1 0 0 0 D 0 0 n n n n d d d d t t t t z z a a m m m m	 VST1<c>.<size>_<list>,_[<Rn>{:<align>}]{!}_VST1<c>.<size>_<list>,_[<Rn>{:<align>}],_<Rm> T1/A1 A8.8.404
 1 1 1 1 0 1 0 0 0 D 0 0 n n n n d d d d t t t t z z a a m m m m	 VST2<c>.<size>_<list>,_[<Rn>{:<align>}]{!}_VST2<c>.<size>_<list>,_[<Rn>{:<align>}],_<Rm> T1/A1 A8.8.406
@@ -138,20 +154,20 @@ of each description. The listing should contain both A1 and A2 encodings.
 1 1 1 1 0 1 0 0 1 D 1 0 n n n n d d d d z z 0 1 a a a a m m m m	 VLD2<c>.<size>_<list>,_[<Rn>{:<align>}]{!}_VLD2<c>.<size>_<list>,_[<Rn>{:<align>}],_<Rm> T1/A1 A8.8.324
 1 1 1 1 0 1 0 0 1 D 1 0 n n n n d d d d z z 1 0 a a a a m m m m	 VLD3<c>.<size>_<list>,_[<Rn>]{!}_VLD3<c>.<size>_<list>,_[<Rn>],_<Rm> T1/A1 A8.8.327
 1 1 1 1 0 1 0 0 1 D 1 0 n n n n d d d d z z 1 1 a a a a m m m m	 VLD4<c>.<size>_<list>,_[<Rn>{:<align>}]{!}_VLD4<c>.<size>_<list>,_[<Rn>{:<align>}],_<Rm> T1/A1 A8.8.330
-1 1 1 1 0 1 0 0 U 1 0 1 n n n n (1) (1) (1) (1) x x x x x x x x x x x x	 PLI_[<Rn>,_#+/-<x x x x x x x x x x x x>]_PLI_<label>_PLI_[PC,_#-0]_Special_case A1 A8.8.129
+1 1 1 1 0 1 0 0 U 1 0 1 n n n n (1) (1) (1) (1) x x x x x x x x x x x x	 PLI_[<Rn>,_#+/-<imm12>]_PLI_<label>_PLI_[PC,_#-0]_Special_case A1 A8.8.129
 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 1 (1) (1) (1) (1)	 CLREX A1 A8.8.32
 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 0 0 o o o o	 DSB_<option> A1 A8.8.44
 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 0 1 o o o o	 DMB_<option> A1 A8.8.43
 1 1 1 1 0 1 0 1 0 1 1 1 (1) (1) (1) (1) (1) (1) (1) (1) (0) (0) (0) (0) 0 1 1 0 o o o o	 ISB_<option> A1 A8.8.53
 1 1 1 1 0 1 0 1 U (1) 0 1 1 1 1 1 (1) (1) (1) (1) x x x x x x x x x x x x	 PLD_<label>_PLD_[PC,_#-0]_Special_case A1 A8.8.127
-1 1 1 1 0 1 0 1 U R 0 1 n n n n (1) (1) (1) (1) x x x x x x x x x x x x	 PLD{W}_[<Rn>,_#+/-<x x x x x x x x x x x x>] A1 A8.8.126
+1 1 1 1 0 1 0 1 U R 0 1 n n n n (1) (1) (1) (1) x x x x x x x x x x x x	 PLD{W}_[<Rn>,_#+/-<imm12>] A1 A8.8.126
 1 1 1 1 0 1 1 0 U 1 0 1 n n n n (1) (1) (1) (1) x x x x x T T 0 m m m m	 PLI_[<Rn>,+/-<Rm>{,_<shift>}] A1 A8.8.130
 1 1 1 1 0 1 1 1 U R 0 1 n n n n (1) (1) (1) (1) x x x x x T T 0 m m m m	 PLD{W}_[<Rn>,+/-<Rm>{,_<shift>}] A1 A8.8.128
 1 1 1 1 1 0 0 P U 0 W 1 n n n n (0) (0) (0) (0) (1) (0) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0)	 RFE{<amode>}_<Rn>{!} A1 B9.3.13
 1 1 1 1 1 0 0 P U 1 W 0 (1) (1) (0) (1) (0) (0) (0) (0) (0) (1) (0) (1) (0) (0) (0) m m m m m	 SRS{<amode>}_SP{!},_#<mode> A1 B9.3.16
 1 1 1 1 1 0 1 H x x x x x x x x x x x x x x x x x x x x x x x x	 BLX_<label> A2 A8.8.25
 1 1 1 1 1 1 0 0 0 1 0 0 T T T T t t t t p p p p f f f f m m m m	 MCRR2<c>_<coproc>,_<opc1>,_<Rt>,_<Rt2>,_<CRm> T2/A2 A8.8.99
-1 1 1 1 1 1 0 0 0 1 0 1 T T T T t t t t p p p p f f f f m m m m  MRRC2<c>_<coproc>,_<opc>,_<Rt>,_<Rt2>,_<CRm> T2/A2 A8.8.108
+1 1 1 1 1 1 0 0 0 1 0 1 T T T T t t t t p p p p f f f f m m m m	 MRRC2<c>_<coproc>,_<opc>,_<Rt>,_<Rt2>,_<CRm> T2/A2 A8.8.108
 1 1 1 1 1 1 0 P U D W 0 n n n n d d d d p p p p x x x x x x x x	 STC2{L}<c>_<coproc>,_<CRd>,_[<Rn>,_#+/-<imm>]{!}_STC2{L}<c>_<coproc>,_<CRd>,_[<Rn>],_#+/-<imm>_STC2{L}<c>_<coproc>,_<CRd>,_[<Rn>],_<option> T2/A2 A8.8.198
 1 1 1 1 1 1 0 P U D W 1 1 1 1 1 d d d d p p p p x x x x x x x x	 LDC2{L}<c>_<coproc>,_<CRd>,_<label>_LDC2{L}<c>_<coproc>,_<CRd>,_[PC,_#-0]_Special_case_LDC2{L}<c>_<coproc>,_<CRd>,_[PC],_<option> T2/A2 A8.8.56
 1 1 1 1 1 1 0 P U D W 1 n n n n d d d d p p p p x x x x x x x x	 LDC2{L}<c>_<coproc>,_<CRd>,_[<Rn>,_#+/-<imm>]{!}_LDC2{L}<c>_<coproc>,_<CRd>,_[<Rn>],_#+/-<imm>_LDC2{L}<c>_<coproc>,_<CRd>,_[<Rn>],_<option> T2/A2 A8.8.55
@@ -189,10 +205,10 @@ c c c c 0 0 0 0 U 0 1 0 n n n n t t t t (0) (0) (0) (0) 1 0 1 1 m m m m	 STRHT<c
 c c c c 0 0 0 0 U 0 1 1 n n n n t t t t (0) (0) (0) (0) 1 0 1 1 m m m m	 LDRHT<c>_<Rt>,_[<Rn>],_+/-<Rm> A2 A8.8.83
 c c c c 0 0 0 0 U 0 1 1 n n n n t t t t (0) (0) (0) (0) 1 1 0 1 m m m m	 LDRSBT<c>_<Rt>,_[<Rn>],_+/-<Rm> A2 A8.8.87
 c c c c 0 0 0 0 U 0 1 1 n n n n t t t t (0) (0) (0) (0) 1 1 1 1 m m m m	 LDRSHT<c>_<Rt>,_[<Rn>],_+/-<Rm> A2 A8.8.91
-c c c c 0 0 0 0 U 1 1 0 n n n n t t t t x x x x 1 0 1 1 x x x x	 STRHT<c>_<Rt>,_[<Rn>]_{,_#+/-<x x x x x x x x>} A1 A8.8.219
-c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 0 1 1 x x x x	 LDRHT<c>_<Rt>,_[<Rn>]_{,_#+/-<x x x x x x x x>} A1 A8.8.83
-c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRSBT<c>_<Rt>,_[<Rn>]_{,_#+/-<x x x x x x x x>} A1 A8.8.87
-c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 1 1 1 x x x x	 LDRSHT<c>_<Rt>,_[<Rn>]_{,_#+/-<x x x x x x x x>} A1 A8.8.91
+c c c c 0 0 0 0 U 1 1 0 n n n n t t t t x x x x 1 0 1 1 x x x x	 STRHT<c>_<Rt>,_[<Rn>]_{,_#+/-<imm8>} A1 A8.8.219
+c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 0 1 1 x x x x	 LDRHT<c>_<Rt>,_[<Rn>]_{,_#+/-<imm8>} A1 A8.8.83
+c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRSBT<c>_<Rt>,_[<Rn>]_{,_#+/-<imm8>} A1 A8.8.87
+c c c c 0 0 0 0 U 1 1 1 n n n n t t t t x x x x 1 1 1 1 x x x x	 LDRSHT<c>_<Rt>,_[<Rn>]_{,_#+/-<imm8>} A1 A8.8.91
 c c c c 0 0 0 1 0 0 0 0 (1) (1) (1) (1) d d d d (0) (0) 0 (0) 0 0 0 0 (0) (0) (0) (0)	 MRS<c>_<Rd>,_<spec_reg> A1 A8.8.109
 c c c c 0 0 0 1 0 0 0 0 d d d d a a a a m m m m 1 M N 0 n n n n	 SMLA<x><y><c>_<Rd>,_<Rn>,_<Rm>,_<Ra> A1 A8.8.176
 c c c c 0 0 0 1 0 0 0 0 n n n n d d d d (0) (0) (0) (0) 0 1 0 1 m m m m	 QADD<c>_<Rd>,_<Rm>,_<Rn> A1 A8.8.134
@@ -204,7 +220,7 @@ c c c c 0 0 0 1 0 0 1 0 (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) 0 0 1 1 
 c c c c 0 0 0 1 0 0 1 0 d d d d (0) (0) (0) (0) m m m m 1 M 1 0 n n n n	 SMULW<y><c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.190
 c c c c 0 0 0 1 0 0 1 0 d d d d a a a a m m m m 1 M 0 0 n n n n	 SMLAW<y><c>_<Rd>,_<Rn>,_<Rm>,_<Ra> A1 A8.8.181
 c c c c 0 0 0 1 0 0 1 0 n n n n d d d d (0) (0) (0) (0) 0 1 0 1 m m m m	 QSUB<c>_<Rd>,_<Rm>,_<Rn> A1 A8.8.141
-c c c c 0 0 0 1 0 0 1 0 x x x x x x x x x x x x 0 1 1 1 x x x x	 BKPT_#<x x x x x x x x x x x x x x x x> A1 A8.8.24
+c c c c 0 0 0 1 0 0 1 0 x x x x x x x x x x x x 0 1 1 1 x x x x	 BKPT_#<imm12> A1 A8.8.24
 c c c c 0 0 0 1 0 0 1 0 m m 0 0 (1) (1) (1) (1) (0) (0) 0 (0) 0 0 0 0 n n n n	 MSR<c>_<spec_reg>,_<Rn> A1 A8.8.112
 c c c c 0 0 0 1 0 0 1 1 n n n n (0) (0) (0) (0) s s s s 0 T T 1 m m m m	 TEQ<c>_<Rn>,_<Rm>,_<type>_<Rs> A1 A8.8.239
 c c c c 0 0 0 1 0 0 1 1 n n n n (0) (0) (0) (0) x x x x x T T 0 m m m m	 TEQ<c>_<Rn>,_<Rm>{,_<shift>} A1 A8.8.238
@@ -214,7 +230,7 @@ c c c c 0 0 0 1 0 1 0 0 x x x x x x x x x x x x 0 1 1 1 x x x x	 HVC_#<imm> A1 B
 c c c c 0 0 0 1 0 1 0 1 n n n n (0) (0) (0) (0) s s s s 0 T T 1 m m m m	 CMP<c>_<Rn>,_<Rm>,_<type>_<Rs> A1 A8.8.39
 c c c c 0 0 0 1 0 1 0 1 n n n n (0) (0) (0) (0) x x x x x T T 0 m m m m	 CMP<c>_<Rn>,_<Rm>{,_<shift>} A1 A8.8.38
 c c c c 0 0 0 1 0 1 1 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) 0 1 1 0 (1) (1) (1) (0)	 ERET<c> A1 B9.3.3
-c c c c 0 0 0 1 0 1 1 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) 0 1 1 1 x x x x	 SMC<c>_#<x x x x> A1 B9.3.14
+c c c c 0 0 0 1 0 1 1 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) 0 1 1 1 x x x x	 SMC<c>_#<imm4> A1 B9.3.14
 c c c c 0 0 0 1 0 1 1 0 (1) (1) (1) (1) d d d d (1) (1) (1) (1) 0 0 0 1 m m m m	 CLZ<c>_<Rd>,_<Rm> A1 A8.8.33
 c c c c 0 0 0 1 0 1 1 0 d d d d (0) (0) (0) (0) m m m m 1 M N 0 n n n n	 SMUL<x><y><c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.188
 c c c c 0 0 0 1 0 1 1 0 n n n n d d d d (0) (0) (0) (0) 0 1 0 1 m m m m	 QDSUB<c>_<Rd>,_<Rm>,_<Rn> A1 A8.8.139
@@ -237,7 +253,7 @@ c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d m m m m 0 0 0 1 n n n n	 LSL{S}<
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d m m m m 0 0 1 1 n n n n	 LSR{S}<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.97
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d m m m m 0 1 0 1 n n n n	 ASR{S}<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.17
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d m m m m 0 1 1 1 n n n n	 ROR{S}<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.150
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x 0 0 0 m m m m	 LSL{S}<c>_<Rd>,_<Rm>,_#<x x x x x> A1 A8.8.94
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x 0 0 0 m m m m	 LSL{S}<c>_<Rd>,_<Rm>,_#<imm5> A1 A8.8.94
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x 0 1 0 m m m m	 LSR{S}<c>_<Rd>,_<Rm>,_#<imm> A1 A8.8.96
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x 1 0 0 m m m m	 ASR{S}<c>_<Rd>,_<Rm>,_#<imm> A1 A8.8.16
 c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x 1 1 0 m m m m	 ROR{S}<c>_<Rd>,_<Rm>,_#<imm> A1 A8.8.149
@@ -255,15 +271,15 @@ c c c c 0 0 0 P U 0 W 0 n n n n t t t t (0) (0) (0) (0) 1 1 1 1 m m m m	 STRD<c>
 c c c c 0 0 0 P U 0 W 1 n n n n t t t t (0) (0) (0) (0) 1 0 1 1 m m m m	 LDRH<c>_<Rt>,_[<Rn>,+/-<Rm>]{!}_LDRH<c>_<Rt>,_[<Rn>],+/-<Rm> A1 A8.8.82
 c c c c 0 0 0 P U 0 W 1 n n n n t t t t (0) (0) (0) (0) 1 1 0 1 m m m m	 LDRSB<c>_<Rt>,_[<Rn>,+/-<Rm>]{!}_LDRSB<c>_<Rt>,_[<Rn>],+/-<Rm> A1 A8.8.86
 c c c c 0 0 0 P U 0 W 1 n n n n t t t t (0) (0) (0) (0) 1 1 1 1 m m m m	 LDRSH<c>_<Rt>,_[<Rn>,+/-<Rm>]{!}_LDRSH<c>_<Rt>,_[<Rn>],+/-<Rm> A1 A8.8.90
-c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 0 1 1 x x x x	 STRH<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x>}]_STRH<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x>_STRH<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.217
-c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRD<c>_<Rt>,_<Rt2>,_[<Rn>{,_#+/-<x x x x x x x x>}]_LDRD<c>_<Rt>,_<Rt2>,_[<Rn>],_#+/-<x x x x x x x x>_LDRD<c>_<Rt>,_<Rt2>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.72
-c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 1 1 1 x x x x	 STRD<c>_<Rt>,_<Rt2>,_[<Rn>{,_#+/-<x x x x x x x x>}]_STRD<c>_<Rt>,_<Rt2>,_[<Rn>],_#+/-<x x x x x x x x>_STRD<c>_<Rt>,_<Rt2>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.210
+c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 0 1 1 x x x x	 STRH<c>_<Rt>,_[<Rn>{,_#+/-<imm8>}]_STRH<c>_<Rt>,_[<Rn>],_#+/-<imm8>_STRH<c>_<Rt>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.217
+c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRD<c>_<Rt>,_<Rt2>,_[<Rn>{,_#+/-<imm8>}]_LDRD<c>_<Rt>,_<Rt2>,_[<Rn>],_#+/-<imm8>_LDRD<c>_<Rt>,_<Rt2>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.72
+c c c c 0 0 0 P U 1 W 0 n n n n t t t t x x x x 1 1 1 1 x x x x	 STRD<c>_<Rt>,_<Rt2>,_[<Rn>{,_#+/-<imm8>}]_STRD<c>_<Rt>,_<Rt2>,_[<Rn>],_#+/-<imm8>_STRD<c>_<Rt>,_<Rt2>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.210
 c c c c 0 0 0 P U 1 W 1 1 1 1 1 t t t t x x x x 1 0 1 1 x x x x	 LDRH<c>_<Rt>,_<label>_LDRH<c>_<Rt>,_[PC,_#-0]_Special_case A1 A8.8.81
 c c c c 0 0 0 P U 1 W 1 1 1 1 1 t t t t x x x x 1 1 0 1 x x x x	 LDRSB<c>_<Rt>,_<label>_LDRSB<c>_<Rt>,_[PC,_#-0]_Special_case A1 A8.8.85
 c c c c 0 0 0 P U 1 W 1 1 1 1 1 t t t t x x x x 1 1 1 1 x x x x	 LDRSH<c>_<Rt>,_<label>_LDRSH<c>_<Rt>,_[PC,_#-0]_Special_case A1 A8.8.89
-c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 0 1 1 x x x x	 LDRH<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x>}]_LDRH<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x>_LDRH<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.80
-c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRSB<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x>}]_LDRSB<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x>_LDRSB<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.84
-c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 1 1 1 x x x x	 LDRSH<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x>}]_LDRSH<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x>_LDRSH<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x>]! A1 A8.8.88
+c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 0 1 1 x x x x	 LDRH<c>_<Rt>,_[<Rn>{,_#+/-<imm8>}]_LDRH<c>_<Rt>,_[<Rn>],_#+/-<imm8>_LDRH<c>_<Rt>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.80
+c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 1 0 1 x x x x	 LDRSB<c>_<Rt>,_[<Rn>{,_#+/-<imm8>}]_LDRSB<c>_<Rt>,_[<Rn>],_#+/-<imm8>_LDRSB<c>_<Rt>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.84
+c c c c 0 0 0 P U 1 W 1 n n n n t t t t x x x x 1 1 1 1 x x x x	 LDRSH<c>_<Rt>,_[<Rn>{,_#+/-<imm8>}]_LDRSH<c>_<Rt>,_[<Rn>],_#+/-<imm8>_LDRSH<c>_<Rt>,_[<Rn>,_#+/-<imm8>]! A1 A8.8.88
 c c c c 0 0 1 0 0 0 0 S n n n n d d d d x x x x x x x x x x x x	 AND{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.13
 c c c c 0 0 1 0 0 0 1 S n n n n d d d d x x x x x x x x x x x x	 EOR{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.46
 c c c c 0 0 1 0 0 1 0 0 1 1 1 1 d d d d x x x x x x x x x x x x	 ADR<c>_<Rd>,_<label>_<label>_before_current_instruction_SUB_<Rd>,_PC,_#0_Special_case_for_subtraction_of_zero A2 A8.8.12
@@ -276,7 +292,7 @@ c c c c 0 0 1 0 1 0 0 S n n n n d d d d x x x x x x x x x x x x	 ADD{S}<c>_<Rd>,
 c c c c 0 0 1 0 1 0 1 S n n n n d d d d x x x x x x x x x x x x	 ADC{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.1
 c c c c 0 0 1 0 1 1 0 S n n n n d d d d x x x x x x x x x x x x	 SBC{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.161
 c c c c 0 0 1 0 1 1 1 S n n n n d d d d x x x x x x x x x x x x	 RSC{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.155
-c c c c 0 0 1 1 0 0 0 0 x x x x d d d d x x x x x x x x x x x x	 MOVW<c>_<Rd>,_#<x x x x x x x x x x x x x x x x> A2 A8.8.102
+c c c c 0 0 1 1 0 0 0 0 x x x x d d d d x x x x x x x x x x x x	 MOVW<c>_<Rd>,_#<imm12> A2 A8.8.102
 c c c c 0 0 1 1 0 0 0 1 n n n n (0) (0) (0) (0) x x x x x x x x x x x x	 TST<c>_<Rn>,_#<const> A1 A8.8.240
 c c c c 0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 0 0	 NOP<c> A1 A8.8.119
 c c c c 0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 0 0 1	 YIELD<c> A1 A8.8.426
@@ -286,7 +302,7 @@ c c c c 0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 0 0 1 0 0	
 c c c c 0 0 1 1 0 0 1 0 0 0 0 0 (1) (1) (1) (1) (0) (0) (0) (0) 1 1 1 1 o o o o	 DBG<c>_#<option> A1 A8.8.42
 c c c c 0 0 1 1 0 0 1 0 m m 0 0 (1) (1) (1) (1) x x x x x x x x x x x x	 MSR<c>_<spec_reg>,_#<const> A1 A8.8.111
 c c c c 0 0 1 1 0 0 1 1 n n n n (0) (0) (0) (0) x x x x x x x x x x x x	 TEQ<c>_<Rn>,_#<const> A1 A8.8.237
-c c c c 0 0 1 1 0 1 0 0 x x x x d d d d x x x x x x x x x x x x	 MOVT<c>_<Rd>,_#<x x x x x x x x x x x x x x x x> A1 A8.8.106
+c c c c 0 0 1 1 0 1 0 0 x x x x d d d d x x x x x x x x x x x x	 MOVT<c>_<Rd>,_#<imm12> A1 A8.8.106
 c c c c 0 0 1 1 0 1 0 1 n n n n (0) (0) (0) (0) x x x x x x x x x x x x	 CMP<c>_<Rn>,_#<const> A1 A8.8.37
 c c c c 0 0 1 1 0 1 1 1 n n n n (0) (0) (0) (0) x x x x x x x x x x x x	 CMN<c>_<Rn>,_#<const> A1 A8.8.34
 c c c c 0 0 1 1 0 R 1 0 m m m m (1) (1) (1) (1) x x x x x x x x x x x x	 MSR<c>_<spec_reg>,_#<const> A1 B9.3.11
@@ -294,19 +310,18 @@ c c c c 0 0 1 1 1 0 0 S n n n n d d d d x x x x x x x x x x x x	 ORR{S}<c>_<Rd>,
 c c c c 0 0 1 1 1 0 1 S (0) (0) (0) (0) d d d d x x x x x x x x x x x x	 MOV{S}<c>_<Rd>,_#<const> A1 A8.8.102
 c c c c 0 0 1 1 1 1 0 S n n n n d d d d x x x x x x x x x x x x	 BIC{S}<c>_<Rd>,_<Rn>,_#<const> A1 A8.8.21
 c c c c 0 0 1 1 1 1 1 S (0) (0) (0) (0) d d d d x x x x x x x x x x x x	 MVN{S}<c>_<Rd>,_#<const> A1 A8.8.115
-c c c c 0 0 1 C C C C 1 n n n n 1 1 1 1 x x x x x x x x x x x x	 <opc1>S<c>_PC,_<Rn>,_#<const>_<opc2>S<c>_PC,_#<const> A1 B9.3.20
-c c c c 0 1 0 0 1 0 0 1 1 1 0 1 t t t t 0 0 0 0 0 0 0 0 0 1 0 0	 POP<c>_<registers> ,_<Rt> A2 A8.8.132
-c c c c 0 1 0 0 U 0 1 0 n n n n t t t t x x x x x x x x x x x x	 STRT<c>_<Rt>,_[<Rn>]_{,_+/-<x x x x x x x x x x x x>} A1 A8.8.220
-c c c c 0 1 0 0 U 0 1 1 n n n n t t t t x x x x x x x x x x x x	 LDRT<c>_<Rt>,_[<Rn>]_{,_#+/-<x x x x x x x x x x x x>} A1 A8.8.92
-c c c c 0 1 0 0 U 1 1 0 n n n n t t t t x x x x x x x x x x x x	 STRBT<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x> A1 A8.8.209
-c c c c 0 1 0 0 U 1 1 1 n n n n t t t t x x x x x x x x x x x x	 LDRBT<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x> A1 A8.8.71
-c c c c 0 1 0 1 0 0 1 0 1 1 0 1 t t t t 0 0 0 0 0 0 0 0 0 1 0 0	 PUSH<c>_<registers> ,_<Rt> A2 A8.8.133
-c c c c 0 1 0 P U 0 W 0 n n n n t t t t x x x x x x x x x x x x	 STR<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x x x x x>}]_STR<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x>_STR<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x x x x x>]! A1 A8.8.204
+c c c c 0 1 0 0 1 0 0 1 1 1 0 1 t t t t 0 0 0 0 0 0 0 0 0 1 0 0	 POP<c>_<registers>,_<Rt> A2 A8.8.132
+c c c c 0 1 0 0 U 0 1 0 n n n n t t t t x x x x x x x x x x x x	 STRT<c>_<Rt>,_[<Rn>]_{,_+/-<imm12>} A1 A8.8.220
+c c c c 0 1 0 0 U 0 1 1 n n n n t t t t x x x x x x x x x x x x	 LDRT<c>_<Rt>,_[<Rn>]_{,_#+/-<imm12>} A1 A8.8.92
+c c c c 0 1 0 0 U 1 1 0 n n n n t t t t x x x x x x x x x x x x	 STRBT<c>_<Rt>,_[<Rn>],_#+/-<imm12> A1 A8.8.209
+c c c c 0 1 0 0 U 1 1 1 n n n n t t t t x x x x x x x x x x x x	 LDRBT<c>_<Rt>,_[<Rn>],_#+/-<imm12> A1 A8.8.71
+c c c c 0 1 0 1 0 0 1 0 1 1 0 1 t t t t 0 0 0 0 0 0 0 0 0 1 0 0	 PUSH<c>_<registers>,_<Rt> A2 A8.8.133
+c c c c 0 1 0 P U 0 W 0 n n n n t t t t x x x x x x x x x x x x	 STR<c>_<Rt>,_[<Rn>{,_#+/-<imm12>}]_STR<c>_<Rt>,_[<Rn>],_#+/-<imm12>_STR<c>_<Rt>,_[<Rn>,_#+/-<imm12>]! A1 A8.8.204
 c c c c 0 1 0 P U 0 W 1 1 1 1 1 t t t t x x x x x x x x x x x x	 LDR<c>_<Rt>,_<label>_LDR<c>_<Rt>,_[PC,_#-0]_Special_case A1 A8.8.64
-c c c c 0 1 0 P U 0 W 1 n n n n t t t t x x x x x x x x x x x x	 LDR<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x x x x x>}]_LDR<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x>_LDR<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x x x x x>]! A1 A8.8.63
-c c c c 0 1 0 P U 1 W 0 n n n n t t t t x x x x x x x x x x x x	 STRB<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x x x x x>}]_STRB<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x>_STRB<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x x x x x>]! A1 A8.8.207
+c c c c 0 1 0 P U 0 W 1 n n n n t t t t x x x x x x x x x x x x	 LDR<c>_<Rt>,_[<Rn>{,_#+/-<imm12>}]_LDR<c>_<Rt>,_[<Rn>],_#+/-<imm12>_LDR<c>_<Rt>,_[<Rn>,_#+/-<imm12>]! A1 A8.8.63
+c c c c 0 1 0 P U 1 W 0 n n n n t t t t x x x x x x x x x x x x	 STRB<c>_<Rt>,_[<Rn>{,_#+/-<imm12>}]_STRB<c>_<Rt>,_[<Rn>],_#+/-<imm12>_STRB<c>_<Rt>,_[<Rn>,_#+/-<imm12>]! A1 A8.8.207
 c c c c 0 1 0 P U 1 W 1 1 1 1 1 t t t t x x x x x x x x x x x x	 LDRB<c>_<Rt>,_<label>_LDRB<c>_<Rt>,_[PC,_#-0]_Special_case A1 A8.8.69
-c c c c 0 1 0 P U 1 W 1 n n n n t t t t x x x x x x x x x x x x	 LDRB<c>_<Rt>,_[<Rn>{,_#+/-<x x x x x x x x x x x x>}]_LDRB<c>_<Rt>,_[<Rn>],_#+/-<x x x x x x x x x x x x>_LDRB<c>_<Rt>,_[<Rn>,_#+/-<x x x x x x x x x x x x>]! A1 A8.8.68
+c c c c 0 1 0 P U 1 W 1 n n n n t t t t x x x x x x x x x x x x	 LDRB<c>_<Rt>,_[<Rn>{,_#+/-<imm12>}]_LDRB<c>_<Rt>,_[<Rn>],_#+/-<imm12>_LDRB<c>_<Rt>,_[<Rn>,_#+/-<imm12>]! A1 A8.8.68
 c c c c 0 1 1 0 0 0 0 1 n n n n d d d d (1) (1) (1) (1) 0 0 0 1 m m m m	 SADD16<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.158
 c c c c 0 1 1 0 0 0 0 1 n n n n d d d d (1) (1) (1) (1) 0 0 1 1 m m m m	 SASX<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.160
 c c c c 0 1 1 0 0 0 0 1 n n n n d d d d (1) (1) (1) (1) 0 1 0 1 m m m m	 SSAX<c>_<Rd>,_<Rn>,_<Rm> A1 A8.8.195
@@ -359,12 +374,12 @@ c c c c 0 1 1 0 1 1 0 0 1 1 1 1 d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTB16<c>_<
 c c c c 0 1 1 0 1 1 0 0 n n n n d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTAB16<c>_<Rd>,_<Rn>,_<Rm>{,_<rotation>} A1 A8.8.272
 c c c c 0 1 1 0 1 1 1 0 1 1 1 1 d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTB<c>_<Rd>,_<Rm>{,_<rotation>} A1 A8.8.274
 c c c c 0 1 1 0 1 1 1 0 n n n n d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTAB<c>_<Rd>,_<Rn>,_<Rm>{,_<rotation>} A1 A8.8.271
-c c c c 0 1 1 0 1 1 1 0 i i i i d d d d (1) (1) (1) (1) 0 0 1 1 n n n n	 USAT16<c>_<Rd>,_#<x x x x>,_<Rn> A1 A8.8.267
+c c c c 0 1 1 0 1 1 1 0 i i i i d d d d (1) (1) (1) (1) 0 0 1 1 n n n n	 USAT16<c>_<Rd>,_#<imm4>,_<Rn> A1 A8.8.267
 c c c c 0 1 1 0 1 1 1 1 (1) (1) (1) (1) d d d d (1) (1) (1) (1) 0 0 1 1 m m m m	 RBIT<c>_<Rd>,_<Rm> A1 A8.8.144
 c c c c 0 1 1 0 1 1 1 1 (1) (1) (1) (1) d d d d (1) (1) (1) (1) 1 0 1 1 m m m m	 REVSH<c>_<Rd>,_<Rm> A1 A8.8.147
 c c c c 0 1 1 0 1 1 1 1 1 1 1 1 d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTH<c>_<Rd>,_<Rm>{,_<rotation>} A1 A8.8.276
 c c c c 0 1 1 0 1 1 1 1 n n n n d d d d r r (0) (0) 0 1 1 1 m m m m	 UXTAH<c>_<Rd>,_<Rn>,_<Rm>{,_<rotation>} A1 A8.8.273
-c c c c 0 1 1 0 1 1 1 i i i i i d d d d x x x x x s 0 1 n n n n	 USAT<c>_<Rd>,_#<x x x x x>,_<Rn>{,_<shift>} A1 A8.8.266
+c c c c 0 1 1 0 1 1 1 i i i i i d d d d x x x x x s 0 1 n n n n	 USAT<c>_<Rd>,_#<imm5>,_<Rn>{,_<shift>} A1 A8.8.266
 c c c c 0 1 1 0 U 0 1 0 n n n n t t t t x x x x x T T 0 m m m m	 STRT<c>_<Rt>,_[<Rn>],+/-<Rm>{,_<shift>} A2 A8.8.220
 c c c c 0 1 1 0 U 0 1 1 n n n n t t t t x x x x x T T 0 m m m m	 LDRT<c>_<Rt>,_[<Rn>],+/-<Rm>{,_<shift>} A2 A8.8.92
 c c c c 0 1 1 0 U 1 1 0 n n n n t t t t x x x x x T T 0 m m m m	 STRBT<c>_<Rt>,_[<Rn>],+/-<Rm>{,_<shift>} A2 A8.8.209
@@ -392,10 +407,10 @@ c c c c 0 1 1 P U 1 W 0 n n n n t t t t x x x x x T T 0 m m m m	 STRB<c>_<Rt>,_[
 c c c c 0 1 1 P U 1 W 1 n n n n t t t t x x x x x T T 0 m m m m	 LDRB<c>_<Rt>,_[<Rn>,+/-<Rm>{,_<shift>}]{!}_LDRB<c>_<Rt>,_[<Rn>],+/-<Rm>{,_<shift>} A1 A8.8.70
 c c c c 1 0 0 0 0 0 W 0 n n n n r r r r r r r r r r r r r r r r	 STMDA<c>_<Rn>{!},_<registers> A1 A8.8.200
 c c c c 1 0 0 0 0 0 W 1 n n n n r r r r r r r r r r r r r r r r	 LDMDA<c>_<Rn>{!},_<registers> A1 A8.8.59
-c c c c 1 0 0 0 1 0 1 1 1 1 0 1 r r r r r r r r r r r r r r r r	 POP<c>_<registers>  A1 A8.8.132
+c c c c 1 0 0 0 1 0 1 1 1 1 0 1 r r r r r r r r r r r r r r r r	 POP<c>_<registers> A1 A8.8.132
 c c c c 1 0 0 0 1 0 W 0 n n n n r r r r r r r r r r r r r r r r	 STM<c>_<Rn>{!},_<registers> A1 A8.8.199
 c c c c 1 0 0 0 1 0 W 1 n n n n r r r r r r r r r r r r r r r r	 LDM<c>_<Rn>{!},_<registers> A1 A8.8.58
-c c c c 1 0 0 1 0 0 1 0 1 1 0 1 r r r r r r r r r r r r r r r r	 PUSH<c>_<registers>  A1 A8.8.133
+c c c c 1 0 0 1 0 0 1 0 1 1 0 1 r r r r r r r r r r r r r r r r	 PUSH<c>_<registers> A1 A8.8.133
 c c c c 1 0 0 1 0 0 W 0 n n n n r r r r r r r r r r r r r r r r	 STMDB<c>_<Rn>{!},_<registers> A1 A8.8.201
 c c c c 1 0 0 1 0 0 W 1 n n n n r r r r r r r r r r r r r r r r	 LDMDB<c>_<Rn>{!},_<registers> A1 A8.8.60
 c c c c 1 0 0 1 1 0 W 0 n n n n r r r r r r r r r r r r r r r r	 STMIB<c>_<Rn>{!},_<registers> A1 A8.8.202
@@ -409,21 +424,21 @@ c c c c 1 1 0 0 0 1 0 0 T T T T t t t t p p p p f f f f m m m m	 MCRR<c>_<coproc
 c c c c 1 1 0 0 0 1 0 1 T T T T t t t t p p p p f f f f m m m m	 MRRC<c>_<coproc>,_<opc>,_<Rt>,_<Rt2>,_<CRm> T1/A1 A8.8.108
 c c c c 1 1 0 0 0 1 0 f T T T T t t t t 1 0 1 0 0 0 M 1 m m m m	 VMOV<c>_<Sm>,_<Sm1>,_<Rt>,_<Rt2>_VMOV<c>_<Rt>,_<Rt2>,_<Sm>,_<Sm1> T1/A1 A8.8.344
 c c c c 1 1 0 0 0 1 0 f T T T T t t t t 1 0 1 1 0 0 M 1 m m m m	 VMOV<c>_<Dm>,_<Rt>,_<Rt2>_VMOV<c>_<Rt>,_<Rt2>,_<Dm> T1/A1 A8.8.345
-c c c c 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 0 x x x x x x x x	 VPOP_<list>  T2/A2 A8.8.367
-c c c c 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 1 x x x x x x x x	 VPOP_<list>  T1/A1 A8.8.367
-c c c c 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 0 x x x x x x x x	 VPUSH<c>_<list>  T2/A2 A8.8.368
-c c c c 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 1 x x x x x x x x	 VPUSH<c>_<list>  T1/A1 A8.8.368
+c c c c 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 0 x x x x x x x x	 VPOP_<list> T2/A2 A8.8.367
+c c c c 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 1 x x x x x x x x	 VPOP_<list> T1/A1 A8.8.367
+c c c c 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 0 x x x x x x x x	 VPUSH<c>_<list> T2/A2 A8.8.368
+c c c c 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 1 x x x x x x x x	 VPUSH<c>_<list> T1/A1 A8.8.368
 c c c c 1 1 0 1 U D 0 0 n n n n d d d d 1 0 1 0 x x x x x x x x	 VSTR<c>_<Sd>,_[<Rn>{,_#+/-<imm>}] T2/A2 A8.8.413
 c c c c 1 1 0 1 U D 0 0 n n n n d d d d 1 0 1 1 x x x x x x x x	 VSTR<c>_<Dd>,_[<Rn>{,_#+/-<imm>}] T1/A1 A8.8.413
 c c c c 1 1 0 1 U D 0 1 n n n n d d d d 1 0 1 0 x x x x x x x x	 VLDR<c>_<Sd>,_[<Rn>{,_#+/-<imm>}]_VLDR<c>_<Sd>,_<label>_VLDR<c>_<Sd>,_[PC,_#-0]_Special_case T2/A2 A8.8.333
 c c c c 1 1 0 1 U D 0 1 n n n n d d d d 1 0 1 1 x x x x x x x x	 VLDR<c>_<Dd>,_[<Rn>{,_#+/-<imm>}]_VLDR<c>_<Dd>,_<label>_VLDR<c>_<Dd>,_[PC,_#-0]_Special_case T1/A1 A8.8.333
 c c c c 1 1 0 P U D W 0 n n n n d d d d p p p p x x x x x x x x	 STC{L}<c>_<coproc>,_<CRd>,_[<Rn>,_#+/-<imm>]{!}_STC{L}<c>_<coproc>,_<CRd>,_[<Rn>],_#+/-<imm>_STC{L}<c>_<coproc>,_<CRd>,_[<Rn>],_<option> T1/A1 A8.8.198
-c c c c 1 1 0 P U D W 0 n n n n d d d d 1 0 1 0 x x x x x x x x	 VSTM{mode}<c>_<Rn>{!},_<list>  T2/A2 A8.8.412
-c c c c 1 1 0 P U D W 0 n n n n d d d d 1 0 1 1 x x x x x x x x	 VSTM{mode}<c>_<Rn>{!},_<list>  T1/A1 A8.8.412
+c c c c 1 1 0 P U D W 0 n n n n d d d d 1 0 1 0 x x x x x x x x	 VSTM{mode}<c>_<Rn>{!},_<list> T2/A2 A8.8.412
+c c c c 1 1 0 P U D W 0 n n n n d d d d 1 0 1 1 x x x x x x x x	 VSTM{mode}<c>_<Rn>{!},_<list> T1/A1 A8.8.412
 c c c c 1 1 0 P U D W 1 1 1 1 1 d d d d p p p p x x x x x x x x	 LDC{L}<c>_<coproc>,_<CRd>,_<label>_LDC{L}<c>_<coproc>,_<CRd>,_[PC,_#-0]_Special_case_LDC{L}<c>_<coproc>,_<CRd>,_[PC],_<option> T1/A1 A8.8.56
 c c c c 1 1 0 P U D W 1 n n n n d d d d p p p p x x x x x x x x	 LDC{L}<c>_<coproc>,_<CRd>,_[<Rn>,_#+/-<imm>]{!}_LDC{L}<c>_<coproc>,_<CRd>,_[<Rn>],_#+/-<imm>_LDC{L}<c>_<coproc>,_<CRd>,_[<Rn>],_<option> T1/A1 A8.8.55
-c c c c 1 1 0 P U D W 1 n n n n d d d d 1 0 1 0 x x x x x x x x	 VLDM{mode}<c>_<Rn>{!},_<list>  T2/A2 A8.8.332
-c c c c 1 1 0 P U D W 1 n n n n d d d d 1 0 1 1 x x x x x x x x	 VLDM{mode}<c>_<Rn>{!},_<list>  T1/A1 A8.8.332
+c c c c 1 1 0 P U D W 1 n n n n d d d d 1 0 1 0 x x x x x x x x	 VLDM{mode}<c>_<Rn>{!},_<list> T2/A2 A8.8.332
+c c c c 1 1 0 P U D W 1 n n n n d d d d 1 0 1 1 x x x x x x x x	 VLDM{mode}<c>_<Rn>{!},_<list> T1/A1 A8.8.332
 c c c c 1 1 1 0 0 0 0 f n n n n t t t t 1 0 1 0 N (0) (0) 1 (0) (0) (0) (0)	 VMOV<c>_<Sn>,_<Rt>_VMOV<c>_<Rt>,_<Sn> T1/A1 A8.8.343
 c c c c 1 1 1 0 0 D 0 0 n n n n d d d d 1 0 1 z N 0 M 0 m m m m	 VMLA<c>.F64_<Dd>,_<Dn>,_<Dm>_VMLA<c>.F32_<Sd>,_<Sn>,_<Sm> T2/A2 A8.8.337
 c c c c 1 1 1 0 0 D 0 0 n n n n d d d d 1 0 1 z N 1 M 0 m m m m	 VMLS<c>.F64_<Dd>,_<Dn>,_<Dm>_VMLS<c>.F32_<Sd>,_<Sn>,_<Sm> T2/A2 A8.8.337
@@ -456,31 +471,31 @@ c c c c 1 1 1 0 U F F 1 n n n n t t t t 1 0 1 1 N f f 1 (0) (0) (0) (0)	 VMOV<c>
 c c c c 1 1 1 0 F F F 0 n n n n t t t t p p p p f f f 1 m m m m	 MCR<c>_<coproc>,_<opc1>,_<Rt>,_<CRn>,_<CRm>{,_<opc2>} T1/A1 A8.8.98
 c c c c 1 1 1 0 F F F 1 n n n n t t t t p p p p f f f 1 m m m m	 MRC<c>_<coproc>,_<opc1>,_<Rt>,_<CRn>,_<CRm>{,_<opc2>} T1/A1 A8.8.107
 c c c c 1 1 1 0 F F F F n n n n d d d d p p p p f f f 0 m m m m	 CDP<c>_<coproc>,_<opc1>,_<CRd>,_<CRn>,_<CRm>,_<opc2> T1/A1 A8.8.30
-c c c c 1 1 1 1 x x x x x x x x x x x x x x x x x x x x x x x x	 SVC<c>_#<x x x x x x x x x x x x x x x x x x x x x x x x> A1 A8.8.228
-c c c c 0 0 0 1 1 0 1 1 (0) (0) (0) (0) 1 1 1 1 0 0 0 0 0 1 1 0 m m m m	 RRXS<c> PC,<Rm>  A2  B9.3.20
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 0 0 0 0 0 0 0 0 m m m m	 MOV{S}<c> PC,<Rm> (= LSL{S}<c> PC,<Rm>,#0)  A2  B9.3.20
-c c c c 0 0 0 0 0 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 AND{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 0 0 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 EOR{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 0 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 SUB{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 0 1 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 RSB{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 1 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ADD{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 1 0 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ADC{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 1 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 SBC{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 0 1 1 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 RSC{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 1 1 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ORR{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 0 0 0 m m m m	 LSL{S}<c> PC,<Rm>,#<imm5>  A2  B9.3.20
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 0 1 0 m m m m	 LSR{S}<c> PC,<Rm>,#<imm>  A2  B9.3.20
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 1 0 0 m m m m	 ASR{S}<c> PC,<Rm>,#<imm>  A2  B9.3.20
-c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 1 1 0 m m m m	 ROR{S}<c> PC,<Rm>,#<imm>  A2  B9.3.20
-c c c c 0 0 0 1 1 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 BIC{S}<c> PC,<Rn>,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 0 1 1 1 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x T T 0 m m m m	 MVN{S}<c> PC,<Rm>{,<sift>}  A2  B9.3.20
-c c c c 0 0 1 0 0 0 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 EOR{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 0 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 SUB{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 0 1 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 RSB{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 1 0 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 ADD{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 1 0 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 ADC{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 1 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 SBC{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 0 1 1 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 RSC{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x x x x x x x x	 MOV{S}<c> PC,#<const>  A1  B9.3.20
-c c c c 0 0 1 1 1 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 BIC{S}<c> PC,<Rn>,#<const>  A1  B9.3.20
-c c c c 0 0 1 1 1 1 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x x x x x x x x	 MVN{S}<c> PC,#<const>  A1  B9.3.20
+c c c c 1 1 1 1 x x x x x x x x x x x x x x x x x x x x x x x x	 SVC<c>_#<imm24> A1 A8.8.228
+c c c c 0 0 0 1 1 0 1 1 (0) (0) (0) (0) 1 1 1 1 0 0 0 0 0 1 1 0 m m m m	 RRXS<c>_PC,_<Rm> A2 B9.3.20
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 0 0 0 0 0 0 0 0 m m m m	 MOV{S}<c>_PC,_<Rm>_(=_LSL{S}<c>_PC,_<Rm>,_#0) A2 B9.3.20
+c c c c 0 0 0 0 0 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 AND{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 0 0 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 EOR{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 0 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 SUB{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 0 1 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 RSB{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 1 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ADD{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 1 0 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ADC{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 1 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 SBC{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 0 1 1 1 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 RSC{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 1 1 0 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 ORR{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 0 0 0 m m m m	 LSL{S}<c>_PC,_<Rm>,_#<imm5> A2 B9.3.20
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 0 1 0 m m m m	 LSR{S}<c>_PC,_<Rm>,_#<imm> A2 B9.3.20
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 1 0 0 m m m m	 ASR{S}<c>_PC,_<Rm>,_#<imm> A2 B9.3.20
+c c c c 0 0 0 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x 1 1 0 m m m m	 ROR{S}<c>_PC,_<Rm>,_#<imm> A2 B9.3.20
+c c c c 0 0 0 1 1 1 0 S n n n n 1 1 1 1 x x x x x T T 0 m m m m	 BIC{S}<c>_PC,_<Rn>,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 0 1 1 1 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x T T 0 m m m m	 MVN{S}<c>_PC,_<Rm>{,_<sift>} A2 B9.3.20
+c c c c 0 0 1 0 0 0 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 EOR{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 0 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 SUB{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 0 1 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 RSB{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 1 0 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 ADD{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 1 0 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 ADC{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 1 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 SBC{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 0 1 1 1 S n n n n 1 1 1 1 x x x x x x x x x x x x	 RSC{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 1 1 0 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x x x x x x x x	 MOV{S}<c>_PC,_#<const> A1 B9.3.20
+c c c c 0 0 1 1 1 1 0 S n n n n 1 1 1 1 x x x x x x x x x x x x	 BIC{S}<c>_PC,_<Rn>,_#<const> A1 B9.3.20
+c c c c 0 0 1 1 1 1 1 S (0) (0) (0) (0) 1 1 1 1 x x x x x x x x x x x x	 MVN{S}<c>_PC,_#<const> A1 B9.3.20
