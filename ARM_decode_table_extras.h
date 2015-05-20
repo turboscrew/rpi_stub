@@ -336,8 +336,8 @@ arm_vcmp_vcle_z,
 arm_vcmp_vclt_z,
 arm_vcmp_vceq,
 arm_vcmp_vcge,
-arm_vcmp_vcgt,
-arm_vcmp_vcge,
+arm_vcmp_vcgt_dt,
+arm_vcmp_vcge_dt,
 arm_vcmp_vtst,
 arm_vcmp_vceq_dt,
 arm_vcmp_vacge,
@@ -481,5 +481,3 @@ arm_vfpxfer_vmrs_fpscr,
 arm_vfpxfer_vdup,
 arm_vfpxfer_vmov_dt_dx
 
-
-#endif /* ARM_DECODE_TABLE_EXTRAS_H_ */

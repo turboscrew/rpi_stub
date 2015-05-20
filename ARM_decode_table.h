@@ -8,6 +8,7 @@
 #ifndef ARM_DECODE_TABLE_H_
 #define ARM_DECODE_TABLE_H_
 
-int ARM_decoder_dispatch(unsigned int instr);
+#include "instr_comm.h"
+instr_next_addr_t ARM_decoder_dispatch(unsigned int instr);
 
 #endif /* ARM_DECODE_TABLE_H_ */

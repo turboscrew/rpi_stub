@@ -350,9 +350,9 @@
 {0xF3000810,0xFF800F10,arm_vcmp_vceq_dt,arm_v_comp}, // VCEQ<c>.<dt> <Qd>, <Qn>, <Qm> VCEQ<c>.<dt> <Dd>, <Dn>, <Dm>
 {0xF3B10100,0xFFB30B90,arm_vcmp_vceq_z,arm_v_comp}, // VCEQ<c>.<dt> <Qd>, <Qm>, #0 VCEQ<c>.<dt> <Dd>, <Dm>, #0
 {0xF3000E00,0xFFA00F10,arm_vcmp_vcge,arm_v_comp}, // VCGE<c>.F32 <Qd>, <Qn>, <Qm> VCGE<c>.F32 <Dd>, <Dn>, <Dm>
-{0xF2000310,0xFE800F10,arm_vcmp_vcge,arm_v_comp}, // VCGE<c>.<dt> <Qd>, <Qn>, <Qm> VCGE<c>.<dt> <Dd>, <Dn>, <Dm>
+{0xF2000310,0xFE800F10,arm_vcmp_vcge_dt,arm_v_comp}, // VCGE<c>.<dt> <Qd>, <Qn>, <Qm> VCGE<c>.<dt> <Dd>, <Dn>, <Dm>
 {0xF3B10080,0xFFB30B90,arm_vcmp_vcge_z,arm_v_comp}, // VCGE<c>.<dt> <Qd>, <Qm>, #0 VCGE<c>.<dt> <Dd>, <Dm>, #0
-{0xF2000300,0xFE800F10,arm_vcmp_vcgt,arm_v_comp}, // VCGT<c>.<dt> <Qd>, <Qn>, <Qm> VCGT<c>.<dt> <Dd>, <Dn>, <Dm>
+{0xF2000300,0xFE800F10,arm_vcmp_vcgt_dt,arm_v_comp}, // VCGT<c>.<dt> <Qd>, <Qn>, <Qm> VCGT<c>.<dt> <Dd>, <Dn>, <Dm>
 {0xF3200E00,0xFFA00F10,arm_vcmp_vcgt,arm_v_comp}, // VCGT<c>.F32 <Qd>, <Qn>, <Qm> VCGT<c>.F32 <Dd>, <Dn>, <Dm>
 {0xF3B10000,0xFFB30B90,arm_vcmp_vcgt_z,arm_v_comp}, // VCGT<c>.<dt> <Qd>, <Qm>, #0 VCGT<c>.<dt> <Dd>, <Dm>, #0
 {0xF3B10180,0xFFB30B90,arm_vcmp_vcle_z,arm_v_comp}, // VCLE<c>.<dt> <Qd>, <Qm>, #0 VCLE<c>.<dt> <Dd>, <Dm>, #0
