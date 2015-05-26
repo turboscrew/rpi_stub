@@ -3,7 +3,6 @@ instr_next_addr_t arm_coproc(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_div(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_mac(unsigned int instr, ARM_decode_extra_t extra);
-instr_next_addr_t arm_core_data_maca(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_macd(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extra);

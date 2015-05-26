@@ -79,6 +79,11 @@ inline instr_next_addr_t set_addr_lin(void)
 
 // decoder dispatcher - finds the decoding function and calls it
 // TODO: Partition the table search (use bits 27 - 25 of the instruction.
+// Maybe:
+// if condition code is not 1 1 1 1 then divide by bits 27 - 25
+// under which the groups: 0 0 0, 0 1 1, the rest
+// if condition code is 1 1 1 1, divide first by bits 27 - 25 != 0 0 1
+// bits 27 - 25 == 0 0 1 and under which by bit 23.
 instr_next_addr_t ARM_decoder_dispatch(unsigned int instr)
 {
 	int instr_count = sizeof(ARM_decode_table);
@@ -352,15 +357,15 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			retval = set_addr_lin();
 			if (bit(instr, 22) == 1) // SPSR
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			else if (bitrng(instr, 19, 18) == 0)
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			else if (bitrng(instr, 3, 0) == 15)
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else set APSR-bits
 		}
@@ -371,15 +376,15 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)] & 0x1f;
 			if ((tmp1 != 16) && (tmp1 != 31)) // user/system
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			else if (bitrng(instr, 19, 16) == 0) // mask = 0
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			else if (bitrng(instr, 3, 0) == 15)
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else set CPSR/SPSR
 		}
@@ -389,11 +394,11 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			retval = set_addr_lin();
 			if (bitrng(instr, 19, 16) == 0) // mask = 0
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			else if (bitrng(instr, 3, 0) == 15)
 			{
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else set CPSR/SPSR
 		}
@@ -422,7 +427,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					retval.flag = INSTR_ADDR_ARM;
 				}
 				// UNPREDICTABLE anyway due to Rd = PC
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else the program flow is not changed
 		}
@@ -438,7 +443,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					retval.flag = INSTR_ADDR_ARM;
 				}
 				// UNPREDICTABLE anyway due to Rd = PC
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else the program flow is not changed
 		}
@@ -461,7 +466,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					retval.flag = INSTR_ADDR_ARM;
 				}
 				// UNPREDICTABLE anyway due to Rd = PC
-				retval = INSTR_ADDR_IMPL_DEP(retval);
+				retval = set_unpred_addr(retval);
 			}
 			// else the program flow is not changed
 		}
@@ -476,7 +481,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			{
 				if (bit(instr, 22) == 1) // SPSR
 				{
-					retval = INSTR_ADDR_IMPL_DEP(retval);
+					retval = set_unpred_addr(retval);
 				}
 				// else set APSR-bits
 			}
@@ -486,11 +491,11 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 				tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)] & 0x1f;
 				if ((tmp1 != 16) && (tmp1 != 31)) // user/system
 				{
-					retval = INSTR_ADDR_IMPL_DEP(retval);
+					retval = set_unpred_addr(retval);
 				}
 				if (bit(instr, 22) == 1) // SPSR
 				{
-					retval = INSTR_ADDR_IMPL_DEP(retval);
+					retval = set_unpred_addr(retval);
 				}
 				// else set CPSR/SPSR
 			}
@@ -572,7 +577,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 				else
 				{
 					// vst1(instr, 4, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-					retval = INSTR_ADDR_IMPL_DEP(retval);
+					retval = set_unpred_addr(retval);
 				}
 			}
 			else
@@ -599,7 +604,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst1(instr, 3, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -628,7 +633,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst1(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -657,7 +662,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst1(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -688,7 +693,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst2(instr, 2, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -718,7 +723,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst2(instr, 1, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -748,7 +753,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst2(instr, 1, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -780,7 +785,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst3(instr, 1, (bit(instr, 4)? 1: 8));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -810,7 +815,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst3(instr, 2, (bit(instr, 4)? 1: 8));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -842,7 +847,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst4(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -871,7 +876,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vst4(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -915,7 +920,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 				else
 				{
 					// vld1(instr, 4, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-					retval = INSTR_ADDR_IMPL_DEP(retval);
+					retval = set_unpred_addr(retval);
 				}
 			}
 			else
@@ -942,7 +947,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld1(instr, 3, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -971,7 +976,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld1(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1000,7 +1005,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld1(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1031,7 +1036,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld2(instr, 2, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1061,7 +1066,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld2(instr, 1, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1091,7 +1096,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld2(instr, 1, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1122,7 +1127,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld3(instr, 1, (bit(instr, 4)? 1: 8));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1152,7 +1157,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld3(instr, 2, (bit(instr, 4)? 1: 8));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1184,7 +1189,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld4(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1213,7 +1218,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					else
 					{
 						// vld4(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = INSTR_ADDR_IMPL_DEP(retval);
+						retval = set_unpred_addr(retval);
 					}
 				}
 				else
@@ -1232,62 +1237,871 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 	default:
 		break;
 	}
+	// The above needs to be done to find out if the instruction is UNDEFINED or UNPREDICTABLE.
+	// That's why we check the condition here
+	if ((retval.flag & (~INSTR_ADDR_UNPRED)) == INSTR_ADDR_ARM)
+	{
+		// if the condition doesn't match
+		if (!will_branch(instr))
+		{
+			retval = set_addr_lin();
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	int baddr = 0;
+
 	retval = set_undef_addr();
 
+	if (will_branch(instr))
+	{
+		switch (extra)
+		{
+		case arm_bra_b_lbl:
+		case arm_bra_bl_lbl:
+			baddr = (int) rpi2_reg_context.reg.r15; // PC
+			baddr += (sx32(instr, 23, 0) << 2);
+			retval = set_arm_addr((unsigned int) baddr);
+			break;
+		case arm_bra_blx_lbl:
+			baddr = (int) rpi2_reg_context.reg.r15; // PC
+			baddr += (sx32(instr, 23, 0) << 2) | (bit(instr, 24) << 1);
+			retval = set_thumb_addr((unsigned int) baddr);
+			break;
+		case arm_bra_bx_r:
+		case arm_bra_blx_r:
+		case arm_bra_bxj_r:
+			// from Cortex-A7 mpcore trm:
+			// "The BXJ instruction behaves as a BX instruction"
+			// if bit 0 of the address is '1' -> switch to thumb-state.
+			retval.address = rpi2_reg_context.storage[bitrng(instr, 3, 0)];
+			if (bit(retval.address, 0))
+				retval = set_thumb_addr(retval.address & ((~0) << 1));
+			else
+				retval = set_arm_addr(retval.address & ((~0) << 2));
+			if (bitrng(instr, 3, 0) == 15) // PC
+				retval = set_unpred_addr(retval);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+	}
+	else
+	{
+		// No condition match - NOP
+		retval = set_addr_lin();
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_coproc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp;
 	retval = set_undef_addr();
+	// coproc 15 = system control, 14 = debug
+	// coproc 10, 11 = fp and vector
+	// coproc 8, 9, 12, 13 = reserved => UNDEFINED
+	// coproc 0 - 7 = vendor-specific => UNPREDICTABLE
+	// if Rt or RT2 = PC or SP => UNPREDICTABLE
+	// TODO: add checks for valid known coprocessor commands
+	tmp = bitrng(instr, 11, 8); // coproc
+	if (!((tmp == 8) || (tmp == 9) || (tmp == 12) || (tmp == 13)))
+	{
+		switch(extra)
+		{
+		case arm_cop_mcrr2:
+		case arm_cop_mcrr:
+			// if Rt or Rt2 is PC
+			if ((bitrng(instr, 19, 16) == 15) || (bitrng(instr, 15, 12) == 15))
+			{
+				/*
+				if ((bitrng(instr, 19, 16) == 15) && (bitrng(instr, 15, 12) == 15))
+				{
+					// Rt2 = Rt = PC
+					// execute: Rt2 = Rt = R0 if valid
 
+				}
+				else
+				{
+					// execute : Rt2 = R0, Rt = R1 if valid
+
+					// find new PC value
+					if (bitrng(instr, 19, 16) == 15)
+					{
+						// Rt2 = PC
+					}
+					else
+					{
+						// Rt = PC
+					}
+				}
+				*/
+				// at the moment, assume (falsely) linear, but unpredictable
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+			}
+			else
+			{
+				retval = set_addr_lin();
+			}
+			break;
+		case arm_cop_mcr2:
+		case arm_cop_mcr:
+			retval = set_addr_lin();
+			tmp = bitrng(instr, 15, 12);
+			if (tmp == 15)
+			{
+				// at the moment, assume (falsely) linear, but unpredictable
+				retval = set_unpred_addr(retval);
+			}
+			else if (tmp == 13)
+			{
+				retval = set_unpred_addr(retval);
+			}
+			// else no effect on program flow
+			break;
+		case arm_cop_ldc2:
+		case arm_cop_ldc:
+			// if P U D W = 0 0 0 0 => UNDEFINED
+			if (bitrng(instr, 24, 21) != 0)
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+			}
+			break;
+		case arm_cop_ldc2_pc:
+		case arm_cop_ldc_pc:
+			// if P U D W = 0 0 0 0 => UNDEFINED
+			if (bitrng(instr, 24, 21) != 0)
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+			}
+			break;
+		case arm_cop_mrrc2:
+		case arm_cop_mrrc:
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cop_mrc2:
+		case arm_cop_mrc:
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cop_stc2:
+		case arm_cop_stc:
+			// if P U D W = 0 0 0 0 => UNDEFINED
+			if (bitrng(instr, 24, 21) != 0)
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+			}
+			break;
+		case arm_cop_cdp2:
+		case arm_cop_cdp:
+			// coproc 101x => fp instr
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_div(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3;
+	int stmp1, stmp2, stmp3;
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 19, 16); // Rd
+	tmp2 = bitrng(instr, 11, 8);  // Rm
+	tmp3 = bitrng(instr, 3, 0);   // Rn
+	if (tmp1 == 15) // Rd = PC
+	{
+		if (extra == arm_div_sdiv)
+		{
+			stmp2 = (int)rpi2_reg_context.storage[tmp2];
+			stmp3 = (int)rpi2_reg_context.storage[tmp3];
+			if (stmp2 == 0) // zero divisor
+			{
+				// division by zero
+				// if no division by zero exception, return zero
+				retval = set_arm_addr(0);
+			}
+			else
+			{
+				// round towards zero
+				// check the result sign
+				if (bit(stmp3, 31) == bit(stmp2, 31))
+				{
+					// result is positive
+					// round towards zero = trunc
+					stmp1 = stmp3/stmp2;
+				}
+				else
+				{
+					// result is negative
+					stmp1 = (((stmp3 << 1)/stmp2) + 1) >> 1;
+				}
+				// if no division by zero exception, return zero
+				retval = set_arm_addr((unsigned int) stmp1);
+			}
+		}
+		else
+		{
+			// arm_div_udiv
+			tmp2 = rpi2_reg_context.storage[tmp2];
+			tmp3 = rpi2_reg_context.storage[tmp3];
+			if (tmp2 == 0) // zero divisor
+			{
+				// division by zero
+				// if no division by zero exception, return zero
+				retval = set_arm_addr(0);
+			}
+			else
+			{
+				// round towards zero = trunc
+				tmp1 = tmp3/tmp2;
+			}
+			retval = set_arm_addr(tmp1);
+		}
+	}
+	else
+	{
+		// PC not involved
+		retval = set_addr_lin();
+		if ((tmp2 == 15) || (tmp3 == 15))
+			retval = set_unpred_addr(retval); // Why?
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_mac(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1, stmp2, stmp3;
+	long long int ltmp;
+
 	retval = set_undef_addr();
 
-	return retval;
-}
+	// Rd = bits 19-16, Rm = 11-8, Rn = 3-0, Ra = 15-12
+	// if d == 15 || n == 15 || m == 15 || a == 15 then UNPREDICTABLE;
+	tmp3 = bitrng(instr, 19, 16);
 
-instr_next_addr_t arm_core_data_maca(unsigned int instr, ARM_decode_extra_t extra)
-{
-	instr_next_addr_t retval;
-	retval = set_undef_addr();
+	if (tmp3 == 15) // if Rd = PC
+	{
+		tmp1 = bitrng(instr, 11, 8); // Rm
+		tmp2 = bitrng(instr, 3, 0); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp1];
+		tmp2 = rpi2_reg_context.storage[tmp2];
+		switch (extra)
+		{
+		case arm_cmac_mul:
+			// multiply Rn and Rm and keep only the low 32 bits
+		case arm_cmac_mla:
+			// multiply Rn by Rm and add Ra; keep only the low 32 bits
+		case arm_cmac_mls:
+			// multiply Rn by Rm and subtract from Ra; keep only the low 32 bits
+			// The low 32-bits are same whether signed or unsigned multiply
+			ltmp = tmp1 * tmp2;
+			tmp3 = (unsigned int)(ltmp & 0xffffffffL);
+			if (extra == arm_cmac_mla)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				tmp3 += tmp4;
+			}
+			else if (extra == arm_cmac_mls)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				tmp3 = tmp4 - tmp3;
+			}
+			// else no accumulate
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cmac_smulw:
+			// signed multiply of Rn by 16 bits of Rm
+		case arm_cmac_smlaw:
+			// signed multiply of Rn by 16 bits of Rm and add Ra
+			// only the top 32-bit of the 48-bit product is kept
+			if (bit(instr, 6)) // which half of Rm
+				stmp1 = (int)(short int)bitrng(tmp1, 31, 16);
+			else
+				stmp1 = (int)(short int)bitrng(tmp1, 15, 0);
 
+			stmp2 = (int) tmp2;
+			ltmp = stmp2 * stmp1;
+			stmp3 = (int)((ltmp >> 16) & 0xffffffffL);
+			if (extra == arm_cmac_smlaw)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				stmp3 += (int)tmp4;
+			}
+			retval = set_arm_addr((unsigned int)stmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cmac_smul:
+			// signed multiply 16 bits of Rn by 16 bits of Rm
+		case arm_cmac_smla:
+			// signed multiply 16 bits of Rn by 16 bits of Rm and add Ra
+			if (bit(instr, 6)) // which half of Rm
+				stmp1 = (int)(short int)bitrng(tmp1, 31, 16);
+			else
+				stmp1 = (int)(short int)bitrng(tmp1, 15, 0);
+
+			if (bit(instr, 5)) // which half of Rn
+				stmp2 = (int)(short int)bitrng(tmp2, 31, 16);
+			else
+				stmp2 = (int)(short int)bitrng(tmp2, 15, 0);
+
+			stmp3 = stmp2 * stmp1;
+			if (extra == arm_cmac_smla)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				stmp3 += (int)tmp4;
+			}
+			retval = set_arm_addr((unsigned int)stmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cmac_smmul:
+			// multiply Rn by Rm and keep only the top 32 bits
+		case arm_cmac_smmla:
+			// signed multiply Rn by Rm and add only the top 32 bits to Ra
+			// exceptionally Ra can be PC without restrictions
+			// if Ra == '1111' -> SMMUL
+		case arm_cmac_smmls:
+			// smmls is like smmla, but subtract from Ra
+			ltmp = ((int)tmp1) * ((int)tmp2);
+			if (bit(instr, 5)) ltmp += 0x80000000L; // round
+			stmp3 = (int)((ltmp >> 32) & 0xffffffffL);
+			if (extra == arm_cmac_smmla)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				stmp3 += (int)tmp4;
+			}
+			else if (extra == arm_cmac_smmls)
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				stmp3 = (int)tmp4 - stmp3;
+			}
+			retval = set_arm_addr((unsigned int)stmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		case arm_cmac_smuad:
+			// smuad: multiply upper and lower 16 bits (maybe Rm swapped)
+			// and sum results
+		case arm_cmac_smusd:
+			// smusd is like smuad, but subtract (low - high)
+		case arm_cmac_smlad:
+			// smlad is like smuad, but sum is added to Ra
+			// if Ra == '1111' -> SMUAD
+		case arm_cmac_smlsd:
+			// smlsd is like smusd but the difference is added to Ra
+			// if Ra == '1111' -> SMUSD
+			// M-bit = 5
+			if (bit(instr, 5))
+			{
+				// swap Rm
+				tmp3 = bitrng(tmp1, 31, 16);
+				tmp3 |= bitrng(tmp1, 15, 0) << 16;
+				tmp1 = tmp3;
+			}
+			// low 16 bits
+			stmp1 = (int)(short int)(tmp1 & 0xffff);
+			stmp2 = (int)(short int)(tmp2 & 0xffff);
+			stmp3 = stmp1 * stmp2;
+			// high 16 bits
+			stmp1 = (int)(short int)((tmp1 >> 16) & 0xffff);
+			stmp2 = (int)(short int)((tmp2 >> 16) & 0xffff);
+			if ((extra == arm_cmac_smuad) || (extra == arm_cmac_smlad))
+				stmp3 += stmp1 * stmp2;
+			else
+				stmp3 -= stmp1 * stmp2;
+
+			if ((extra == arm_cmac_smlsd) || (extra == arm_cmac_smlad))
+			{
+				tmp4 = bitrng(instr, 15, 12); // Ra
+				tmp4 = rpi2_reg_context.storage[tmp4];
+				stmp3 += (int)tmp4;
+			}
+			retval = set_arm_addr((unsigned int) stmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+	}
+	else
+	{
+		retval = set_addr_lin();
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_macd(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// Rm = bits 11-8, Rn=3-0, RdHi=19-16, RdLo=15-12, R/M/N=bit 5, M=bit 6
+	// if dLo == 15 || dHi == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+	// if dHi == dLo then UNPREDICTABLE;
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1, stmp2, stmp3;
+	long long int ltmp;
+	long long utmp;
+
 	retval = set_undef_addr();
 
+	tmp3 = bitrng(instr, 19, 16); // RdHi
+	tmp4 = bitrng(instr, 15, 12); // RdLo
+
+	if ((tmp3 == 15) || (tmp4 == 15))// if RdHi = PC or RdLo = PC
+	{
+		tmp1 = bitrng(instr, 11, 8); // Rm
+		tmp2 = bitrng(instr, 3, 0); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp1];
+		tmp2 = rpi2_reg_context.storage[tmp2];
+		switch (extra)
+		{
+		case arm_cmac_smlal16:
+			// signed multiply 16 bits of Rn by 16 bits of Rm and
+			// add RdHi and RdLo as two 32-bit values to the result
+			// then put the result to RdHi and RdLo as 64-bit value
+			if (bit(instr, 6)) // which half of Rm
+				stmp1 = (int)(short int)bitrng(tmp1, 31, 16);
+			else
+				stmp1 = (int)(short int)bitrng(tmp1, 15, 0);
+
+			if (bit(instr, 5)) // which half of Rn
+				stmp2 = (int)(short int)bitrng(tmp2, 31, 16);
+			else
+				stmp2 = (int)(short int)bitrng(tmp2, 15, 0);
+
+			ltmp = (long long int)(((int)tmp1) * ((int)tmp2));
+			stmp1 = (int) rpi2_reg_context.storage[tmp3];
+			stmp2 = (int) rpi2_reg_context.storage[tmp4];
+			ltmp += (long long int)(stmp1 + stmp2);
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+			break;
+		case arm_cmac_smlal:
+			// signed multiply Rn by Rm and add RdHi and RdLo as 64-bit value
+			// result is 64 bit value in RdHi and RdLo
+			ltmp = (long long int)(((int)tmp1) * ((int)tmp2));
+			ltmp += ((long long int) tmp3) << 32;
+			ltmp += (long long int)((int) tmp4);
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+			break;
+		case arm_cmac_smull:
+			// signed multiply Rn by Rm
+			// result is 64 bit value in RdHi and RdLo
+			ltmp = (long long int)(((int)tmp1) * ((int)tmp2));
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+			break;
+		case arm_cmac_umaal:
+			// signed multiply Rn by Rm and
+			// add RdHi and RdLo as two 32-bit values to the result
+			// then put the result to RdHi and RdLo as 64-bit value
+			ltmp = (long long int)(((int)tmp1) * ((int)tmp2));
+			stmp1 = (int) rpi2_reg_context.storage[tmp3];
+			stmp2 = (int) rpi2_reg_context.storage[tmp4];
+			ltmp += (long long int)(stmp1 + stmp2);
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+		break;
+		case arm_cmac_umlal:
+			// unsigned multiply Rn by Rm and add RdHi and RdLo as 64-bit value
+			// result is 64 bit value in RdHi and RdLo
+			utmp = (long long)(tmp1 * tmp2);
+			utmp += ((long long)tmp3) << 32;
+			utmp += (long long)tmp4;
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((utmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(utmp & 0xffffffff);
+			break;
+		case arm_cmac_umull:
+			// unsigned multiply Rn by Rm
+			// result is 64 bit value in RdHi and RdLo
+			utmp = (long long)(tmp1 * tmp2);
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+			break;
+		case arm_cmac_smlald:
+			// signed multiply upper and lower 16 bits (maybe Rm swapped)
+			// and sum the products in RdHi and RdLo
+			// result is 64 bit value in RdHi and RdLo
+		case arm_cmac_smlsld:
+			// smlsld is like smlald, but subtract (low - high)
+			if (bit(instr, 5))
+			{
+				// swap Rm
+				tmp3 = bitrng(tmp1, 31, 16);
+				tmp3 |= bitrng(tmp1, 15, 0) << 16;
+				tmp1 = tmp3;
+				tmp3 = bitrng(instr, 19, 16); // restore tmp3
+			}
+
+			// low 16 bits
+			stmp1 = (int)(short int)(tmp1 & 0xffff);
+			stmp2 = (int)(short int)(tmp2 & 0xffff);
+			stmp3 = stmp1 * stmp2;
+			// high 16 bits
+			stmp1 = (int)(short int)((tmp1 >> 16) & 0xffff);
+			stmp2 = (int)(short int)((tmp2 >> 16) & 0xffff);
+			if (extra == arm_cmac_smlald)
+				stmp3 += stmp1 * stmp2;
+			else
+				stmp3 -= stmp1 * stmp2;
+			stmp1 = (int)rpi2_reg_context.storage[tmp3];
+			stmp2 = (int)rpi2_reg_context.storage[tmp4];
+			ltmp = (long long int)stmp3;
+			ltmp += ((long long int)stmp1) << 32;
+			ltmp += (long long int)stmp2;
+			if (tmp3 == 15) // if PC is RdHi
+				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+			else // PC is RdLo
+				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		retval = set_arm_addr(tmp4);
+		retval = set_unpred_addr(retval);
+	}
+	else
+	{
+		retval = set_addr_lin();
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned short htmp1, htmp2;
+
 	retval = set_undef_addr();
 
+	switch (extra)
+	{
+	case arm_cmisc_movw:
+		// move 16-bit immediate to Rd (upper word zeroed)
+	case arm_cmisc_movt:
+		// move 16-bit immediate to top word of Rd
+		// Rd = bits 15-12, imm = bits 19-16 and 11-0
+		// if d == 15 then UNPREDICTABLE;
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = bits(instr, 0x000f0fff); // immediate
+			if (instr == arm_cmisc_movt)
+			{
+				tmp2 <<= 16;
+				tmp1 = rpi2_reg_context.storage[tmp1];
+				tmp1 &= 0x0000ffff;
+				tmp2 |= tmp1;
+			}
+			retval = set_arm_addr(tmp2);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_clz:
+		// counts leading zeroes in Rm and places the number in Rd
+		// Rd = bits 15-12, Rm = bits 3-0
+		// if d == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp2];
+			// this could be optimized
+			for (tmp3=0; tmp3 < 32; tmp3++)
+			{
+				// if tmp3:th bit (from top) is set
+				if (tmp2 & (1 << (31 - tmp3))) break;
+			}
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_bfc:
+		// clears a bit field in Rd (bits 15-12)
+		// msb = bits 20-16, lsb = bits 11-7
+		// if d == 15 then UNPREDICTABLE;
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = bitrng(instr, 20, 16); // msb
+			tmp3 = bitrng(instr, 11, 7); // lsb
+			// make the 'clear' mask
+			tmp4 = (~0) << (tmp2 - tmp3 + 1);
+			tmp4 = (~tmp4) << tmp3;
+			tmp4 = ~tmp4;
+			// clear bits
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 &= tmp4;
+			retval = set_arm_addr(tmp1);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_bfi:
+		// inserts (low)bits from Rn into bit field in Rd
+		// Rd = bits 15-12, Rm = bits 3-0
+		// msb = bits 20-16, lsb = bits 11-7
+		// if d == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = bitrng(instr, 20, 16); // msb
+			tmp3 = bitrng(instr, 11, 7); // lsb
+			// make the 'pick' mask
+			tmp4 = (~0) << (tmp2 - tmp3 + 1);
+			tmp4 = (~tmp4) << tmp3;
+			// clear bits in Rd
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 &= (~tmp4);
+			// get bits from Rm
+			tmp2 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp2];
+			tmp2 &= tmp4;
+			// insert bits
+			tmp1 |= tmp2;
+			retval = set_arm_addr(tmp1);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_rbit:
+		// reverse Rm bit order
+		// if d == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			// swap odd and even bits
+			tmp1 = ((tmp1 & 0xaaaaaaaa) >> 1) | ((tmp1 & 0x55555555) << 1);
+			// swap bit pairs
+			tmp1 = ((tmp1 & 0xcccccccc) >> 2) | ((tmp1 & 0x33333333) << 2);
+			// swap nibbles
+			tmp1 = ((tmp1 & 0xf0f0f0f0) >> 4) | ((tmp1 & 0x0f0f0f0f) << 4);
+			// swap bytes
+			tmp1 = ((tmp1 & 0xff00ff00) >> 8) | ((tmp1 & 0x00ff00ff) << 8);
+			// swap half words
+			tmp1 = ((tmp1 & 0xffff0000) >> 16) | ((tmp1 & 0x0000ffff) << 16);
+
+			retval = set_arm_addr(tmp1);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_rev:
+		// reverse Rm byte order
+		// if d == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp1 = (tmp2 & 0xff000000)  >> 24; // result lowest
+			tmp1 |= (tmp2 & 0x00ff0000) >> 8;
+			tmp1 |= (tmp2 & 0x0000ff00) << 8;
+			tmp1 |= (tmp2 & 0x000000ff) << 24; // result highest
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+
+	case arm_cmisc_rev16:
+		// reverse Rm half word byte orders
+		// if d == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp1 = (tmp2 & 0xff000000)  >> 8;
+			tmp1 |= (tmp2 & 0x00ff0000) << 8; // result highest
+			tmp1 |= (tmp2 & 0x0000ff00) >> 8; // result lowest
+			tmp1 |= (tmp2 & 0x000000ff) << 8;
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_revsh:
+		// Byte-Reverse Signed Halfword and sign-extend
+		// if d == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			if (bit(tmp2, 7)) // the result will be negative
+				tmp3 = (~0) << 16;
+			else
+				tmp3 = 0;
+			tmp3 |= (tmp2 & 0x0000ff00) >> 8;
+			tmp3 |= (tmp2 & 0x000000ff) << 8;
+
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_sbfx:
+	case arm_cmisc_ubfx:
+		// Signed Bit Field Extract
+		// if d == 15 || n == 15 then UNPREDICTABLE
+		// width minus 1 = bits 20-16, lsb = bits 11-7
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp2 = bitrng(instr, 20, 16); // widhtminus1
+			tmp3 = bitrng(instr, 11, 7); // lsb
+			// make the 'pick' mask
+			tmp4 = (~0) << (tmp2 + 1);
+			tmp4 = (~tmp4) << tmp3;
+			// get bits from Rm
+			tmp1 = bitrng(instr, 3, 0); // Rn
+			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 &= tmp4;
+			// make it an unsigned number
+			tmp1 >>= tmp3;
+			if (extra == arm_cmisc_sbfx)
+			{
+				// if msb is '1'
+				if (bit(tmp1, tmp2))
+				{
+					// sign-extend to signed
+					tmp1 |= (~0)<<(tmp2 + 1);
+				}
+			}
+			retval = set_arm_addr(tmp1);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_sel:
+		// select bytes by GE-flags
+		// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // (Rn)
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp3 = rpi2_reg_context.reg.cpsr;
+			tmp4 = 0;
+			// select Rn or Rm by the GE-bits
+			tmp4 |= ((bit(tmp3,19)?tmp1:tmp2) & 0xff000000);
+			tmp4 |= ((bit(tmp3,18)?tmp1:tmp2) & 0x00ff0000);
+			tmp4 |= ((bit(tmp3,17)?tmp1:tmp2) & 0x0000ff00);
+			tmp4 |= ((bit(tmp3,16)?tmp1:tmp2) & 0x000000ff);
+			retval = set_arm_addr(tmp4);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_cmisc_usad8:
+	case arm_cmisc_usada8:
+		// calculate sum of absolute byte differences
+		// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
+		tmp1 = bitrng(instr, 15, 12); // Rd
+		if (tmp1 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // (Rm)
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rn)
+			// sum of absolute differences
+			tmp3 = 0;
+			for (tmp4 = 0; tmp4 < 4; tmp4++) // for each byte
+			{
+				htmp1 = (unsigned short)((tmp1 >> (8*tmp4)) & 0xff);
+				htmp2 = (unsigned short)((tmp2 >> (8*tmp4)) & 0xff);
+				if (htmp2 < htmp1) htmp1 -= htmp2;
+				else htmp1 = htmp2 - htmp1;
+				tmp3 += (unsigned int)htmp1;
+			}
+
+			if (extra == arm_cmisc_usada8)
+			{
+				// USADA8 (=USAD8 with Ra)
+				tmp1 = rpi2_reg_context.storage[bitrng(instr, 15, 12)]; // (Ra)
+				tmp3 += tmp1;
+			}
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	default:
+		break;
+	}
 	return retval;
 }
 

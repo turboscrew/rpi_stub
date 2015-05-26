@@ -32,20 +32,20 @@
 {0x01A00070,0x0FE000F0,arm_cdata_ror_r,arm_core_data_bit}, // ROR{S}<c> <Rd>, <Rn>, <Rm>
 {0x07100010,0x0FF000F0,arm_div_sdiv,arm_core_data_div}, // SDIV<c> <Rd>, <Rn>, <Rm>
 {0x07300010,0x0FF000F0,arm_div_udiv,arm_core_data_div}, // UDIV<c> <Rd>, <Rn>, <Rm>
-{0x01000080,0x0FF00090,arm_cmac_smla,arm_core_data_mac}, // SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra>
 {0x01600080,0x0FF00090,arm_cmac_smul,arm_core_data_mac}, // SMUL<x><y><c> <Rd>, <Rn>, <Rm>
 {0x012000A0,0x0FF000B0,arm_cmac_smulw,arm_core_data_mac}, // SMULW<y><c> <Rd>, <Rn>, <Rm>
 {0x00000090,0x0FE000F0,arm_cmac_mul,arm_core_data_mac}, // MUL{S}<c> <Rd>, <Rn>, <Rm>
 {0x0750F010,0x0FF0F0D0,arm_cmac_smmul,arm_core_data_mac}, // SMMUL{R}<c> <Rd>, <Rn>, <Rm>
 {0x0700F010,0x0FF0F0D0,arm_cmac_smuad,arm_core_data_mac}, // SMUAD{X}<c> <Rd>, <Rn>, <Rm>
 {0x0700F050,0x0FF0F0D0,arm_cmac_smusd,arm_core_data_mac}, // SMUSD{X}<c> <Rd>, <Rn>, <Rm>
-{0x01200080,0x0FF000B0,arm_cmac_smlaw,arm_core_data_maca}, // SMLAW<y><c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x00200090,0x0FE000F0,arm_cmac_mla,arm_core_data_maca}, // MLA{S}<c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x00600090,0x0FF000F0,arm_cmac_mls,arm_core_data_maca}, // MLS<c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x07000010,0x0FF000D0,arm_cmac_smlad,arm_core_data_maca}, // SMLAD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x07000050,0x0FF000D0,arm_cmac_smlsd,arm_core_data_maca}, // SMLSD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x07500010,0x0FF000D0,arm_cmac_smmla,arm_core_data_maca}, // SMMLA{R}<c> <Rd>, <Rn>, <Rm>, <Ra>
-{0x075000D0,0x0FF000D0,arm_cmac_smmls,arm_core_data_maca}, // SMMLS{R}<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x01000080,0x0FF00090,arm_cmac_smla,arm_core_data_mac}, // SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x01200080,0x0FF000B0,arm_cmac_smlaw,arm_core_data_mac}, // SMLAW<y><c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x00200090,0x0FE000F0,arm_cmac_mla,arm_core_data_mac}, // MLA{S}<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x00600090,0x0FF000F0,arm_cmac_mls,arm_core_data_mac}, // MLS<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x07000010,0x0FF000D0,arm_cmac_smlad,arm_core_data_mac}, // SMLAD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x07000050,0x0FF000D0,arm_cmac_smlsd,arm_core_data_mac}, // SMLSD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x07500010,0x0FF000D0,arm_cmac_smmla,arm_core_data_mac}, // SMMLA{R}<c> <Rd>, <Rn>, <Rm>, <Ra>
+{0x075000D0,0x0FF000D0,arm_cmac_smmls,arm_core_data_mac}, // SMMLS{R}<c> <Rd>, <Rn>, <Rm>, <Ra>
 {0x01400080,0x0FF00090,arm_cmac_smlal16,arm_core_data_macd}, // SMLAL<x><y><c> <RdLo>, <RdHi>, <Rn>, <Rm>
 {0x00E00090,0x0FE000F0,arm_cmac_smlal,arm_core_data_macd}, // SMLAL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm>
 {0x00C00090,0x0FE000F0,arm_cmac_smull,arm_core_data_macd}, // SMULL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm>
