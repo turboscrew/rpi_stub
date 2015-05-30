@@ -27,6 +27,7 @@
 // the register context
 #include "rpi2.h"
 #include "ARM_decode_table.h"
+#include "instr_util.h"
 
 // Extra info to help in decoding.
 // Especially useful for decoding multiplexed instructions
@@ -39,6 +40,14 @@
 typedef enum
 {
 #include "ARM_decode_table_extras.h"
+// added extras for multiplexed instructions
+	arm_cdata_mov_r,
+	arm_cdata_lsl_imm,
+	arm_ret_mov_pc,
+	arm_ret_lsl_imm,
+	arm_cdata_rrx_r,
+	arm_cdata_ror_imm,
+	arm_extras_last
 } ARM_decode_extra_t;
 
 // Decoding function prototypes are read from a file generated from the
@@ -269,6 +278,8 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			if (extra == arm_mux_lsl_i_mov)
 			{
 				// MOV reg
+				retval = arm_core_data_bit(instr, arm_cdata_mov_r);
+
 			}
 			else
 			{
@@ -280,10 +291,12 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 					// elsif CurrentModeIsUserOrSystem() then UNPREDICTABLE
 					// copy SPSR to CPSR (many state-related restrictions)
 					// put result to PC
+					retval = arm_core_data_bit(instr, arm_ret_mov_pc);
 				}
 				else
 				{
 					// MOV PC
+					retval = arm_core_data_bit(instr, arm_cdata_mov_r);
 				}
 			}
 		}
@@ -293,6 +306,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 			if (extra == arm_mux_lsl_i_mov)
 			{
 				// LSL imm
+				retval = arm_core_data_bit(instr, arm_cdata_lsl_imm);
 			}
 			else
 			{
@@ -300,10 +314,12 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 				if (bit(instr, 20) == 1)
 				{
 					// return from exception
+					retval = arm_core_data_bit(instr, arm_ret_lsl_imm);
 				}
 				else
 				{
 					// LSL imm PC
+					retval = arm_core_data_bit(instr, arm_cdata_lsl_imm);
 				}
 			}
 		}
@@ -314,10 +330,12 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 		if (bitrng(instr, 11, 7) == 0)
 		{
 			// RRX reg
+			retval = arm_core_data_bit(instr, arm_cdata_rrx_r);
 		}
 		else
 		{
 			// ROR imm
+			retval = arm_core_data_bit(instr, arm_cdata_ror_imm);
 		}
 		break;
 	case arm_mux_vmovn_q:
@@ -2108,39 +2126,870 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned short htmp1, htmp2;
+	int stmp1, stmp2;
+
 	retval = set_undef_addr();
 
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		// pack half words
+		// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
+		// Rn = bits 19-16, Rd = bits 15-12, Rm = bits 3-0
+		// tb = bit 6, imm = bits 11-7
+		tmp4 = bitrng(instr, 15, 12); // Rd
+		if (tmp4 == 15) // Rd = PC
+		{
+			// operand2
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp2 = bitrng(instr, 11, 7); // imm5
+			tmp3 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // (Rn)
+			if (bit(instr, 6)) // tb: 1=top from Rn, bottom from operand2
+			{
+				// PKHTB: shift=ASR (sign extended shift)
+				// >> is ASR only for signed numbers
+				stmp1 = (int)tmp1;
+				stmp1 >>= tmp2;
+				tmp1 = (unsigned int) stmp1;
+				// Rd[31:16] = Rn[31:16]
+				tmp4 = tmp3 & 0xffff0000;
+				// Rd[15:0] = shifted_op[15:0]
+				tmp4 |= tmp1 & 0xffff;
+			}
+			else // bt: 1=top from operand2, bottom from Rn
+			{
+				// PKHBT: shift=LSL
+				tmp1 <<= tmp2;
+				// Rd[31:16] = shifted_op[31:16]
+				tmp4 = tmp1 & 0xffff0000;
+				// Rd[15:0] = Rn[15:0]
+				tmp4 |= tmp3 & 0xffff;
+			}
+			retval = set_arm_addr(tmp4);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_pack_sxtb:
+		// sign-extend byte
+	case arm_pack_uxtb:
+		// zero-extend byte
+	case arm_pack_sxtab:
+		// sign-extend byte and add
+	case arm_pack_uxtab:
+		// zero-extend byte and add
+	case arm_pack_sxtab16:
+		// sign-extend dual byte and add
+	case arm_pack_uxtab16:
+		// zero-extend dual byte and add
+	case arm_pack_sxtb16:
+		// sign-extend dual byte
+	case arm_pack_uxtb16:
+		// zero-extend dual byte
+	case arm_pack_sxth:
+		// sign-extend half word
+	case arm_pack_sxtah:
+		// sign-extend half word and add
+	case arm_pack_uxtah:
+		// zero-extend half word and add
+	case arm_pack_uxth:
+		// zero-extend half word
+
+		// if d == 15 || m == 15 then UNPREDICTABLE;
+		// Rn = bits 19-16, Rd = bits 15-12, Rm = bits 3-0
+		// Rm ror = bits 11-10 (0, 8, 16, or 24 bits)
+		// bit 22: 1=unsigned, bit 21-20: 00=b16, 10=b, 11=h
+		tmp4 = bitrng(instr, 15, 12); // Rd
+		if (tmp4 == 15) // Rd = PC
+		{
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+			// Rotate Rm
+			tmp1 = instr_util_rorb(tmp1, (int)bitrng(instr, 3, 0));
+
+			// prepare extract mask
+			switch (bitrng(instr, 21, 20))
+			{
+			case 0: // dual byte
+				tmp2 = 0xff00ff00; // mask for dual-byte
+				break;
+			case 2: // single byte
+				tmp2 = (~0) << 8; // mask for byte
+				break;
+			case 3:
+				tmp2 = (~0) << 16; // mask for half word
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+
+			tmp3 = 0; // clear extraction result
+
+			if (bit(instr, 22)) // signed?
+			{
+				// prepare sign extension bits as needed
+				if (bitrng(instr, 21, 20) == 0) // sxtb16 / sxtab16
+				{
+					if (bit(tmp1, 23)) // upper byte is negative
+					{
+						// sign extension bits for upper part
+						tmp3 |= 0xff000000;
+					}
+					if (bit(tmp1, 7)) // lower byte is negative
+					{
+						// sign extension bits for lower part
+						tmp3 |= 0x0000ff00;
+					}
+				}
+				else
+				{
+					if ((tmp1 & (~tmp2)) & (tmp2 >> 1))
+					{
+						tmp3 = tmp2; // set sign-extension bits
+					}
+				}
+			}
+			tmp3 |= (tmp1 & (~tmp2)); // extract data
+
+			// if Rn = PC then no Rn
+			if (bitrng(instr, 19, 16) != 15)
+			{
+				tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+				if (bit(instr, 22)) // signed
+				{
+					if (bitrng(instr, 21, 20) == 0) // sxtab16
+					{
+						// low half
+						stmp1 = instr_util_shgetlo(tmp1);
+						stmp1 += instr_util_shgetlo(tmp3 );
+						// high half
+						stmp2 = instr_util_shgethi(tmp1);
+						stmp2 += instr_util_shgethi(tmp3 );
+
+						tmp3 = instr_util_ustuffs16(stmp2, stmp1);;
+					}
+					else
+					{
+						stmp1 = (int)tmp3 + (int)tmp1;
+						tmp3 = (unsigned int) tmp3;
+					}
+				}
+				else // unsigned
+				{
+					if (bitrng(instr, 21, 20) == 0) // uxtab16
+					{
+						tmp4 = bitrng(tmp1, 31, 16) + bitrng(tmp3, 31, 16);
+						tmp2 = bitrng(tmp1, 15, 0) + bitrng(tmp3, 15, 0);
+						tmp3 = instr_util_ustuffu16(tmp4, tmp2);
+					}
+					else
+					{
+						tmp3 += tmp1;
+					}
+				}
+			}
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_par(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4, tmp5, tmp6;
+	int stmp1, stmp2, stmp3, stmp4;
+
 	retval = set_undef_addr();
 
+	// parallel add&subtr (Rd: bits 15-12, Rn:19-16, Rm:3-0)
+	// unify all these with execution (if Rd = PC)
+	// bit 22=1: unsigned, bits 21,20: 00=undef, 01=basic, 10=Q and 11=H
+	// bits 7-5 = op 0,1,2,3,4,7 (5,6 = UNDEFINED, but shouldn't come here)
+	// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+	if (bitrng(instr, 15, 12) == 15) // Rd = PC
+	{
+		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+		switch (extra)
+		{
+		case arm_par_qadd16:
+			stmp1 = instr_util_ssat(instr_util_shgethi(tmp1)
+					+ instr_util_shgethi(tmp2), 16);
+			stmp2 = instr_util_ssat(instr_util_shgetlo(tmp1)
+					+ instr_util_shgetlo(tmp2), 16);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_qsub16:
+			stmp1 = instr_util_ssat(instr_util_shgethi(tmp1)
+					- instr_util_shgethi(tmp2), 16);
+			stmp2 = instr_util_ssat(instr_util_shgetlo(tmp1)
+					- instr_util_shgetlo(tmp2), 16);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_sadd16:
+			stmp1 = instr_util_shgethi(tmp1) + instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) + instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_ssub16:
+			stmp1 = instr_util_shgethi(tmp1) - instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) - instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_shadd16:
+			stmp1 = instr_util_shgethi(tmp1) + instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) + instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1 >> 1, stmp2 >> 1);
+			break;
+		case arm_par_shsub16:
+			stmp1 = instr_util_shgethi(tmp1) + instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) + instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1 >> 1, stmp2 >> 1);
+			break;
+		case arm_par_qadd8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 = instr_util_ssat((stmp4
+					+ instr_util_signx_byte((tmp2 >> 24) & 0xff)), 8);
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 = instr_util_ssat((stmp3
+					+ instr_util_signx_byte((tmp2 >> 16) & 0xff)), 8);
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 = instr_util_ssat((stmp2
+					+ instr_util_signx_byte((tmp2 >> 8) & 0xff)), 8);
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 = instr_util_ssat((stmp1
+					+ instr_util_signx_byte(tmp2 & 0xff)), 8);
+			tmp4 = instr_util_ustuffs8(stmp4, stmp3, stmp2, stmp1);
+			break;
+		case arm_par_qsub8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 = instr_util_ssat((stmp4
+					- instr_util_signx_byte((tmp2 >> 24) & 0xff)), 8);
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 = instr_util_ssat((stmp3
+					- instr_util_signx_byte((tmp2 >> 16) & 0xff)), 8);
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 = instr_util_ssat((stmp2
+					- instr_util_signx_byte((tmp2 >> 8) & 0xff)), 8);
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 = instr_util_ssat((stmp1
+					- instr_util_signx_byte(tmp2 & 0xff)), 8);
+			tmp4 = instr_util_ustuffs8(stmp4, stmp3, stmp2, stmp1);
+			break;
+		case arm_par_sadd8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 += instr_util_signx_byte((tmp2 >> 24) & 0xff);
+
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 += instr_util_signx_byte((tmp2 >> 16) & 0xff);
+
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 += instr_util_signx_byte((tmp2 >> 8) & 0xff);
+
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 += instr_util_signx_byte(tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffs8(stmp4, stmp3, stmp2, stmp1);
+			break;
+		case arm_par_shadd8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 += instr_util_signx_byte((tmp2 >> 24) & 0xff);
+
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 += instr_util_signx_byte((tmp2 >> 16) & 0xff);
+
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 += instr_util_signx_byte((tmp2 >> 8) & 0xff);
+
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 += instr_util_signx_byte(tmp2 & 0xff);
+			tmp4 = instr_util_ustuffs8(stmp4 >> 1, stmp3 >> 1, stmp2 >> 1, stmp1 >> 1);
+			break;
+		case arm_par_shsub8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 -= instr_util_signx_byte((tmp2 >> 24) & 0xff);
+
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 -= instr_util_signx_byte((tmp2 >> 16) & 0xff);
+
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 -= instr_util_signx_byte((tmp2 >> 8) & 0xff);
+
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 -= instr_util_signx_byte(tmp2 & 0xff);
+			tmp4 = instr_util_ustuffs8(stmp4 >> 1, stmp3 >> 1, stmp2 >> 1, stmp1 >> 1);
+			break;
+		case arm_par_ssub8:
+			stmp4 = instr_util_signx_byte((tmp1 >> 24) & 0xff);
+			stmp4 -= instr_util_signx_byte((tmp2 >> 24) & 0xff);
+
+			stmp3 = instr_util_signx_byte((tmp1 >> 16) & 0xff);
+			stmp3 -= instr_util_signx_byte((tmp2 >> 16) & 0xff);
+
+			stmp2 = instr_util_signx_byte((tmp1 >> 8) & 0xff);
+			stmp2 -= instr_util_signx_byte((tmp2 >> 8) & 0xff);
+
+			stmp1 = instr_util_signx_byte(tmp1 & 0xff);
+			stmp1 -= instr_util_signx_byte(tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffs8(stmp4, stmp3, stmp2, stmp1);
+			break;
+		case arm_par_qasx:
+			stmp1 = instr_util_ssat(instr_util_shgetlo(tmp1)
+					+ instr_util_shgethi(tmp2), 16);
+			stmp2 = instr_util_ssat(instr_util_shgethi(tmp1)
+					- instr_util_shgetlo(tmp2), 16);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_qsax:
+			stmp1 = instr_util_ssat(instr_util_shgethi(tmp1)
+					+ instr_util_shgetlo(tmp2), 16);
+			stmp2 = instr_util_ssat(instr_util_shgetlo(tmp1)
+					- instr_util_shgethi(tmp2), 16);
+			tmp4 = instr_util_ustuffs16(stmp2, stmp1);
+			break;
+		case arm_par_sasx:
+			stmp1 = instr_util_shgetlo(tmp1) + instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgethi(tmp1) - instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1, stmp2);
+			break;
+		case arm_par_shasx:
+			stmp1 = instr_util_shgetlo(tmp1) + instr_util_shgethi(tmp2);
+			stmp2 = instr_util_shgethi(tmp1) - instr_util_shgetlo(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1 >> 1, stmp2 >> 1);
+			break;
+		case arm_par_shsax:
+			stmp1 = instr_util_shgethi(tmp1) + instr_util_shgetlo(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) - instr_util_shgethi(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp1 >> 1, stmp2 >> 1);
+			break;
+		case arm_par_ssax:
+			stmp1 = instr_util_shgethi(tmp1) + instr_util_shgetlo(tmp2);
+			stmp2 = instr_util_shgetlo(tmp1) - instr_util_shgethi(tmp2);
+			tmp4 = instr_util_ustuffs16(stmp2, stmp1);
+			break;
+		case arm_par_uadd16:
+			tmp3 = ((tmp1 >> 16) & 0xffff) + ((tmp2 >> 16) & 0xffff);
+			tmp2 = (tmp1 & 0xffff) + (tmp2 & 0xffff);
+			tmp4 = instr_util_ustuffu16(tmp3, tmp2);
+			break;
+		case arm_par_uhadd16:
+			tmp3 = ((tmp1 >> 16) & 0xffff) + ((tmp2 >> 16) & 0xffff);
+			tmp2 = (tmp1 & 0xffff) + (tmp2 & 0xffff);
+			tmp4 = instr_util_ustuffu16(tmp3 >> 1, tmp2 >> 1);
+			break;
+		case arm_par_uhsub16:
+			tmp3 = ((tmp1 >> 16) & 0xffff) - ((tmp2 >> 16) & 0xffff);
+			tmp2 = (tmp1 & 0xffff) - (tmp2 & 0xffff);
+			tmp4 = instr_util_ustuffu16(tmp3 >> 1, tmp2 >> 1);
+			break;
+		case arm_par_uqadd16:
+			tmp3 = instr_util_usat(((tmp1 >> 16) & 0xffff)
+					+ ((tmp2 >> 16) & 0xffff), 16);
+			tmp2 = instr_util_usat((tmp1 & 0xffff) + (tmp2 & 0xffff), 16);
+			tmp4 = instr_util_ustuffu16(tmp3, tmp2);
+			break;
+		case arm_par_uqsub16:
+			tmp3 = instr_util_usat(((tmp1 >> 16) & 0xffff)
+					- ((tmp2 >> 16) & 0xffff), 16);
+			tmp2 = instr_util_usat((tmp1 & 0xffff) - (tmp2 & 0xffff), 16);
+			tmp4 = instr_util_ustuffu16(tmp3, tmp2);
+			break;
+		case arm_par_usub16:
+			tmp3 = ((tmp1 >> 16) & 0xffff) - ((tmp2 >> 16) & 0xffff);
+			tmp2 = (tmp1 & 0xffff) - (tmp2 & 0xffff);
+			tmp4 = instr_util_ustuffu16(tmp3, tmp2);
+			break;
+		case arm_par_uadd8:
+			tmp6 = ((tmp1 >> 24) & 0xff) + ((tmp2 >> 24) & 0xff);
+			tmp5 = ((tmp1 >> 16) & 0xff) + ((tmp2 >> 16) & 0xff);
+			tmp4 = ((tmp1 >> 8) & 0xff) + ((tmp2 >> 8) & 0xff);
+			tmp3 = (tmp1 & 0xff) + (tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffu8(tmp6, tmp5, tmp4, tmp3);
+			break;
+		case arm_par_uhadd8:
+			tmp6 = ((tmp1 >> 24) & 0xff) + ((tmp2 >> 24) & 0xff);
+			tmp5 = ((tmp1 >> 16) & 0xff) + ((tmp2 >> 16) & 0xff);
+			tmp4 = ((tmp1 >> 8) & 0xff) + ((tmp2 >> 8) & 0xff);
+			tmp3 = (tmp1 & 0xff) + (tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffu8(tmp6 >> 1, tmp5 >> 1, tmp4 >> 1, tmp3 >> 1);
+			break;
+		case arm_par_uhsub8:
+			tmp6 = ((tmp1 >> 24) & 0xff) - ((tmp2 >> 24) & 0xff);
+			tmp5 = ((tmp1 >> 16) & 0xff) - ((tmp2 >> 16) & 0xff);
+			tmp4 = ((tmp1 >> 8) & 0xff) - ((tmp2 >> 8) & 0xff);
+			tmp3 = (tmp1 & 0xff) - (tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffu8(tmp6 >> 1, tmp5 >> 1, tmp4 >> 1, tmp3 >> 1);
+			break;
+		case arm_par_uqadd8:
+			tmp6 = ((tmp1 >> 24) & 0xff) + ((tmp2 >> 24) & 0xff);
+			tmp6 = instr_util_usat((int)tmp6, 8);
+
+			tmp5 = ((tmp1 >> 16) & 0xff) + ((tmp2 >> 16) & 0xff);
+			tmp5 = instr_util_usat((int)tmp5, 8);
+
+			tmp4 = ((tmp1 >> 8) & 0xff) + ((tmp2 >> 8) & 0xff);
+			tmp4 = instr_util_usat((int)tmp4, 8);
+
+			tmp3 = (tmp1 & 0xff) + (tmp2 & 0xff);
+			tmp3 = instr_util_usat((int)tmp3, 8);
+
+			tmp4 = instr_util_ustuffu8(tmp6, tmp5, tmp4, tmp3);
+			break;
+		case arm_par_uqsub8:
+			tmp6 = ((tmp1 >> 24) & 0xff) - ((tmp2 >> 24) & 0xff);
+			tmp6 = instr_util_usat((int)tmp6, 8);
+
+			tmp5 = ((tmp1 >> 16) & 0xff) - ((tmp2 >> 16) & 0xff);
+			tmp5 = instr_util_usat((int)tmp5, 8);
+
+			tmp4 = ((tmp1 >> 8) & 0xff) - ((tmp2 >> 8) & 0xff);
+			tmp4 = instr_util_usat((int)tmp4, 8);
+
+			tmp3 = (tmp1 & 0xff) - (tmp2 & 0xff);
+			tmp3 = instr_util_usat((int)tmp3, 8);
+
+			tmp4 = instr_util_ustuffu8(tmp6, tmp5, tmp4, tmp3);
+			break;
+		case arm_par_usub8:
+			tmp6 = ((tmp1 >> 24) & 0xff) - ((tmp2 >> 24) & 0xff);
+			tmp5 = ((tmp1 >> 16) & 0xff) - ((tmp2 >> 16) & 0xff);
+			tmp4 = ((tmp1 >> 8) & 0xff) - ((tmp2 >> 8) & 0xff);
+			tmp3 = (tmp1 & 0xff) - (tmp2 & 0xff);
+
+			tmp4 = instr_util_ustuffu8(tmp6, tmp5, tmp4, tmp3);
+			break;
+		case arm_par_uasx:
+			tmp3 = (tmp1 & 0xffff) + ((tmp2 >> 16) & 0xffff);
+			tmp4 = ((tmp1 >> 16) & 0xffff) - (tmp2 & 0xffff);
+
+			tmp4 = instr_util_ustuffu16(tmp3, tmp4);
+			break;
+		case arm_par_uhasx:
+			tmp3 = (tmp1 & 0xffff) + ((tmp2 >> 16) & 0xffff);
+			tmp4 = ((tmp1 >> 16) & 0xffff) - (tmp2 & 0xffff);
+
+			tmp4 = instr_util_ustuffu16(tmp3 >> 1, tmp4 >> 1);
+			break;
+		case arm_par_uhsax:
+			tmp3 = ((tmp1 >> 16) & 0xffff) + (tmp2 & 0xffff);
+			tmp4 = (tmp1 & 0xffff) - ((tmp2 >> 16) & 0xffff);
+
+			tmp4 = instr_util_ustuffu16(tmp3 >> 1, tmp4 >> 1);
+			break;
+		case arm_par_uqasx:
+			tmp3 = (tmp1 & 0xffff) + ((tmp2 >> 16) & 0xffff);
+			tmp3 = instr_util_usat((int)tmp3, 16);
+
+			tmp4 = ((tmp1 >> 16) & 0xffff) - (tmp2 & 0xffff);
+			tmp4 = instr_util_usat((int)tmp4, 16);
+
+			tmp4 = instr_util_ustuffu16(tmp3, tmp4);
+			break;
+		case arm_par_uqsax:
+			tmp3 = ((tmp1 >> 16) & 0xffff) + (tmp2 & 0xffff);
+			tmp3 = instr_util_usat((int)tmp3, 16);
+
+			tmp4 = (tmp1 & 0xffff) - ((tmp2 >> 16) & 0xffff);
+			tmp4 = instr_util_usat((int)tmp4, 16);
+
+			tmp4 = instr_util_ustuffu16(tmp3, tmp4);
+			break;
+		case arm_par_usax:
+			tmp3 = ((tmp1 >> 16) & 0xffff) + (tmp2 & 0xffff);
+			tmp4 = (tmp1 & 0xffff) - ((tmp2 >> 16) & 0xffff);
+
+			tmp4 = instr_util_ustuffu16(tmp3, tmp4);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		retval = set_arm_addr(tmp4);
+		retval = set_unpred_addr(retval);
+	}
+	else
+	{
+		retval = set_addr_lin();
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_sat(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
+	// Rn = bits 19-16, Rm = bits 3-0, Rd = bits 15-12
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3;
+	int stmp1, stmp2;
+	long long int sltmp;
+
 	retval = set_undef_addr();
 
+	if (bitrng(instr, 15, 12) == 15) // Rd = PC
+	{
+		if (bitrng(instr, 24, 23) == 2)
+		{
+			// QADD/QDADD/QSUB/QDSUB
+			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
+			// Rn = bits 19-16, Rm = bits 3-0, Rd = bits 15-12
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+			switch(extra)
+			{
+			case arm_sat_qadd:
+				sltmp = ((long long int)tmp2) + ((long long int)tmp1);
+				sltmp = instr_util_lssat(sltmp, 32);
+				tmp3 = (unsigned int)(sltmp & 0xffffffffL);
+				break;
+			case arm_sat_qdadd:
+				sltmp = instr_util_lssat(2 * ((long long int)tmp1), 32);
+				sltmp = instr_util_lssat(((long long int)tmp2) - sltmp, 32);
+				tmp3 = (unsigned int)(sltmp & 0xffffffffL);
+				break;
+			case arm_sat_qdsub:
+				sltmp = instr_util_lssat(2 * ((long long int)tmp1), 32);
+				sltmp = instr_util_lssat(((long long int)tmp2) - sltmp, 32);
+				tmp3 = (unsigned int)(sltmp & 0xffffffffL);
+				break;
+			case arm_sat_qsub:
+				sltmp = ((long long int)tmp2) + ((long long int)tmp1);
+				sltmp = instr_util_lssat(sltmp, 32);
+				tmp3 = (unsigned int)(sltmp & 0xffffffffL);
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+		}
+		else
+		{
+			// SSAT/SSAT16/USAT/USAT16
+			// if d == 15 || n == 15 then UNPREDICTABLE;
+			// Rn = bits 3-0, Rd = bits 15-12, imm = bits 11-6
+			// sat_imm = bits 20/19 - 16, shift = bit 6
+			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rn
+
+			switch (extra)
+			{
+			case arm_sat_ssat:
+			case arm_sat_usat:
+				// make operand
+				tmp2 = bitrng(instr, 11, 7); // shift count
+				stmp1 = (int)tmp1;
+				if (bit(instr, 6))
+				{
+					// signed int used to make '>>' ASR
+					if (tmp2 == 0) // ASR #32
+					{
+						stmp1 >>= 31;
+					}
+					else // ASR imm
+					{
+						stmp1 >>= tmp2;
+					}
+				}
+				else
+				{
+					if (tmp2 != 0)
+					{
+						stmp1 <<= tmp2; // LSL imm
+					}
+					// else LSL #0
+				}
+				if (extra == arm_sat_ssat)
+				{
+					stmp2 = instr_util_ssat(stmp1, bitrng(instr, 20, 16) -1);
+				}
+				else // arm_sat_usat
+				{
+					stmp2 = (int)instr_util_usat(stmp1, bitrng(instr, 20, 16));
+				}
+				tmp3 = (unsigned int)stmp2;
+				break;
+			case arm_sat_ssat16:
+				stmp1 = instr_util_ssat(instr_util_shgetlo(tmp1),
+						bitrng(instr, 19, 16));
+				stmp2 = instr_util_ssat(instr_util_shgethi(tmp1),
+						bitrng(instr, 19, 16));
+				tmp3 = instr_util_ustuffs16(stmp2, stmp1);
+				break;
+			case arm_sat_usat16:
+				stmp1 = instr_util_usat(instr_util_shgetlo(tmp1),
+						bitrng(instr, 19, 16));
+				stmp2 = instr_util_usat(instr_util_shgethi(tmp1),
+						bitrng(instr, 19, 16));
+				tmp3 = instr_util_ustuffs16(stmp2, stmp1);
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+		}
+		retval = set_arm_addr(tmp3);
+		retval = set_unpred_addr(retval);
+	}
+	else
+	{
+		retval = set_addr_lin();
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra)
 {
-	instr_next_addr_t retval;
-	retval = set_undef_addr();
+	// Rd = bits 15-12, Rm = bits 3-0, imm = bits 11-7
+	// Rd = bits 15-12, Rm = bits 11-8, Rn = bits 3-0
+	// shift type = bits 6-5: 0=LSL, 1=LSR, 2=ASR, 3=ROR/RRX
+	// exception returning:
+	// find out operation result, set cpsr = spsr, pc = result (jump)
 
+	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1;
+
+	retval = set_undef_addr();
+	if (bitrng(instr, 15, 12) == 15) // Rd = PC
+	{
+		tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rn / Rm if imm
+		switch (extra)
+		{
+		case arm_ret_asr_imm:
+		case arm_cdata_asr_imm:
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			stmp1 = (int) tmp1; // for '>>' to act as ASR instead of LSR
+			tmp3 = (unsigned int) (stmp1 >> tmp2);
+			break;
+		case arm_ret_lsr_imm:
+		case arm_cdata_lsr_imm:
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp3 = tmp1 >> tmp2;
+			break;
+		case arm_ret_lsl_imm:
+		case arm_cdata_lsl_imm:
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp3 = tmp1 << tmp2;
+			break;
+		case arm_ret_mov_pc:
+		case arm_cdata_mov_r:
+			tmp3 = tmp1;
+			break;
+		case arm_ret_ror_imm:
+		case arm_cdata_ror_imm:
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp4 = bitrng(tmp1, tmp2, 0); // catch the dropping bits
+			tmp4 <<= (32 - tmp2); // prepare for putting back in the top
+			tmp3 = tmp1 >> tmp2;
+			tmp2 = (~0) << tmp2; // make mask
+			tmp3 = (tmp3 & (~tmp2)) || (tmp4 & tmp2); // add dropped bits into result
+			break;
+		case arm_ret_rrx_pc:
+		case arm_cdata_rrx_r:
+			tmp2 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
+			tmp3 = (tmp1 >> 1) | (tmp2 << 31);
+			break;
+		case arm_cdata_asr_r:
+			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp2 &= 0x1f; // we don't need shifts more than 31 bits
+			stmp1 = (int) tmp1; // for '>>' to act as ASR instead of LSR
+			tmp3 = (unsigned int) (stmp1 >> tmp2);
+			break;
+		case arm_cdata_lsl_r:
+			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			if (tmp2 > 31) // to get rid of warning about too long shift
+			{
+				tmp3 = 0;
+			}
+			else
+			{
+				tmp2 &= 0x1f; // we don't need shifts more than 31 bits
+				tmp3 = tmp1 << tmp2;
+			}
+			break;
+		case arm_cdata_lsr_r:
+			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			if (tmp2 > 31) // to get rid of warning about too long shift
+			{
+				tmp3 = 0;
+			}
+			else
+			{
+				tmp2 &= 0x1f; // we don't need shifts more than 31 bits
+				tmp3 = tmp1 >> tmp2;
+			}
+			break;
+		case arm_cdata_ror_r:
+			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp2 &= 0x1f; // we don't need shifts more than 31 bits
+			if (tmp2 == 0) // to get rid of warning about too long shift
+			{
+				tmp3 = tmp1;
+			}
+			else
+			{
+				tmp4 = bitrng(tmp1, tmp2, 0); // catch the dropping bits
+				tmp4 <<= (32 - tmp2); // prepare for putting back in the top
+				tmp3 = tmp1 >> tmp2;
+				tmp2 = (~0) << tmp2; // make mask
+				tmp3 = (tmp3 & (~tmp2)) || (tmp4 & tmp2); // add dropped bits into result
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+	} // if Rd = PC
+	// check for UNPREDICTABLE and UNDEFINED
+	switch (extra)
+	{
+	// none of these if Rd != PC
+	case arm_ret_asr_imm:
+	case arm_ret_lsr_imm:
+	case arm_ret_lsl_imm:
+	case arm_ret_ror_imm:
+	case arm_ret_rrx_pc:
+	case arm_ret_mov_pc:
+		// if CurrentModeIsHyp() then UNDEFINED;
+		// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
+		// if executed in Debug state then UNPREDICTABLE
+		// TODO: check other stare restrictions too
+		tmp1 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
+		switch (tmp1 & 0x1f) // current mode
+		{
+		case 0x10: // usr
+		case 0x1f: // sys
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+			break;
+		case 0x1a: // hyp
+			retval = set_undef_addr();
+			break;
+		default:
+			retval = set_arm_addr(tmp3);
+			break;
+		}
+		break;
+	// here Rd may be PC
+	case arm_cdata_asr_r:
+	case arm_cdata_lsl_r:
+	case arm_cdata_lsr_r:
+	case arm_cdata_ror_r:
+		// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
+		if (bitrng(instr, 15, 12) == 15) // Rd = PC
+		{
+			retval = set_arm_addr(tmp3);
+			retval = set_unpred_addr(retval);
+		}
+		else
+		{
+			retval = set_addr_lin();
+		}
+		break;
+	default:
+		retval = set_addr_lin();
+		break;
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// Rd = bits 15-12, Rn = bits 19-16, Rm = bits 3-0
+	// imm = bits 11-7, shift = bits 6-5
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1, stmp2, stmp3, stmp4;
+
 	retval = set_undef_addr();
+
+	tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+
+	// calculate operand2
+	tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+	tmp3 = bitrng(instr, 11, 7); // shift-immediate
+	switch (bitrng(instr, 6, 5))
+	{
+	case 0: // LSL
+		tmp2 <<= tmp3;
+		break;
+	case 1: // LSR
+		if (tmp3 == 0)
+			tmp2 = 0;
+		else
+			tmp2 >>= tmp3;
+		break;
+	case 2: // ASR
+		if (tmp3 == 0) tmp3 = 31;
+		stmp1 = tmp2; // for ASR instead of LSR
+		tmp2 = (unsigned int)(stmp1 >> tmp3);
+		break;
+	case 3: // ROR
+		if (tmp3 == 0)
+		{
+			// RRX
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
+			tmp2 = (tmp2 >> 1) | (tmp3 << 31);
+		}
+		else
+		{
+			tmp4 = tmp2;
+			tmp4 <<= (32 - tmp3); // prepare for putting back in the top
+			tmp2 = tmp2 >> tmp3;
+			tmp1 = (~0) << tmp3; // make mask
+			tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
+		}
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
+
+	switch (extra)
+	{
+	case arm_cdata_adc_r:
+	case arm_cdata_add_r:
+	case arm_cdata_add_r_sp:
+	case arm_cdata_and_r:
+	case arm_cdata_bic_r:
+	case arm_cdata_cmn_r:
+	case arm_cdata_cmp_r:
+	case arm_cdata_eor_r:
+	case arm_cdata_mvn_r:
+	case arm_cdata_orr_r:
+	case arm_cdata_rsb_r:
+	case arm_cdata_rsc_r:
+	case arm_cdata_sbc_r:
+	case arm_cdata_sub_r:
+	case arm_cdata_sub_r_sp:
+	case arm_cdata_teq_r:
+	case arm_cdata_tst_r:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
@@ -2148,6 +2997,14 @@ instr_next_addr_t arm_core_data_std_pcr(unsigned int instr, ARM_decode_extra_t e
 {
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
@@ -2155,6 +3012,14 @@ instr_next_addr_t arm_core_data_std_sh(unsigned int instr, ARM_decode_extra_t ex
 {
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
@@ -2162,6 +3027,14 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 {
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
@@ -2169,6 +3042,14 @@ instr_next_addr_t arm_core_data_std_ipc(unsigned int instr, ARM_decode_extra_t e
 {
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 
@@ -2177,6 +3058,14 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
 
+	switch (extra)
+	{
+	case arm_pack_pkh:
+		break;
+	default:
+		// shouldn't get here
+		break;
+	}
 	return retval;
 }
 

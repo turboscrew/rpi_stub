@@ -479,5 +479,5 @@ arm_vfpxfer_vmov_dx,
 arm_vfpxfer_vmsr_fpscr,
 arm_vfpxfer_vmrs_fpscr,
 arm_vfpxfer_vdup,
-arm_vfpxfer_vmov_dt_dx
+arm_vfpxfer_vmov_dt_dx,
 
