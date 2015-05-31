@@ -9,8 +9,6 @@ instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extr
 instr_next_addr_t arm_core_data_par(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_sat(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t extra);
-instr_next_addr_t arm_core_data_std_ipc(unsigned int instr, ARM_decode_extra_t extra);
-instr_next_addr_t arm_core_data_std_pcr(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_data_std_sh(unsigned int instr, ARM_decode_extra_t extra);
 instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra);

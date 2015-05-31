@@ -2875,12 +2875,14 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 		// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
 		// if executed in Debug state then UNPREDICTABLE
 		// TODO: check other stare restrictions too
+		// UNPREDICTABLE due to privilege violation might cause
+		// UNDEFINED or SVC exception. Let's guess SVC for now.
 		tmp1 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
 		switch (tmp1 & 0x1f) // current mode
 		{
 		case 0x10: // usr
 		case 0x1f: // sys
-			retval = set_arm_addr(tmp3);
+			retval = set_arm_addr(0x8); // SVC-vector
 			retval = set_unpred_addr(retval);
 			break;
 		case 0x1a: // hyp
@@ -2920,135 +2922,407 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 	// imm = bits 11-7, shift = bits 6-5
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
-	int stmp1, stmp2, stmp3, stmp4;
+	int stmp1;
 
 	retval = set_undef_addr();
 
-	tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
-
-	// calculate operand2
-	tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
-	tmp3 = bitrng(instr, 11, 7); // shift-immediate
-	switch (bitrng(instr, 6, 5))
+	// These don't have Rd
+	if ((extra == arm_cdata_cmn_r) || (extra == arm_cdata_cmp_r)
+			|| (extra == arm_cdata_teq_r) || (extra == arm_cdata_tst_r))
 	{
-	case 0: // LSL
-		tmp2 <<= tmp3;
-		break;
-	case 1: // LSR
-		if (tmp3 == 0)
-			tmp2 = 0;
-		else
-			tmp2 >>= tmp3;
-		break;
-	case 2: // ASR
-		if (tmp3 == 0) tmp3 = 31;
-		stmp1 = tmp2; // for ASR instead of LSR
-		tmp2 = (unsigned int)(stmp1 >> tmp3);
-		break;
-	case 3: // ROR
-		if (tmp3 == 0)
-		{
-			// RRX
-			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
-			tmp2 = (tmp2 >> 1) | (tmp3 << 31);
-		}
-		else
-		{
-			tmp4 = tmp2;
-			tmp4 <<= (32 - tmp3); // prepare for putting back in the top
-			tmp2 = tmp2 >> tmp3;
-			tmp1 = (~0) << tmp3; // make mask
-			tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
-		}
-		break;
-	default:
-		// shouldn't get here
-		break;
+		// these don't affect program flow
+		retval = set_addr_lin();
 	}
-
-	switch (extra)
+	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-	case arm_cdata_adc_r:
-	case arm_cdata_add_r:
-	case arm_cdata_add_r_sp:
-	case arm_cdata_and_r:
-	case arm_cdata_bic_r:
-	case arm_cdata_cmn_r:
-	case arm_cdata_cmp_r:
-	case arm_cdata_eor_r:
-	case arm_cdata_mvn_r:
-	case arm_cdata_orr_r:
-	case arm_cdata_rsb_r:
-	case arm_cdata_rsc_r:
-	case arm_cdata_sbc_r:
-	case arm_cdata_sub_r:
-	case arm_cdata_sub_r_sp:
-	case arm_cdata_teq_r:
-	case arm_cdata_tst_r:
-		break;
-	default:
-		// shouldn't get here
-		break;
+		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+
+		// calculate operand2
+		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+		tmp3 = bitrng(instr, 11, 7); // shift-immediate
+		switch (bitrng(instr, 6, 5))
+		{
+		case 0: // LSL
+			tmp2 <<= tmp3;
+			break;
+		case 1: // LSR
+			if (tmp3 == 0)
+				tmp2 = 0;
+			else
+				tmp2 >>= tmp3;
+			break;
+		case 2: // ASR
+			if (tmp3 == 0) tmp3 = 31;
+			stmp1 = tmp2; // for ASR instead of LSR
+			tmp2 = (unsigned int)(stmp1 >> tmp3);
+			break;
+		case 3: // ROR
+			if (tmp3 == 0)
+			{
+				// RRX
+				tmp3 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
+				tmp2 = (tmp2 >> 1) | (tmp3 << 31);
+			}
+			else
+			{
+				tmp4 = tmp2;
+				tmp4 <<= (32 - tmp3); // prepare for putting back in the top
+				tmp2 = tmp2 >> tmp3;
+				tmp1 = (~0) << tmp3; // make mask
+				tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+
+		switch (extra)
+		{
+		case arm_cdata_adc_r:
+		case arm_ret_adc_r:
+			tmp3 = tmp1 + tmp2 + bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp3);
+			break;
+		case arm_cdata_add_r:
+		case arm_cdata_add_r_sp:
+		case arm_ret_add_r:
+			retval = set_arm_addr(tmp1 + tmp2);
+			break;
+		case arm_cdata_and_r:
+		case arm_ret_and_r:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_bic_r:
+		case arm_ret_bic_r:
+			retval = set_arm_addr(tmp1 & (~tmp2));
+			break;
+		case arm_cdata_eor_r:
+		case arm_ret_eor_r:
+			retval = set_arm_addr(tmp1 ^ tmp2);
+			break;
+		case arm_cdata_mvn_r:
+		case arm_ret_mvn_r:
+			retval = set_arm_addr(~tmp2);
+			break;
+		case arm_cdata_orr_r:
+		case arm_ret_orr_r:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_rsb_r:
+		case arm_ret_rsb_r:
+			retval = set_arm_addr(tmp2 - tmp1);
+			break;
+		case arm_cdata_rsc_r:
+		case arm_ret_rsc_r:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr((~tmp1) + tmp2 + tmp3);
+			break;
+		case arm_cdata_sbc_r:
+		case arm_ret_sbc_r:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp1 + (~tmp2) + tmp3);
+			break;
+		case arm_cdata_sub_r:
+		case arm_cdata_sub_r_sp:
+		case arm_ret_sub_r:
+			retval = set_arm_addr(tmp1 - tmp2);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+
+		// check for UNPREDICTABLE and UNDEFINED
+		switch (extra)
+		{
+		case arm_ret_adc_r:
+		case arm_ret_add_r:
+		case arm_ret_and_r:
+		case arm_ret_bic_r:
+		case arm_ret_eor_r:
+		case arm_ret_mvn_r:
+		case arm_ret_orr_r:
+		case arm_ret_rsb_r:
+		case arm_ret_rsc_r:
+		case arm_ret_sbc_r:
+		case arm_ret_sub_r:
+			// if CurrentModeIsHyp() then UNDEFINED;
+			// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
+			// if executed in Debug state then UNPREDICTABLE
+			// UNPREDICTABLE due to privilege violation might cause
+			// UNDEFINED or SVC exception. Let's guess SVC for now.
+			// TODO: check other stare restrictions too
+			switch (tmp1 & 0x1f) // current mode
+			{
+			case 0x10: // usr
+			case 0x1f: // sys
+				retval = set_unpred_addr(0x8); // SVC-vector
+				break;
+			case 0x1a: // hyp
+				retval = set_undef_addr();
+				break;
+			default:
+				// Nothing to do
+				break;
+			}
+		}
 	}
-	return retval;
-}
-
-instr_next_addr_t arm_core_data_std_pcr(unsigned int instr, ARM_decode_extra_t extra)
-{
-	instr_next_addr_t retval;
-	retval = set_undef_addr();
-	switch (extra)
+	else
 	{
-	case arm_pack_pkh:
-		break;
-	default:
-		// shouldn't get here
-		break;
+		retval = set_addr_lin();
 	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_std_sh(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// if d == 15 || n == 15 || m == 15 || s == 15 then UNPREDICTABLE
+	// Rd = bits 15-12, Rn = bits 19-16, Rm = bits 3-0
+	// Rs = bits 11-8, shift = bits 6-5
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1;
+
 	retval = set_undef_addr();
-	switch (extra)
+
+	// These don't have Rd
+	if ((extra == arm_cdata_cmn_rshr) || (extra == arm_cdata_cmp_rshr)
+			|| (extra == arm_cdata_teq_rshr) || (extra == arm_cdata_tst_rshr))
 	{
-	case arm_pack_pkh:
-		break;
-	default:
-		// shouldn't get here
-		break;
+		// these don't affect program flow
+		retval = set_addr_lin();
+	}
+	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
+	{
+		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+
+		// calculate operand2
+		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+		tmp3 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rs
+		tmp3 &= 0x1f; // we don't need any longer shifts here
+		if (tmp3 != 0) // with zero shift count there's nothing to do
+		{
+			switch (bitrng(instr, 6, 5))
+			{
+			case 0: // LSL
+				tmp2 <<= tmp3;
+				break;
+			case 1: // LSR
+				tmp2 >>= tmp3;
+				break;
+			case 2: // ASR
+				stmp1 = tmp2; // for ASR instead of LSR
+				tmp2 = (unsigned int)(stmp1 >> tmp3);
+				break;
+			case 3: // ROR
+				tmp4 = tmp2;
+				tmp4 <<= (32 - tmp3); // prepare for putting back in the top
+				tmp2 = tmp2 >> tmp3;
+				tmp1 = (~0) << tmp3; // make mask
+				tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+		}
+
+		switch (extra)
+		{
+	  	case arm_cdata_adc_rshr:
+			tmp3 = tmp1 + tmp2 + bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp3);
+			break;
+		case arm_cdata_add_rshr:
+			retval = set_arm_addr(tmp1 + tmp2);
+			break;
+		case arm_cdata_and_rshr:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_bic_rshr:
+			retval = set_arm_addr(tmp1 & (~tmp2));
+			break;
+		case arm_cdata_eor_rshr:
+			retval = set_arm_addr(tmp1 ^ tmp2);
+			break;
+		case arm_cdata_mvn_rshr:
+			retval = set_arm_addr(~tmp2);
+			break;
+		case arm_cdata_orr_rshr:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_rsb_rshr:
+			retval = set_arm_addr(tmp2 - tmp1);
+			break;
+		case arm_cdata_rsc_rshr:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr((~tmp1) + tmp2 + tmp3);
+			break;
+		case arm_cdata_sbc_rshr:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp1 + (~tmp2) + tmp3);
+			break;
+		case arm_cdata_sub_rshr:
+			retval = set_arm_addr(tmp1 - tmp2);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		// due to Rd = PC
+		retval = set_unpred_addr(retval);
+	}
+	else
+	{
+		retval = set_addr_lin();
 	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// if d == 15 || n == 15 || m == 15 || s == 15 then UNPREDICTABLE
+	// Rd = bits 15-12, Rn = bits 19-16, imm = bits 11-0
+	// Rs = bits 11-8, shift = bits 6-5
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
-	switch (extra)
-	{
-	case arm_pack_pkh:
-		break;
-	default:
-		// shouldn't get here
-		break;
-	}
-	return retval;
-}
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1;
 
-instr_next_addr_t arm_core_data_std_ipc(unsigned int instr, ARM_decode_extra_t extra)
-{
-	instr_next_addr_t retval;
 	retval = set_undef_addr();
-	switch (extra)
+
+	// These don't have Rd
+	if ((extra == arm_cdata_cmn_imm) || (extra == arm_cdata_cmp_imm)
+			|| (extra == arm_cdata_teq_imm) || (extra == arm_cdata_tst_imm))
 	{
-	case arm_pack_pkh:
-		break;
-	default:
-		// shouldn't get here
-		break;
+		// these don't affect program flow
+		retval = set_addr_lin();
+	}
+	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
+	{
+		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+
+		// calculate operand2
+		// imm12: bits 11-8 = half of ror amount, bits 7-0 = immediate value
+		tmp2 = bitrng(instr, 7, 0); // immediate
+		tmp3 = bitrng(instr, 11, 8) << 1; // ROR-amount
+		tmp3 &= 0x1f;
+		if (tmp3 != 0) // with zero shift count there's nothing to do
+		{
+			// always ROR
+			tmp4 = tmp2;
+			tmp4 <<= (32 - tmp3); // prepare for putting back in the top
+			tmp2 = tmp2 >> tmp3;
+			tmp1 = (~0) << tmp3; // make mask
+			tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
+		}
+
+		switch (extra)
+		{
+		case arm_cdata_adc_imm:
+		case arm_ret_adc_imm:
+			tmp3 = tmp1 + tmp2 + bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp3);
+			break;
+		case arm_cdata_add_imm:
+		case arm_cdata_add_imm_sp:
+		case arm_ret_add_imm:
+			retval = set_arm_addr(tmp1 + tmp2);
+			break;
+		case arm_cdata_adr_lbla:
+			// result = (Align(PC,4) + imm32);
+			// Align(x, y) = y * (x DIV y)
+			tmp3 = rpi2_reg_context.reg.r15 & ((~0) << 2);
+			retval = set_arm_addr(tmp3 + tmp2);
+			break;
+		case arm_cdata_adr_lblb:
+			// result = (Align(PC,4) - imm32);
+			tmp3 = rpi2_reg_context.reg.r15 & ((~0) << 2);
+			retval = set_arm_addr(tmp3 - tmp2);
+			break;
+		case arm_cdata_and_imm:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_bic_imm:
+		case arm_ret_bic_imm:
+			retval = set_arm_addr(tmp1 & (~tmp2));
+			break;
+		case arm_cdata_eor_imm:
+		case arm_ret_eor_imm:
+			retval = set_arm_addr(tmp1 ^ tmp2);
+			break;
+		case arm_cdata_mov_imm:
+		case arm_ret_mov_imm:
+			retval = set_arm_addr(tmp2);
+			break;
+		case arm_cdata_mvn_imm:
+		case arm_ret_mvn_imm:
+			retval = set_arm_addr(~tmp2);
+			break;
+		case arm_cdata_orr_imm:
+			retval = set_arm_addr(tmp1 & tmp2);
+			break;
+		case arm_cdata_rsb_imm:
+		case arm_ret_rsb_imm:
+			retval = set_arm_addr(tmp2 - tmp1);
+			break;
+		case arm_cdata_rsc_imm:
+		case arm_ret_rsc_imm:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr((~tmp1) + tmp2 + tmp3);
+			break;
+		case arm_cdata_sbc_imm:
+		case arm_ret_sbc_imm:
+			tmp3 = bit(rpi2_reg_context.reg.cpsr, 29);
+			retval = set_arm_addr(tmp1 + (~tmp2) + tmp3);
+			break;
+		case arm_cdata_sub_imm:
+		case arm_cdata_sub_imm_sp:
+		case arm_ret_sub_imm:
+			retval = set_arm_addr(tmp1 - tmp2);
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+
+		// check for UNPREDICTABLE and UNDEFINED
+		switch (extra)
+		{
+		case arm_ret_adc_imm:
+		case arm_ret_add_imm:
+		case arm_ret_bic_imm:
+		case arm_ret_eor_imm:
+		case arm_ret_mov_imm:
+		case arm_ret_mvn_imm:
+		case arm_ret_rsb_imm:
+		case arm_ret_rsc_imm:
+		case arm_ret_sbc_imm:
+		case arm_ret_sub_imm:
+			// if CurrentModeIsHyp() then UNDEFINED;
+			// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
+			// if executed in Debug state then UNPREDICTABLE
+			// UNPREDICTABLE due to privilege violation might cause
+			// UNDEFINED or SVC exception. Let's guess SVC for now.
+			// TODO: check other stare restrictions too
+			switch (tmp1 & 0x1f) // current mode
+			{
+			case 0x10: // usr
+			case 0x1f: // sys
+				retval = set_unpred_addr(0x8); // SVC-vector
+				break;
+			case 0x1a: // hyp
+				retval = set_undef_addr();
+				break;
+			default:
+				// Nothing to do
+				break;
+			}
+		}
+	}
+	else
+	{
+		retval = set_addr_lin();
 	}
 	return retval;
 }
@@ -3060,7 +3334,14 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 
 	switch (extra)
 	{
-	case arm_pack_pkh:
+	case arm_exc_eret:
+	case arm_exc_bkpt:
+	case arm_exc_hvc:
+	case arm_exc_smc:
+	case arm_exc_svc:
+	case arm_exc_udf:
+	case arm_exc_rfe:
+	case arm_exc_srs:
 		break;
 	default:
 		// shouldn't get here

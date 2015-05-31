@@ -145,27 +145,27 @@
 {0x024D0000,0x0FEF0000,arm_cdata_sub_imm_sp,arm_core_data_std_i}, // SUB{S}<c> <Rd>, SP, #<const>
 {0x03300000,0x0FF00000,arm_cdata_teq_imm,arm_core_data_std_i}, // TEQ<c> <Rn>, #<const>
 {0x03100000,0x0FF00000,arm_cdata_tst_imm,arm_core_data_std_i}, // TST<c> <Rn>, #<const>
-{0x02A0F000,0x0FE0F000,arm_ret_adc_imm,arm_core_data_std_ipc}, // ADC{S}<c> PC, <Rn>, #<const>
-{0x0280F000,0x0FE0F000,arm_ret_add_imm,arm_core_data_std_ipc}, // ADD{S}<c> PC, <Rn>, #<const>
-{0x03C0F000,0x0FE0F000,arm_ret_bic_imm,arm_core_data_std_ipc}, // BIC{S}<c> PC, <Rn>, #<const>
-{0x0220F000,0x0FE0F000,arm_ret_eor_imm,arm_core_data_std_ipc}, // EOR{S}<c> PC, <Rn>, #<const>
-{0x03A0F000,0x0FE0F000,arm_ret_mov_imm,arm_core_data_std_ipc}, // MOV{S}<c> PC, #<const>
-{0x03E0F000,0x0FE0F000,arm_ret_mvn_imm,arm_core_data_std_ipc}, // MVN{S}<c> PC, #<const>
-{0x0260F000,0x0FE0F000,arm_ret_rsb_imm,arm_core_data_std_ipc}, // RSB{S}<c> PC, <Rn>, #<const>
-{0x02E0F000,0x0FE0F000,arm_ret_rsc_imm,arm_core_data_std_ipc}, // RSC{S}<c> PC, <Rn>, #<const>
-{0x02C0F000,0x0FE0F000,arm_ret_sbc_imm,arm_core_data_std_ipc}, // SBC{S}<c> PC, <Rn>, #<const>
-{0x0240F000,0x0FE0F000,arm_ret_sub_imm,arm_core_data_std_ipc}, // SUB{S}<c> PC, <Rn>, #<const>
-{0x00A0F000,0x0FE0F010,arm_ret_adc_r,arm_core_data_std_pcr}, // ADC{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x0080F000,0x0FE0F010,arm_ret_add_r,arm_core_data_std_pcr}, // ADD{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x0000F000,0x0FE0F010,arm_ret_and_r,arm_core_data_std_pcr}, // AND{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x01C0F000,0x0FE0F010,arm_ret_bic_r,arm_core_data_std_pcr}, // BIC{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x0020F000,0x0FE0F010,arm_ret_eor_r,arm_core_data_std_pcr}, // EOR{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x01E0F000,0x0FE0F010,arm_ret_mvn_r,arm_core_data_std_pcr}, // MVN{S}<c> PC, <Rm>{, <sift>}
-{0x0180F000,0x0FE0F010,arm_ret_orr_r,arm_core_data_std_pcr}, // ORR{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x0060F000,0x0FE0F010,arm_ret_rsb_r,arm_core_data_std_pcr}, // RSB{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x00E0F000,0x0FE0F010,arm_ret_rsc_r,arm_core_data_std_pcr}, // RSC{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x00C0F000,0x0FE0F010,arm_ret_sbc_r,arm_core_data_std_pcr}, // SBC{S}<c> PC, <Rn>, <Rm>{, <sift>}
-{0x0040F000,0x0FE0F010,arm_ret_sub_r,arm_core_data_std_pcr}, // SUB{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x02A0F000,0x0FE0F000,arm_ret_adc_imm,arm_core_data_std_i}, // ADC{S}<c> PC, <Rn>, #<const>
+{0x0280F000,0x0FE0F000,arm_ret_add_imm,arm_core_data_std_i}, // ADD{S}<c> PC, <Rn>, #<const>
+{0x03C0F000,0x0FE0F000,arm_ret_bic_imm,arm_core_data_std_i}, // BIC{S}<c> PC, <Rn>, #<const>
+{0x0220F000,0x0FE0F000,arm_ret_eor_imm,arm_core_data_std_i}, // EOR{S}<c> PC, <Rn>, #<const>
+{0x03A0F000,0x0FE0F000,arm_ret_mov_imm,arm_core_data_std_i}, // MOV{S}<c> PC, #<const>
+{0x03E0F000,0x0FE0F000,arm_ret_mvn_imm,arm_core_data_std_i}, // MVN{S}<c> PC, #<const>
+{0x0260F000,0x0FE0F000,arm_ret_rsb_imm,arm_core_data_std_i}, // RSB{S}<c> PC, <Rn>, #<const>
+{0x02E0F000,0x0FE0F000,arm_ret_rsc_imm,arm_core_data_std_i}, // RSC{S}<c> PC, <Rn>, #<const>
+{0x02C0F000,0x0FE0F000,arm_ret_sbc_imm,arm_core_data_std_i}, // SBC{S}<c> PC, <Rn>, #<const>
+{0x0240F000,0x0FE0F000,arm_ret_sub_imm,arm_core_data_std_i}, // SUB{S}<c> PC, <Rn>, #<const>
+{0x00A0F000,0x0FE0F010,arm_ret_adc_r,arm_core_data_std_r}, // ADC{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x0080F000,0x0FE0F010,arm_ret_add_r,arm_core_data_std_r}, // ADD{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x0000F000,0x0FE0F010,arm_ret_and_r,arm_core_data_std_r}, // AND{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x01C0F000,0x0FE0F010,arm_ret_bic_r,arm_core_data_std_r}, // BIC{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x0020F000,0x0FE0F010,arm_ret_eor_r,arm_core_data_std_r}, // EOR{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x01E0F000,0x0FE0F010,arm_ret_mvn_r,arm_core_data_std_r}, // MVN{S}<c> PC, <Rm>{, <sift>}
+{0x0180F000,0x0FE0F010,arm_ret_orr_r,arm_core_data_std_r}, // ORR{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x0060F000,0x0FE0F010,arm_ret_rsb_r,arm_core_data_std_r}, // RSB{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x00E0F000,0x0FE0F010,arm_ret_rsc_r,arm_core_data_std_r}, // RSC{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x00C0F000,0x0FE0F010,arm_ret_sbc_r,arm_core_data_std_r}, // SBC{S}<c> PC, <Rn>, <Rm>{, <sift>}
+{0x0040F000,0x0FE0F010,arm_ret_sub_r,arm_core_data_std_r}, // SUB{S}<c> PC, <Rn>, <Rm>{, <sift>}
 {0x00A00000,0x0FE00010,arm_cdata_adc_r,arm_core_data_std_r}, // ADC{S}<c> <Rd>, <Rn>, <Rm>{, <shift>}
 {0x00800000,0x0FE00010,arm_cdata_add_r,arm_core_data_std_r}, // ADD{S}<c> <Rd>, <Rn>, <Rm>{, <shift>}
 {0x008D0000,0x0FEF0010,arm_cdata_add_r_sp,arm_core_data_std_r}, // ADD{S}<c> <Rd>, SP, <Rm>{, <shift>}
