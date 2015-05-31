@@ -3057,7 +3057,8 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 			{
 			case 0x10: // usr
 			case 0x1f: // sys
-				retval = set_unpred_addr(0x8); // SVC-vector
+				retval = set_arm_addr(0x8);
+				retval = set_unpred_addr(retval); // SVC-vector
 				break;
 			case 0x1a: // hyp
 				retval = set_undef_addr();
@@ -3309,7 +3310,8 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 			{
 			case 0x10: // usr
 			case 0x1f: // sys
-				retval = set_unpred_addr(0x8); // SVC-vector
+				retval = set_arm_addr(0x8);
+				retval = set_unpred_addr(retval); // SVC-vector
 				break;
 			case 0x1a: // hyp
 				retval = set_undef_addr();
