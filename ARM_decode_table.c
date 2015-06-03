@@ -2874,7 +2874,7 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 		// if CurrentModeIsHyp() then UNDEFINED;
 		// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
 		// if executed in Debug state then UNPREDICTABLE
-		// TODO: check other stare restrictions too
+		// TODO: check other state restrictions too
 		// UNPREDICTABLE due to privilege violation might cause
 		// UNDEFINED or SVC exception. Let's guess SVC for now.
 		tmp1 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
@@ -3310,8 +3310,8 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 			{
 			case 0x10: // usr
 			case 0x1f: // sys
-				retval = set_arm_addr(0x8);
-				retval = set_unpred_addr(retval); // SVC-vector
+				retval = set_arm_addr(0x8); // SVC-vector
+				retval = set_unpred_addr(retval);
 				break;
 			case 0x1a: // hyp
 				retval = set_undef_addr();
@@ -3329,21 +3329,190 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 	return retval;
 }
 
+// here we take some shortcuts. We assume ARM or Thumb instruction set
+// and we don't go further into more complicated modes, like hyp, debug
+// or secure monitor
 instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+
 	retval = set_undef_addr();
 
 	switch (extra)
 	{
 	case arm_exc_eret:
+		if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+		{
+			retval = set_arm_addr(get_elr_hyp());
+			retval = set_unpred_addr(retval); // we don't support hyp
+		}
+		else if (check_proc_mode(INSTR_PMODE_USR, INSTR_PMODE_SYS, 0, 0))
+		{
+			retval = set_undef_addr();
+		}
+		else
+		{
+			retval = set_arm_addr(rpi2_reg_context.reg.r14); // lr
+		}
+		break;
 	case arm_exc_bkpt:
+		// what the heck to do with this? user code contains bkpt
+		// warn and cause UNDEF?
+		// Maybe it's possible to use, say, alignment PABT for
+		// BKPT replacement?
 	case arm_exc_hvc:
+		// UNPREDICTABLE in Debug state.
+		if (get_security_state())
+		{
+			retval = set_undef_addr();
+		}
+		else if(check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
+		{
+			retval = set_undef_addr();
+		}
+		else
+		{
+			if (!(get_SCR() & (1 <<8))) // HVC disabled
+			{
+				if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
+				{
+					retval = set_arm_addr(0x14); // HVC-vector
+					retval = set_unpred_addr(retval);
+				}
+				else
+					retval = set_undef_addr();
+			}
+			else
+				retval = set_arm_addr(0x14); // HVC-vector
+		}
+		break;
 	case arm_exc_smc:
+		if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
+		{
+			retval = set_undef_addr();
+		}
+		else if ((get_HCR() & (1 << 19)) && (!get_security_state())) // HCR.TSC
+		{
+				retval = set_arm_addr(0x14); // hyp trap
+				retval = set_unpred_addr(retval); // we don't support hyp
+		}
+		else if (get_SCR() & (1 << 7)) // SCR.SCD
+		{
+			if (!get_security_state()) // non-secure
+			{
+				retval = set_undef_addr();
+			}
+			else
+			{
+				retval = set_arm_addr(0x08); // smc-vector?
+				retval = set_unpred_addr(retval);
+			}
+		}
+		else
+		{
+			retval = set_arm_addr(0x08); // smc-vector?
+		}
+		break;
 	case arm_exc_svc:
+		if (get_HCR() & (1 << 27)) // HCR.TGE
+		{
+			if ((!get_security_state()) // non-secure
+					&& check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
+			{
+				retval = set_arm_addr(0x14); // hyp trap
+				retval = set_unpred_addr(retval); // we don't support hyp
+			}
+			else
+				retval = set_arm_addr(0x08); // svc-vector
+		}
+		else
+			retval = set_arm_addr(0x08); // svc-vector
+		break;
 	case arm_exc_udf:
+		retval = set_undef_addr();
+		break;
 	case arm_exc_rfe:
+		if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+			retval = set_undef_addr();
+		else
+		{
+			// bit 24 = P, 23 = Y, 22 = W
+			// bits 19-16 = Rn
+			// if n == 15 then UNPREDICTABLE
+			tmp1 = bitrng(instr, 19, 16); // Rn
+			tmp2 = rpi2_reg_context.storage[tmp1]; // (Rn)
+			tmp3 = bits(instr, 0x01800000); // P and U
+			// wback = (W == '1'); increment = (U == '1');
+			// wordhigher = (P == U);
+			// address = if increment then R[n] else R[n]-8;
+			// if wordhigher then address = address+4;
+			// new_pc_value = MemA[address,4];
+			// spsr_value = MemA[address+4,4];
+			switch (tmp3)
+			{
+			case 0: // DA
+				// wordhigher
+				tmp3 = *((unsigned int *)(tmp2 - 4));
+				break;
+			case 1: // IA
+				// increment
+				tmp3 = *((unsigned int *)tmp2);
+				break;
+			case 2: // DB
+				tmp2 -= 4;
+				tmp3 = *((unsigned int *)(tmp2 - 8));
+				break;
+			case 3: // IB
+				// increment, wordhigher
+				tmp2 += 4;
+				tmp3 = *((unsigned int *)(tmp2 + 4));
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+
+			retval = set_arm_addr(tmp3);
+
+			// if encoding is Thumb or ARM, how the heck instruction set
+			// can be ThumbEE?
+			if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0)
+					&& (rpi2_reg_context.reg.cpsr & 0x01000020 == 0x01000020)) // ThumbEE
+			{
+				retval = set_unpred_addr(retval);
+			}
+		}
+		break;
 	case arm_exc_srs:
+		if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+		{
+			retval = set_undef_addr();
+		}
+		else
+		{
+			// doesn't affect program flow (?)
+			retval = set_addr_lin();
+			if (check_proc_mode(INSTR_PMODE_USR, INSTR_PMODE_SYS, 0, 0))
+			{
+				retval = set_unpred_addr(retval);
+			}
+			else if (bitrng(instr, 4, 0) == INSTR_PMODE_HYP)
+			{
+				retval = set_unpred_addr(retval);
+			}
+			else if (check_proc_mode(INSTR_PMODE_MON, 0, 0, 0)
+					&& (!get_security_state()))
+			{
+				retval = set_unpred_addr(retval);
+			}
+			else if (check_proc_mode(INSTR_PMODE_FIQ, 0, 0, 0)
+					&& check_coproc_access(16)
+					&& (!get_security_state()))
+			{
+				retval = set_unpred_addr(retval);
+			}
+		}
 		break;
 	default:
 		// shouldn't get here

@@ -325,6 +325,10 @@ void rpi2_pabt_handler()
 	uint32_t *p;
 	save_regs();
 	exception_info = RPI2_EXC_PABT;
+	// TODO: check
+	// MRC p15, 0, <Rt>, c5, c0, 1 ; Read IFSR into Rt
+	// if bit 10=0 and bits 3-0=2 -> breakpoint
+
 	// if pc points to 'bkpt', trap, otherwise fetch abort
 	p = (uint32_t *)(&(rpi2_reg_context.reg.r15));
 	if (*p == TRAP_INSTR_A)
@@ -353,7 +357,7 @@ void rpi2_set_vector(int excnum, void *handler)
 void rpi2_trap()
 {
 	/* Use BKPT */
-	asm("bkpt #0\n\t");
+	asm("bkptal #0\n\t");
 }
 
 /* set BKPT to given address */
