@@ -3357,10 +3357,10 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 		}
 		break;
 	case arm_exc_bkpt:
-		// what the heck to do with this? user code contains bkpt
-		// warn and cause UNDEF?
-		// Maybe it's possible to use, say, alignment PABT for
-		// BKPT replacement?
+		// if user code contains bkpt, unpredictable
+		retval = set_arm_addr(0x0c); // PABT
+		retval = set_unpred_addr(retval); // also used by the debuger
+		break;
 	case arm_exc_hvc:
 		// UNPREDICTABLE in Debug state.
 		if (get_security_state())
@@ -3523,81 +3523,1357 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 
 instr_next_addr_t arm_core_ldst(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// Rn = bits 19-16, Rt = bits 15-12, Rm= bits 3-0
+	// imm = bits 11-0, shiftcount = bits 11-7, shift type = bits 6-5
+	// P = bit 24, U = bit 23, B = bit 22, W = bit 21, L = bit 20
+	// register
+	// if m == 15 then UNPREDICTABLE;
+	// if wback && (n == 15 || n == t) then UNPREDICTABLE;
+	// immediate
+	// if wback && n == t then UNPREDICTABLE
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int stmp1; // for making '>>' to work like ASR
+	int unp = 0;
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 19, 16); // Rn
+	tmp2 = bitrng(instr, 15, 12); // Rt
+	tmp3 = (bit(instr, 21)); // W
 
-	switch (bitrng(instr, 27, 25))
+	if (tmp3 && (tmp1 == tmp2)) unp++; // wback && n = t
+
+	if ((tmp1 == 15) || (tmp2 == 15)) // if Rn or Rt is PC
 	{
-	case 0:
-		// TODO: add a couple of handlers to decode table
-		break;
-	case 2:
-		// immediate
-		break;
-	case 3:
-		// register
-		break;
-	default:
-		// shouldn't get here
-		break;
+		// operand2
+		if (bit(instr, 25)) // reg or imm
+		{
+			// register
+			if (tmp3 && (tmp2 == 15)) unp++; // reg, wback && n = 15
+
+			tmp1 = bitrng(instr, 3, 0); // Rm
+			if (tmp1 == 15) unp++; // m = 15
+
+			// calculate operand2
+			tmp2 = rpi2_reg_context.storage[tmp1]; // Rm
+			tmp3 = bitrng(instr, 11, 7); // shift-immediate
+			switch (bitrng(instr, 6, 5))
+			{
+			case 0: // LSL
+				tmp2 <<= tmp3;
+				break;
+			case 1: // LSR
+				if (tmp3 == 0)
+					tmp2 = 0;
+				else
+					tmp2 >>= tmp3;
+				break;
+			case 2: // ASR
+				if (tmp3 == 0) tmp3 = 31;
+				stmp1 = tmp2; // for ASR instead of LSR
+				tmp2 = (unsigned int)(stmp1 >> tmp3);
+				break;
+			case 3: // ROR
+				if (tmp3 == 0)
+				{
+					// RRX
+					tmp3 = rpi2_reg_context.reg.cpsr;
+					tmp3 = bit(tmp3, 29); // carry-flag
+					tmp2 = (tmp2 >> 1) | (tmp3 << 31);
+				}
+				else
+				{
+					tmp4 = tmp2;
+					tmp4 <<= (32 - tmp3); // prepare for putting back in the top
+					tmp2 = tmp2 >> tmp3;
+					tmp1 = (~0) << tmp3; // make mask
+					tmp2 = (tmp2 & (~tmp1)) || (tmp4 & tmp1); // add dropped bits into result
+				}
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+		}
+		else
+		{
+			// immediate
+			tmp2 = bitrng(instr, 11, 0);
+		}
+		// now offset in tmp2
+
+		tmp3 = bitrng(instr, 19, 16); // Rn
+		tmp1 = bitrng(instr, 15, 12); // Rt
+
+		// P = 0 always writeback, when W = 0: normal, W = 1: user mode
+		switch (bits(instr, 0x01200000)) // P and W
+		{
+		case 0: // postindexing
+			// rt = (Rn); rn = rn + offset
+			if (tmp3 == 15) // Rn
+			{
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				// final Rn is returned
+				if (bit(instr, 23)) // U-bit
+				{
+					tmp4 += tmp2;
+				}
+				else
+				{
+					tmp4 -= tmp2;
+				}
+			}
+			else
+			{
+				// U, B, L
+				// Rt is returned
+				if (bit(instr, 20)) // L-bit
+				{
+					tmp3 = rpi2_reg_context.storage[tmp3];
+					if (bit(instr, 22)) // B-bit
+					{
+						// byte
+						tmp4 = (unsigned int)(*((unsigned char *)(tmp3)));
+					}
+					else
+					{
+						// word
+						tmp4 = (*((unsigned int *)(tmp3)));
+					}
+				}
+				else
+				{
+					// store doesn't change the register contents
+					tmp4 = rpi2_reg_context.storage[tmp1];
+				}
+			}
+			retval = set_arm_addr(tmp4);
+			break;
+		case 1: // usermode access, offset
+		case 2: // offset
+			// rt = (Rn + offset)
+			if (tmp1 == 15) // if Rt = PC
+			{
+				if (bit(instr, 20)) // L-bit
+				{
+					if (bit(instr, 23)) // U-bit
+					{
+						tmp3 = rpi2_reg_context.storage[tmp3] + tmp2;
+						if (bit(instr, 22)) // B-bit
+						{
+							// byte
+							tmp4 = (unsigned int)(*((unsigned char *)(tmp3)));
+						}
+						else
+						{
+							// word
+							tmp4 = (*((unsigned int *)(tmp3)));
+						}
+					}
+					else
+					{
+						tmp3 = rpi2_reg_context.storage[tmp3] - tmp2;
+						if (bit(instr, 22)) // B-bit
+						{
+							// byte
+							tmp4 = (unsigned int)(*((unsigned char *)(tmp3)));
+						}
+						else
+						{
+							// word
+							tmp4 = (*((unsigned int *)(tmp3)));
+						}
+					}
+				}
+				else
+				{
+					// store doesn't change the register contents
+					tmp4 = rpi2_reg_context.storage[tmp1];
+				}
+				retval = set_arm_addr(tmp4);
+			}
+			else
+			{
+				retval = set_addr_lin();
+			}
+			break;
+		case 3: // preindexing
+			// rn = rn + offset; rt = (Rn)
+			// address
+			if (bit(instr, 23)) // U-bit
+			{
+				tmp3 = rpi2_reg_context.storage[tmp3] + tmp2;
+			}
+			else
+			{
+				tmp3 = rpi2_reg_context.storage[tmp3] - tmp2;
+			}
+			// set up return value - updated if load
+			if (tmp3 == 15) // if Rn = PC
+			{
+				tmp4 = tmp3;
+			}
+			else
+			{
+				tmp4 = rpi2_reg_context.storage[tmp1];
+			}
+
+			// load/store
+			if (tmp1 == 15) // if Rt = PC
+			{
+				if (bit(instr, 20)) // L-bit
+				{
+						if (bit(instr, 22)) // B-bit
+						{
+							// byte
+							tmp4 = (unsigned int)(*((unsigned char *)(tmp3)));
+						}
+						else
+						{
+							// word
+							tmp4 = (*((unsigned int *)(tmp3)));
+						}
+				}
+				// else return value already in tmp4
+				retval = set_arm_addr(tmp4);
+			}
+			if (tmp4 == rpi2_reg_context.storage[tmp1])
+			{
+				// The instruction didn't affect program flow
+				retval = set_addr_lin();
+			}
+			else
+			{
+				retval = set_arm_addr(tmp4);
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
 	}
+	else
+	{
+		retval = set_addr_lin();
+	}
+	if (unp) retval = set_unpred_addr(retval);
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstm(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// if n == 15 || BitCount(registers) < 1 then UNPREDICTABLE;
+	// if wback && registers<n> == '1' && ArchVersion() >= 7 then UNPREDICTABLE;
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+
 	retval = set_undef_addr();
 
-	/*
-	 * if bits 24 - 20: B I M W L
-	 * B 1=before, 0=after
-	 * I 1=increment, 0=decrement
-	 * M 1=other mode, 0=current mode
-	 * W 1=writeback, 0=no writeback
-	 * L 1=load. 0=store
-	 */
+	if (extra == arm_cldstm_pop_r)
+	{
+		// pop one register from stack, Rt = bits 15-12
+		// if t == 13 then UNPREDICTABLE
+		// LDM{<c>}{<q>} SP!, <registers>
+		if (bitrng(instr, 15, 12) == 15) // pop PC
+		{
+			tmp1 = rpi2_reg_context.reg.r13; // SP
+			tmp2 = *((unsigned int *)tmp1);
+			retval = set_arm_addr(tmp2);
+		}
+		else
+		{
+			// The instruction doesn't affect program flow
+			retval = set_addr_lin();
+			if (bitrng(instr, 15, 12) == 13) // pop SP
+			{
+				retval = set_unpred_addr(retval);
+			}
+		}
+	}
+	else if (extra == arm_cldstm_push_r)
+	{
+		// push one register to stack
+		// The instruction doesn't affect program flow
+		retval = set_addr_lin();
+		if (bitrng(instr, 15, 12) == 13) // push SP
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
+	else
+	{
+		/*
+		 * bits 24 - 20: B I M W L
+		 * B 1=before, 0=after
+		 * I 1=increment, 0=decrement
+		 * M 1=other mode, 0=current mode
+		 * W 1=writeback, 0=no writeback
+		 * L 1=load, 0=store
+		 */
+		tmp1 = bitrng(instr, 15, 12); // base register
+
+		// bit count in register-list
+		tmp4 = 0;
+		for (tmp3 = 0; tmp3 < 16; tmp3++)
+		{
+			if (instr & (1 << tmp3)) tmp4++;
+		}
+
+		// if L == 0 || (M == 1 && bit 15 == 0) - stm or ldm-usr
+		if ((bit(instr, 20) == 0) || (bit(instr, 22) && (bit(instr, 15) == 0)))
+		{
+			if ((tmp1 == 15) && bit(instr, 21)) // ((n == 15) && W)
+			{
+				// new n - B-bit doesn't make a difference
+				if (bit(instr, 23)) // I-bit
+				{
+					tmp3 = rpi2_reg_context.reg.r15 + 4 * tmp4;
+				}
+				else
+				{
+					tmp3 = rpi2_reg_context.reg.r15 - 4 * tmp4;
+				}
+				retval = set_arm_addr(tmp3);
+			}
+			else
+			{
+				// no effect on program flow - store or user registers
+				retval = set_addr_lin();
+			}
+
+			if (tmp1 == 15)
+			{
+				retval = set_unpred_addr(retval);
+			}
+			if ((tmp1 == 13) && (bit(instr, 13) || tmp4 < 2))
+			{
+				retval = set_unpred_addr(retval);
+			}
+			if (bit(instr, 22))
+			{
+				if (check_proc_mode(INSTR_PMODE_USR, INSTR_PMODE_SYS, 0, 0))
+				{
+					// UNPREDICTABLE if mode is usr or sys
+					retval = set_unpred_addr(retval);
+				}
+				if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				{
+					// UNDEFINED if hyp mode
+					retval = set_undef_addr();
+				}
+			}
+		}
+		else // (L==1 && (M==0 || bit 15 == 1)) - ldm or pop-ret
+		{
+			if ((tmp1 == 15) && bit(instr, 21)) // ((n == 15) && W)
+			{
+				// new n - B-bit doesn't make a difference
+				if (bit(instr, 23)) // I-bit
+				{
+					tmp3 = rpi2_reg_context.reg.r15 + 4 * tmp4;
+				}
+				else
+				{
+					tmp3 = rpi2_reg_context.reg.r15 - 4 * tmp4;
+				}
+				retval = set_arm_addr(tmp3);
+			}
+			else if (bit(instr, 15)) // bit 15 == 1
+			{
+				// new PC
+				tmp3 = rpi2_reg_context.storage[tmp1];
+				switch (bitrng(instr, 24, 23)) // B and I
+				{
+				case 0: // decrement after
+					tmp3 -= 4 * (tmp4 - 1);
+					break;
+				case 1: // increment after
+					tmp3 += 4 * (tmp4 - 1);
+					break;
+				case 2: // decrement before
+					tmp3 -= 4 * tmp4;
+					break;
+				case 3: // increment before
+					tmp3 += 4 * tmp4;
+					break;
+				default:
+					// shouldn't get here
+					break;
+				}
+				tmp3 = *((unsigned int *) tmp3);
+				retval = set_arm_addr(tmp3);
+			}
+			else
+			{
+				retval = set_addr_lin();
+			}
+
+			if (tmp1 == 15)
+			{
+				retval = set_unpred_addr(retval);
+			}
+			if (tmp1 == 13 && (bit(instr, 13) || tmp4 < 2))
+			{
+				retval = set_unpred_addr(retval);
+			}
+			else if (tmp4 < 1)
+			{
+				retval = set_unpred_addr(retval);
+			}
+			if (bit(instr, 22) && bit(instr, 15)) // (M=1 && bit 15 == 1)
+			{
+				if (check_proc_mode(INSTR_PMODE_USR, INSTR_PMODE_SYS, 0, 0))
+				{
+					// UNPREDICTABLE if mode is usr or sys
+					retval = set_unpred_addr(retval);
+				}
+				if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				{
+					// UNDEFINED if hyp mode
+					retval = set_undef_addr();
+				}
+			}
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstrd(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// bits 24 - 21: PUIW (I = immediate)
+	// bit 5: 0=load, 1=store
+	// if Rn == '1111' then SEE (literal);
+	// if Rt<0> == '1' then UNPREDICTABLE;
+	// t2 = t+1; imm32 = ZeroExtend(imm4H:imm4L, 32);
+	// if P == '0' && W == '1' then UNPREDICTABLE;
+	// if wback && (n == t || n == t2) then UNPREDICTABLE;
+	// if t2 == 15 then UNPREDICTABLE;
+
+	// reg: additional restrictions
+	// if t2 == 15 || m == 15 || m == t || m == t2 then UNPREDICTABLE;
+	// if wback && (n == 15 || n == t || n == t2) then UNPREDICTABLE;
+
+	// Rn = bits 19-16, Rt = bits 15-12, Rm = bits 3-0
+	// imm = bits 11-8 and bits 3-0
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int unp = 0; // unpredictable
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 19, 16); // Rn
+	tmp2 = bitrng(instr, 15, 12); // Rt
+	tmp3 = bit(instr, 21); // W
+	if (tmp2 & 1) unp++; // Rt<0> == '1'
+	if (tmp1 == 14) unp++; // t2 == 15
+	// wback && (n == t || n == t2)
+	if (tmp3 & ((tmp1 == tmp2) || (tmp1 == tmp2 + 1))) unp++;
+	// if Rn, Rt or Rt2 is PC
+	if ((tmp1 == 14) || (tmp1 == 15) || (tmp2 == 15))
+	{
+		// operand2
+		if (bit(instr, 22)) // reg or imm
+		{
+			// register
+			if (tmp3 && (tmp1 == 15)) unp++; // reg, wback && n = 15
+			tmp4 = bitrng(instr, 3, 0); // Rm
+			if (tmp4 == 15) unp++; // m = 15
+			// (m == t || m == t2)
+			if ((tmp4 == tmp1) || (tmp4 == tmp1 + 1)) unp++;
+			// calculate operand2
+			tmp2 = rpi2_reg_context.storage[tmp4]; // Rm
+		}
+		else
+		{
+			// immediate
+			tmp2 = bits(instr, 0x00000f0f);
+		}
+		// now offset in tmp2
+
+		tmp4 = bitrng(instr, 15, 12); // Rt
+		if (tmp1 == 15) // Rn is PC
+		{
+			tmp3 = rpi2_reg_context.storage[tmp1]; // (Rn)
+			// bits 24 - 21: PUIW (I = immediate)
+			// bit 5: 0=load, 1=store
+			// P = 0 always writeback, when W = 0: normal, W = 1: user mode
+			// address = (Align(PC,4) +/- imm32);
+			switch (bits(instr, 0x01200000)) // P and W
+			{
+			case 0: // postindexing
+				// rt = (Rn); rn = rn + offset
+				// if rn == 15, PC will eventually have new rn
+				tmp3 = (tmp3 & ((~0) << 2));
+				if (bit(instr, 23)) // U-bit
+					tmp3 += tmp2;
+				else
+					tmp3 -= tmp2;
+				tmp3 = (tmp3 & ((~0) << 2));
+				retval = set_arm_addr(tmp3);
+				break;
+			case 1: // user mode access: UNDEFINED
+				retval = set_undef_addr();
+				break;
+			case 2: // offset
+				// rt = (Rn + offset)
+				if(bit(instr, 5)) // STR
+				{
+					// STR doesn't affect Rt or RT2
+					retval = set_addr_lin();
+				}
+				else
+				{
+					// address
+					tmp3 = (tmp3 & ((~0) << 2));
+					if (bit(instr, 23)) // U-bit
+						tmp3 += tmp2;
+					else
+						tmp3 -= tmp2;
+					tmp3 = (tmp3 & ((~0) << 2));
+
+					if (tmp4 == 15) // Rt is PC
+					{
+						tmp3 = *((unsigned int *) tmp3);
+						retval = set_arm_addr(tmp3);
+					}
+					else if (tmp4 == 14) // Rt2 is PC
+					{
+						tmp3 = *((unsigned int *) (tmp3 + 4));
+						retval = set_arm_addr(tmp3);
+					}
+					else
+					{
+						// PC wasn't affected
+						retval = set_addr_lin();
+					}
+				}
+				break;
+			case 3: // preindexing
+				// rn = rn + offset; rt = (Rn)
+				// if rn == 15, PC will eventually have new rn
+				tmp3 = (tmp3 & ((~0) << 2));
+				if (bit(instr, 23)) // U-bit
+					tmp3 += tmp2;
+				else
+					tmp3 -= tmp2;
+				tmp3 = (tmp3 & ((~0) << 2));
+				retval = set_arm_addr(tmp3);
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+		}
+		else
+		{
+			// Rn is not PC, but either Rt or Rt2 is
+			tmp3 = rpi2_reg_context.storage[tmp1]; // (Rn)
+			// STR doesn't affect Rt or RT2
+			if (bit(instr, 5)) // LDR
+			{
+				// bits 24 - 21: PUIW (I = immediate)
+				// bit 5: 0=load, 1=store
+				// P = 0 always writeback, when W = 0: normal, W = 1: user mode
+				switch (bits(instr, 0x01200000)) // P and W
+				{
+				case 0: // postindexing
+					// rt = (Rn); rn = rn + offset
+					// address
+					tmp3 = (tmp3 & ((~0) << 2));
+
+					if (tmp4 == 15) // Rt is PC
+					{
+						tmp3 = *((unsigned int *) tmp3);
+						retval = set_arm_addr(tmp3);
+					}
+					else if (tmp4 == 14) // Rt2 is PC
+					{
+						tmp3 = *((unsigned int *) (tmp3 + 4));
+						retval = set_arm_addr(tmp3);
+					}
+					else
+					{
+						// PC wasn't affected
+						retval = set_addr_lin();
+					}
+					break;
+				case 1: // user mode access: UNDEFINED
+					retval = set_undef_addr();
+					break;
+				case 2: // offset
+					// rt = (Rn + offset)
+				case 3: // preindexing
+					// rn = rn + offset; rt = (Rn)
+					// address
+					if (bit(instr, 23)) // U-bit
+						tmp3 += tmp2;
+					else
+						tmp3 -= tmp2;
+					tmp3 = (tmp3 & ((~0) << 2));
+
+					if (tmp4 == 15) // Rt is PC
+					{
+						tmp3 = *((unsigned int *) tmp3);
+						retval = set_arm_addr(tmp3);
+					}
+					else if (tmp4 == 14) // Rt2 is PC
+					{
+						tmp3 = *((unsigned int *) (tmp3 + 4));
+						retval = set_arm_addr(tmp3);
+					}
+					else
+					{
+						// PC wasn't affected - shouldn't get here
+						retval = set_addr_lin();
+					}
+					break;
+				default:
+					// shouldn't get here
+					break;
+				}
+			}
+			else
+			{
+				// STR
+				if (bits(instr, 0x01200000) == 1) // user mode: UNDEFINED
+				{
+					retval = set_undef_addr();
+				}
+				else
+				{
+					// PC wasn't affected
+					retval = set_addr_lin();
+				}
+			}
+		}
+	}
+	else
+	{
+		// PC not involved
+		retval = set_addr_lin();
+	}
+
+	// check if UNPREDICTABLE
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstrex(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// STR: Rn = bits 19-16, Rd (status) = bits 15-12, Rt = bits 3-0
+	// LDR: Rn = bits 19-16, Rt = bits 15-12
+	// bits 22 - 20: S H L
+	// S = size: 0 = double, 1 = half word
+	// H = half: 0 = size, 1 = half-size
+	// L = load: 0 = store, 1 = load
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3;
+	int unp = 0; // unpredictable
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 19, 16); // Rn
+	if (tmp1 == 15) unp++; // n == 15
+
+	if (bit(instr, 20))
+	{
+		// load
+		tmp2 = bitrng(instr, 15, 12); // Rt
+		// if Rt == PC or Rt2 == PC
+		if (tmp2 == 15 || ((tmp2 == 14) && (extra == arm_sync_ldrexd)))
+		{
+			unp++;
+			tmp1 = rpi2_reg_context.storage[tmp1]; // (Rn)
+			tmp1 &= (~0) << 2; // word aligned - also ldrexd
+			switch (extra)
+			{
+			case arm_sync_ldrex:
+				tmp3 = *((unsigned int *) tmp1);
+				break;
+			case arm_sync_ldrexb:
+				tmp3 = (unsigned int)(*((unsigned char *) tmp1));
+				break;
+			case arm_sync_ldrexh:
+				tmp3 = (unsigned int)(*((unsigned short *) tmp1));
+				break;
+			case arm_sync_ldrexd:
+				if (tmp2 == 15)
+				{
+					tmp3 = *((unsigned int *) tmp1);
+				}
+				else
+				{
+					tmp3 = *((unsigned int *) (tmp1 + 4));
+
+				}
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+			retval = set_arm_addr(tmp3);
+		}
+		else
+		{
+			// doesn'r affect PC
+			retval = set_addr_lin();
+		}
+	}
+	else
+	{
+		// store
+		// if d == 15 || t == 15 || n == 15 then UNPREDICTABLE;
+		// if strexd && (Rt<0> == '1' || t == 14) then UNPREDICTABLE;
+		// if d == n || d == t || d == t2 then UNPREDICTABLE;
+		if (tmp1 == 15) unp++; // n == 15
+		tmp2 = bitrng(instr, 15, 12); // Rd
+		if (tmp2 == tmp1) unp++; // d == n
+		tmp3 = bitrng(instr, 3, 0); // Rt
+		if (tmp3 == 15) unp++; // t == 15
+		if (tmp2 == tmp1) unp++; // d == t
+		if (tmp2 == 15)
+		{
+			unp++; // d == 15
+		}
+		else if (extra == arm_sync_strexd)
+		{
+			if (tmp3 == 14) unp++; // strexd && t+1 == 15
+			else if (tmp3 & 1) unp++; // Rt<0> == '1'
+		}
+		retval = set_arm_addr(0); // assume success
+	}
+
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstrh(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// bits 24 - 20: PUIWL (I = immediate)
+	// Rn = bits 19-16, Rt = bits 15-12, Rm = bits 3-0
+	// imm = bits 11-8 and bits 3-0
+	// if P == '0' && W == '1' then SEE LDRHT;
+	// imm32 = ZeroExtend(imm4H:imm4L, 32);
+	// if t == 15 || (wback && n == t) then UNPREDICTABLE;
+	// if Rn == PC && P == W then UNPREDICTABLE
+	// if m == 15 then UNPREDICTABLE
+	// if LDRHT && (t == 15 || n == 15 || n == t) then UNPREDICTABLE;
+	// LDRHT and STRHT are UNPREDICTABLE in Hyp mode.
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int unp = 0;
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 15, 12); // Rt
+	tmp2 = bitrng(instr, 19, 16); // Rn
+	if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+	// offset
+	if (tmp1 == 15)
+	{
+		unp++; // Rt == 15
+		// offset
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+	else if (tmp2 == 15) // Rn == 15
+	{
+		// offset
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+
+	retval = set_addr_lin(); // if PC is not involved
+
+	// bits 24 - 20: PUIWL
+	if (bit(instr, 20)) // load
+	{
+		if (tmp1 == 15) // Rt == PC
+		{
+			// P & W
+			switch (bits(instr, (1<<24 | 1<<21)))
+			{
+			case 1: // ldrht - always postindexed
+				if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				{
+					unp++;
+				}
+				// fallthrough
+			case 0: // postindexing Rt = (Rn), Rn += offset
+				if (tmp2 == 15) // assume that writeback is done after load
+				{
+					// loaded value becomes overwritten by writeback
+					tmp4 = rpi2_reg_context.storage[tmp3];
+					if (bit(instr, 23)) // U
+					{
+						tmp4 += tmp3;
+					}
+					else
+					{
+						tmp4 -= tmp3;
+					}
+				}
+				else // load only
+				{
+					tmp4 = rpi2_reg_context.storage[tmp3];
+					if (bit(instr, 23)) // U
+					{
+						tmp4 += tmp3;
+					}
+					else
+					{
+						tmp4 -= tmp3;
+					}
+					tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+				}
+				break;
+			case 2: // offset Rt = (Rn + offset)
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+
+				break;
+			case 3:	// preindexing Rn += offset, Rt = (Rn)
+				if (tmp2 == 15) // assume that writeback is done after load
+				{
+					// loaded value becomes overwritten by writeback
+					tmp4 = rpi2_reg_context.storage[tmp3];
+					if (bit(instr, 23)) // U
+					{
+						tmp4 += tmp3;
+					}
+					else
+					{
+						tmp4 -= tmp3;
+					}
+				}
+				else
+				{
+					tmp4 = rpi2_reg_context.storage[tmp3];
+					if (bit(instr, 23)) // U
+					{
+						tmp4 += tmp3;
+					}
+					else
+					{
+						tmp4 -= tmp3;
+					}
+					tmp4 = (unsigned int)(* ((unsigned int *) tmp4));
+				}
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+			retval = set_arm_addr(tmp4);
+		}
+		else if (tmp2 == 15) // Rn == PC
+		{
+			// P & W
+			switch (bits(instr, (1<<24 | 1<<21)))
+			{
+			case 1: // ldrht - always postindexed
+				if (check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				{
+					unp++;
+				}
+				// fallthrough
+			case 0: // postindexing
+				// writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				break;
+			case 2: // offset
+				tmp4 = tmp3;
+				break;
+			case 3:	// preindexing
+				// writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+			retval = set_arm_addr(tmp4);
+		}
+	}
+	else // store - only writeback can change PC
+	{
+		if (tmp2 == 15) // Rn == PC
+		{
+			// P & W
+			switch (bits(instr, (1<<24 | 1<<21)))
+			{
+			case 0: // postindexing
+			case 1: // ldrht - always postindexed
+				// writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				break;
+			case 2: // offset
+				tmp4 = tmp3;
+				break;
+			case 3:	// preindexing
+				// writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				break;
+			default:
+				// shouldn't get here
+				break;
+			}
+			retval = set_arm_addr(tmp4);
+		}
+	}
+
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstrsb(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// bits 24 - 21: PUIW (there is no store)
+	// Rn = bits 19-16, Rt = bits 15-12, Rm = bits 3-0
+	// imm = bits 11-8 and bits 3-0
+	// if P == '0' && W == '1' then SEE LDRHT;
+	// imm32 = ZeroExtend(imm4H:imm4L, 32);
+	// if t == 15 || (wback && n == t) then UNPREDICTABLE;
+	// if Rn == PC && P == W then UNPREDICTABLE
+	// if m == 15 then UNPREDICTABLE
+	// if LDRSBT && (t == 15 || n == 15 || n == t) then UNPREDICTABLE;
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int unp = 0;
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 15, 12); // Rt
+	tmp2 = bitrng(instr, 19, 16); // Rn
+	if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+	// offset
+	if (tmp1 == 15)
+	{
+		unp++; // Rt == 15
+		// imm
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+	else if (tmp2 == 15) // Rn == 15
+	{
+		// imm
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+
+	retval = set_addr_lin(); // if PC is not involved
+
+	if (tmp1 == 15) // Rt == PC
+	{
+		// P & W
+		switch (bits(instr, (1<<24 | 1<<21)))
+		{
+		case 1: // ldrsbt - always postindexed
+		case 0: // postindexing Rt = (Rn), Rn += offset
+			if (tmp2 == 15) // assume that writeback is done after load
+			{
+				// loaded value becomes overwritten by writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+			}
+			else // load only
+			{
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+			}
+			break;
+		case 2: // offset Rt = (Rn + offset)
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+
+			break;
+		case 3:	// preindexing Rn += offset, Rt = (Rn)
+			if (tmp2 == 15) // assume that writeback is done after load
+			{
+				// loaded value becomes overwritten by writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+			}
+			else
+			{
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				tmp4 = (unsigned int)(* ((unsigned int *) tmp4));
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		tmp4 = (unsigned int) instr_util_signx_byte(tmp4);
+		retval = set_arm_addr(tmp4);
+	}
+	else if (tmp2 == 15) // Rn == PC
+	{
+		// P & W
+		switch (bits(instr, (1<<24 | 1<<21)))
+		{
+		case 1: // ldrsbt - always postindexed
+		case 0: // postindexing
+			// writeback
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			break;
+		case 2: // offset
+			tmp4 = tmp3;
+			break;
+		case 3:	// preindexing
+			// writeback
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		retval = set_arm_addr(tmp4);
+	}
+
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_ldstsh(unsigned int instr, ARM_decode_extra_t extra)
 {
+	// bits 24 - 21: PUIW (there is no store)
+	// Rn = bits 19-16, Rt = bits 15-12, Rm = bits 3-0
+	// imm = bits 11-8 and bits 3-0
+	// if P == '0' && W == '1' then SEE LDRHT;
+	// imm32 = ZeroExtend(imm4H:imm4L, 32);
+	// if t == 15 || (wback && n == t) then UNPREDICTABLE;
+	// if Rn == PC && P == W then UNPREDICTABLE
+	// if m == 15 then UNPREDICTABLE
+	// if LDRSHT && (t == 15 || n == 15 || n == t) then UNPREDICTABLE;
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int unp = 0;
+
 	retval = set_undef_addr();
 
+	tmp1 = bitrng(instr, 15, 12); // Rt
+	tmp2 = bitrng(instr, 19, 16); // Rn
+	if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+	// offset
+	if (tmp1 == 15)
+	{
+		unp++; // Rt == 15
+		// imm
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21) && (tmp1 == tmp2)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+	else if (tmp2 == 15) // Rn == 15
+	{
+		// imm
+		if (bit(instr, 22)) // imm
+		{
+			tmp3 = bits(instr, 0xf0f);
+		}
+		else // reg
+		{
+			if (bit(instr, 21)) unp++;
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			if (tmp3 == 15) unp++;
+			tmp3 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		}
+	}
+
+	retval = set_addr_lin(); // if PC is not involved
+
+	if (tmp1 == 15) // Rt == PC
+	{
+		// P & W
+		switch (bits(instr, (1<<24 | 1<<21)))
+		{
+		case 1: // ldrsht - always postindexed
+		case 0: // postindexing Rt = (Rn), Rn += offset
+			if (tmp2 == 15) // assume that writeback is done after load
+			{
+				// loaded value becomes overwritten by writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+			}
+			else // load only
+			{
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+			}
+			break;
+		case 2: // offset Rt = (Rn + offset)
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			tmp4 = (unsigned int)(* ((unsigned short *) tmp4));
+
+			break;
+		case 3:	// preindexing Rn += offset, Rt = (Rn)
+			if (tmp2 == 15) // assume that writeback is done after load
+			{
+				// loaded value becomes overwritten by writeback
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+			}
+			else
+			{
+				tmp4 = rpi2_reg_context.storage[tmp3];
+				if (bit(instr, 23)) // U
+				{
+					tmp4 += tmp3;
+				}
+				else
+				{
+					tmp4 -= tmp3;
+				}
+				tmp4 = (unsigned int)(* ((unsigned int *) tmp4));
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		tmp4 = (unsigned int) instr_util_signx_short(tmp4);
+		retval = set_arm_addr(tmp4);
+	}
+	else if (tmp2 == 15) // Rn == PC
+	{
+		// P & W
+		switch (bits(instr, (1<<24 | 1<<21)))
+		{
+		case 1: // ldrsht - always postindexed
+		case 0: // postindexing
+			// writeback
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			break;
+		case 2: // offset
+			tmp4 = tmp3;
+			break;
+		case 3:	// preindexing
+			// writeback
+			tmp4 = rpi2_reg_context.storage[tmp3];
+			if (bit(instr, 23)) // U
+			{
+				tmp4 += tmp3;
+			}
+			else
+			{
+				tmp4 -= tmp3;
+			}
+			break;
+		default:
+			// shouldn't get here
+			break;
+		}
+		retval = set_arm_addr(tmp4);
+	}
+
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
