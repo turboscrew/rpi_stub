@@ -4880,16 +4880,506 @@ instr_next_addr_t arm_core_ldstsh(unsigned int instr, ARM_decode_extra_t extra)
 instr_next_addr_t arm_core_misc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	int unp = 0;
+
 	retval = set_undef_addr();
 
+	switch (extra)
+	{
+	case arm_misc_sev:
+	case arm_misc_dbg:
+	case arm_misc_setend:
+	case arm_misc_clrex:
+	case arm_misc_dmb:
+	case arm_misc_dsb:
+	case arm_misc_isb:
+	case arm_misc_pld_imm:
+	case arm_misc_pld_lbl:
+	case arm_misc_pli_lbl:
+		retval = set_addr_lin();
+		break;
+	case arm_misc_pld_r:
+		if (bit(instr, 22) && (bitrng(instr, 19, 16) == 15)) // pldw && n == 15
+		{
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+		}
+		// fallthrough
+	case arm_misc_pli_r:
+		if (bitrng(instr, 3, 0) == 15) // m == 15
+		{
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+		}
+		break;
+	case arm_misc_swp:
+		// tmp <- (Rn); Rt2 -> (Rn); Rt <- tmp
+		// bit 22 == 0 => swpb
+		// Rn = bits 19-16, Rt = bits 15-12, Rt2 = bits 3-0
+		// if t == 15 || t2 == 15 || n == 15 || n == t || n == t2 then UNPREDICTABLE;
+		tmp1 = bitrng(instr, 19, 16);
+		tmp2 = bitrng(instr, 15, 12);
+		tmp3 = bitrng(instr, 3, 0);
+		retval = set_addr_lin();
+		if ((tmp1 == 15) || (tmp2 == 15) || (tmp3 == 15)
+			|| (tmp1 == tmp2) || (tmp1 == tmp3))
+		{
+			unp++;
+		}
+		if (tmp2 == 15) // if PC is affected
+		{
+			tmp4 = rpi2_reg_context.storage[tmp1];
+			if (bit(instr, 22)) // B
+			{
+				// swp
+				tmp1 = *((unsigned int *)tmp4);
+			}
+			else
+			{
+				// swpb
+				tmp1 = (unsigned int)(*((unsigned char *)tmp4));
+			}
+			retval = set_arm_addr(tmp1);
+		}
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+		break;
+	default:
+		// just in case...
+		break;
+	}
 	return retval;
 }
 
 instr_next_addr_t arm_core_status(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int proc_mode;
+	unsigned int secure_state;
+	int unp = 0;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+
 	retval = set_undef_addr();
 
+	if (extra == arm_cstat_cps)
+	{
+		// imod = bits 19-18, M = bit 17, AIF = bits 8-6
+		// mode = bits 4-0
+		// if mode != '00000' && M == '0' then UNPREDICTABLE;
+		// if (imod<1> == '1' && A:I:F == '000') || (imod<1> == '0' && A:I:F != '000')
+		//   then UNPREDICTABLE;
+		// if (imod == '00' && M == '0') || imod == '01' then UNPREDICTABLE;
+
+		if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
+		{
+			retval = set_addr_lin(); // NOP
+			return retval;
+		}
+		tmp1 = bitrng(instr, 4, 0); // mode
+		if ((bit(instr, 17) == 0) && (tmp1 != 0))
+		{
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			return retval;
+		}
+		tmp2 = bitrng(instr, 19, 18); // imod
+		if ((tmp2 == 1) || ((tmp2 = 0) && (bit(instr, 17) == 0)))
+		{
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			return retval;
+		}
+		if (bitrng(instr, 8, 6) == 0)
+		{
+			if (bit(instr, 19))
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+				return retval;
+			}
+		}
+		else
+		{
+			if (!bit(instr, 19))
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+				return retval;
+			}
+		}
+
+		retval = set_addr_lin();
+		switch (tmp1)
+		{
+		case INSTR_PMODE_MON:
+
+			if (!get_security_state())
+			{
+				unp++;
+			}
+			break;
+		case INSTR_PMODE_FIQ:
+			tmp2 = get_security_state();
+			tmp3 = get_NSACR();
+			if (bit(tmp3, 19) && (tmp2 == 0))
+			{
+				unp++;
+			}
+			break;
+		case INSTR_PMODE_HYP:
+			if (get_security_state() && (!check_proc_mode(INSTR_PMODE_MON, 0, 0, 0)))
+			{
+				unp++;
+			}
+			else if (check_proc_mode(INSTR_PMODE_MON, 0, 0, 0))
+			{
+				if((get_SCR() & 1) == 0)
+				{
+					unp++;
+				}
+			}
+			else
+			{
+				if (!check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				{
+					unp++;
+				}
+			}
+			break;
+		case INSTR_PMODE_IRQ:
+		case INSTR_PMODE_SVC:
+		case INSTR_PMODE_ABT:
+		case INSTR_PMODE_UND:
+		case INSTR_PMODE_SYS:
+			break;
+		default:
+			unp++;
+			break;
+		}
+	}
+	else
+	{
+		proc_mode = get_proc_mode();
+		secure_state = get_security_state();
+		tmp1 = bitrng(instr, 19, 16); // accessed mode
+		tmp1 |= bit(instr, 8) << 4;
+		tmp2 = bitrng(tmp1, 2, 0); // accessed register code
+		// 'normalize' access mode to match processor mode
+		switch (bitrng(tmp1, 4, 3))
+		{
+		case 0: // USR
+			tmp1 = INSTR_PMODE_USR;
+			tmp2 = tmp2 + 8; // register
+			if (tmp2 == 15) // illegal -> UNPREDICTABLE
+			{
+				tmp2 = 0;
+				unp++;
+			}
+			break;
+		case 1: // FIQ
+			tmp1 = INSTR_PMODE_FIQ;
+			tmp2 = tmp2 + 8; // register
+			if (tmp2 == 15) // illegal -> UNPREDICTABLE
+			{
+				tmp2 = 0;
+				unp++;
+			}
+			break;
+		case 2: // IRQ, SVC, ABT, UND
+			switch (tmp2)
+			{
+			case 0:
+				tmp1 = INSTR_PMODE_IRQ;
+				tmp2 = 14; // LR
+				break;
+			case 1:
+				tmp1 = INSTR_PMODE_IRQ;
+				tmp2 = 13; // SP
+				break;
+			case 2:
+				tmp1 = INSTR_PMODE_SVC;
+				tmp2 = 14; // LR
+				break;
+			case 3:
+				tmp1 = INSTR_PMODE_SVC;
+				tmp2 = 13; // SP
+				break;
+			case 4:
+				tmp1 = INSTR_PMODE_ABT;
+				tmp2 = 14; // LR
+				break;
+			case 5:
+				tmp1 = INSTR_PMODE_ABT;
+				tmp2 = 13; // SP
+				break;
+			case 6:
+				tmp1 = INSTR_PMODE_UND;
+				tmp2 = 14; // LR
+				break;
+			case 7:
+				tmp1 = INSTR_PMODE_UND;
+				tmp2 = 13; // SP
+				break;
+			default:
+				// logically impossible to get here
+				break;
+			}
+			break;
+		case 3: // MON, HYP
+			switch (tmp2)
+			{
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+				tmp2 = 0;
+				unp++;
+				break;
+			case 4:
+				tmp1 = INSTR_PMODE_MON;
+				tmp2 = 14; // LR
+				break;
+			case 5:
+				tmp1 = INSTR_PMODE_MON;
+				tmp2 = 13; // SP
+				break;
+			case 6:
+				tmp1 = INSTR_PMODE_HYP;
+				tmp2 = 14; // LR
+				break;
+			case 7:
+				tmp1 = INSTR_PMODE_HYP;
+				tmp2 = 13; // SP
+				break;
+			default:
+				// not logically possible to get here
+				break;
+			}
+			break;
+		default:
+			// not logically possible to get here
+			break;
+		}
+		if ((tmp2 == 14) && bit(instr, 22)) tmp2 = 16; // spsr
+
+		if (tmp2 == 0)
+		{
+			// bad register
+			retval = set_addr_lin();
+			retval = set_unpred_addr(retval);
+			return retval;
+		}
+
+		tmp4 = bitrng(instr, 15, 12); // Rd
+
+		switch (proc_mode)
+		{
+		case INSTR_PMODE_USR:
+			unp++;
+			retval = set_addr_lin(); // just a guess...
+			break;
+		case INSTR_PMODE_FIQ:
+			tmp3 = get_NSACR();
+			if (bit(tmp3, 19) && (secure_state == 0))
+			{
+				unp++;
+				retval = set_addr_lin();
+				break;
+			}
+			switch(tmp1)
+			{
+			case INSTR_PMODE_FIQ:
+			case INSTR_PMODE_HYP:
+			case INSTR_PMODE_MON:
+				unp++;
+				retval = set_addr_lin();
+				break;
+			default:
+				if (extra == arm_cstat_msr_b)
+				{
+					retval = set_addr_lin();
+				}
+				else // arm_cstat_mrs_b
+				{
+					if (tmp4 == 15)
+					{
+						unp++;
+						tmp4 = get_mode_reg(tmp1, tmp2);
+						retval = set_arm_addr(tmp4);
+					}
+					else
+					{
+						retval = set_addr_lin();
+					}
+				}
+				break;
+			}
+			break;
+		case INSTR_PMODE_IRQ:
+		case INSTR_PMODE_SVC:
+		case INSTR_PMODE_ABT:
+		case INSTR_PMODE_UND:
+			if (proc_mode == tmp1) // current mode registers
+			{
+				unp++;
+				retval = set_addr_lin();
+			}
+			else if (tmp1 == INSTR_PMODE_HYP)
+			{
+				unp++;
+				retval = set_addr_lin();
+			}
+			else if ((tmp1 == INSTR_PMODE_MON) && (secure_state == 0))
+			{
+				unp++;
+				retval = set_addr_lin();
+			}
+			else if (tmp1 == INSTR_PMODE_FIQ)
+			{
+				tmp3 = get_NSACR();
+				// FIQ mode and the FIQ Banked registers are accessible in
+				// Secure security state only.
+				if (bit(tmp3, 19) && (secure_state == 0))
+				{
+					unp++;
+					retval = set_addr_lin();
+				}
+				else
+				{
+					// access FIQ
+					if (extra == arm_cstat_msr_b)
+					{
+						retval = set_addr_lin();
+					}
+					else // arm_cstat_mrs_b
+						{
+						if (tmp4 == 15)
+						{
+							unp++;
+							tmp4 = get_mode_reg(tmp1, tmp2);
+							retval = set_arm_addr(tmp4);
+						}
+						else
+						{
+							retval = set_addr_lin();
+						}
+					}
+				}
+			}
+			else
+			{
+				if (extra == arm_cstat_msr_b)
+				{
+					retval = set_addr_lin();
+				}
+				else // arm_cstat_mrs_b
+				{
+					if (tmp4 == 15)
+					{
+						unp++;
+						tmp4 = get_mode_reg(tmp1, tmp2);
+						retval = set_arm_addr(tmp4);
+					}
+					else
+					{
+						retval = set_addr_lin();
+					}
+				}
+			}
+			break;
+		case INSTR_PMODE_MON:
+			if (extra == arm_cstat_msr_b)
+			{
+				retval = set_addr_lin();
+			}
+			else // arm_cstat_mrs_b
+			{
+				if (tmp4 == 15)
+				{
+					unp++;
+					tmp4 = get_mode_reg(tmp1, tmp2);
+					retval = set_arm_addr(tmp4);
+				}
+				else
+				{
+					retval = set_addr_lin();
+				}
+			}
+			break;
+		case INSTR_PMODE_HYP:
+			if ((tmp1 == proc_mode) || (tmp1 == INSTR_PMODE_MON)
+				|| ((tmp1 == INSTR_PMODE_FIQ) && (get_NSACR() & (1 << 19))))
+			{
+				unp++;
+				retval = set_addr_lin();
+			}
+			else
+			{
+				if (extra == arm_cstat_msr_b)
+				{
+					retval = set_addr_lin();
+				}
+				else // arm_cstat_mrs_b
+				{
+					if (tmp4 == 15)
+					{
+						unp++;
+						tmp4 = get_mode_reg(tmp1, tmp2);
+						retval = set_arm_addr(tmp4);
+					}
+					else
+					{
+						retval = set_addr_lin();
+					}
+				}
+			}
+			break;
+		case INSTR_PMODE_SYS:
+			if ((tmp1 == proc_mode) || (tmp1 == INSTR_PMODE_HYP)
+				|| (tmp1 == INSTR_PMODE_MON))
+			{
+				unp++;
+				retval = set_addr_lin();
+			}
+			else
+			{
+				if (extra == arm_cstat_msr_b)
+				{
+					retval = set_addr_lin();
+				}
+				else // arm_cstat_mrs_b
+				{
+					if (tmp4 == 15)
+					{
+						unp++;
+						tmp4 = get_mode_reg(tmp1, tmp2);
+						retval = set_arm_addr(tmp4);
+					}
+					else
+					{
+						retval = set_addr_lin();
+					}
+				}
+			}
+			break;
+		default:
+			// As user
+			unp++;
+			retval = set_addr_lin();
+			break;
+		}
+	}
+
+	if (retval.flag != INSTR_ADDR_UNDEF)
+	{
+		if (unp)
+		{
+			retval = set_unpred_addr(retval);
+		}
+	}
 	return retval;
 }
 
