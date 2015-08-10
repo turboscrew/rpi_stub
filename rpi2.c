@@ -119,7 +119,7 @@ static inline void save_regs()
 			"mrs r1, cpsr @ store our cpsr to stack\n\t"
 			"str r1, [sp], #-4\n\t"
 			"@ cpsr with zeroed mode into r2 for easier mode change\n\t"
-			"ldr r2, =#0xfffffff0 @ clean up mode bits\n\t"
+			"mvn r2, #0x0f @ clean up mode bits (all modes have bit 4 set)\n\t"
 			"and r2, r1 @ store mode bit masked cpsr in r2\n\t"
 			"@ check original mode field to find out the old bank\n\t"
 			"@ and switch into that mode to get lr and sp\n\t"
@@ -333,11 +333,11 @@ void rpi2_pabt_handler()
 	p = (uint32_t *)(&(rpi2_reg_context.reg.r15));
 	if (*p == TRAP_INSTR_A)
 	{
-		exception_extra |= 1; // trap (ARM)
+		exception_extra = 1; // trap (ARM)
 	}
 	else if (*(uint16_t *)p == TRAP_INSTR_T)
 	{
-		exception_extra |= 2; // trap (THUMB)
+		exception_extra = 2; // trap (THUMB)
 	}
 	rpi2_trap_handler();
 	load_regs();
@@ -357,16 +357,24 @@ void rpi2_set_vector(int excnum, void *handler)
 void rpi2_trap()
 {
 	/* Use BKPT */
-	asm("bkptal #0\n\t");
+	asm("bkpt #0\n\t");
 }
 
 /* set BKPT to given address */
 void rpi2_set_trap(void *address, int kind)
 {
-	uint16_t *location = (uint16_t *)address;
+	uint16_t *location_t = (uint16_t *)address;
+	uint32_t *location_a = (uint32_t *)address;
+
 	/* poke BKPT instruction */
-	*(location++) = 0xBE00; // BKPT
-	*(location) = 0xBE00; // BKPT
+	if (kind == RPI2_TRAP_THUMB)
+	{
+		*(location_t++) = 0xBEBE; // BKPT
+	}
+	else
+	{
+		*(location_a) = 0xE1200070; // BKPT
+	}
 	return;
 }
 

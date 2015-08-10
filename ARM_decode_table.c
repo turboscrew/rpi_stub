@@ -4329,7 +4329,7 @@ instr_next_addr_t arm_core_ldstrh(unsigned int instr, ARM_decode_extra_t extra)
 				{
 					unp++;
 				}
-				// fallthrough
+				// no break
 			case 0: // postindexing Rt = (Rn), Rn += offset
 				if (tmp2 == 15) // assume that writeback is done after load
 				{
@@ -4415,7 +4415,7 @@ instr_next_addr_t arm_core_ldstrh(unsigned int instr, ARM_decode_extra_t extra)
 				{
 					unp++;
 				}
-				// fallthrough
+				// no break
 			case 0: // postindexing
 				// writeback
 				tmp4 = rpi2_reg_context.storage[tmp3];
@@ -4905,7 +4905,7 @@ instr_next_addr_t arm_core_misc(unsigned int instr, ARM_decode_extra_t extra)
 			retval = set_addr_lin();
 			retval = set_unpred_addr(retval);
 		}
-		// fallthrough
+		// no break
 	case arm_misc_pli_r:
 		if (bitrng(instr, 3, 0) == 15) // m == 15
 		{
@@ -5388,6 +5388,17 @@ instr_next_addr_t arm_fp(unsigned int instr, ARM_decode_extra_t extra)
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
 
+/*
+arm_fp_vcmp_r
+arm_fp_vcmp_z
+arm_fp_vcvt_f3216
+arm_fp_vcvt_f6432
+arm_fp_vcvt_f6432_bc
+arm_fp_vcvt_sf6432
+arm_fp_vdiv
+arm_fp_vfnm
+
+ */
 	return retval;
 }
 
@@ -5396,6 +5407,19 @@ instr_next_addr_t arm_v_bits(unsigned int instr, ARM_decode_extra_t extra)
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
 
+/*
+arm_vbits_vmov_6432_i
+arm_vbits_vmov_6432_r
+arm_vbits_vand
+arm_vbits_vbic
+arm_vbits_vbif
+arm_vbits_vbit
+arm_vbits_vbsl
+arm_vbits_veor
+arm_vbits_vmvn
+arm_vbits_vorn
+
+ */
 	return retval;
 }
 
@@ -5404,6 +5428,23 @@ instr_next_addr_t arm_v_comp(unsigned int instr, ARM_decode_extra_t extra)
 	instr_next_addr_t retval;
 	retval = set_undef_addr();
 
+/*
+arm_vcmp_vacge
+arm_vcmp_vacgt
+arm_vcmp_vceq
+arm_vcmp_vceq_dt
+arm_vcmp_vceq_z
+arm_vcmp_vcge
+arm_vcmp_vcge_dt
+arm_vcmp_vcge_z
+arm_vcmp_vcgt_dt
+arm_vcmp_vcgt
+arm_vcmp_vcgt_z
+arm_vcmp_vcle_z
+arm_vcmp_vclt_z
+arm_vcmp_vtst
+
+ */
 	return retval;
 }
 

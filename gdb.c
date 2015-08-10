@@ -10,6 +10,7 @@
 #include "rpi2.h"
 #include "util.h"
 #include "gdb.h"
+#include "instr.h"
 
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
@@ -60,10 +61,12 @@ volatile gdb_trap_rec gdb_usr_breakpoint[GDB_MAX_BREAKPOINTS];
 // number of breakpoints in use
 volatile int gdb_num_bkpts = 0;
 
-// breakpoints for single-stepping - both ways of conditional branches
-volatile gdb_trap_rec gdb_step_bkpt[2];
-volatile int gdb_single_stepping;
-
+// breakpoint for single-stepping
+volatile gdb_trap_rec gdb_step_bkpt;
+volatile int gdb_single_stepping = 0; // flag: 1 = currently single stepping
+static volatile uint32_t gdb_single_stepping_address = 0xffffffff; // step until this
+static volatile int gdb_trap_num = -1; // breakpoint number in case of bkpt
+static int gdb_resuming = -1; // flag for single stepping over resumed breakpoint
 // program to be debugged
 volatile gdb_program_rec gdb_debuggee;
 
@@ -74,10 +77,15 @@ volatile io_device *gdb_iodev;
 static volatile uint8_t gdb_in_packet[GDB_MAX_MSG_LEN]; // packets from gdb
 static volatile uint8_t gdb_out_packet[GDB_MAX_MSG_LEN]; // packets to gdb
 static volatile uint8_t gdb_tmp_packet[GDB_MAX_MSG_LEN]; // for building packets
+
+// flag: 0 = return to debuggee, 1 = stay in monitor
 static volatile int gdb_monitor_running = 0;
 
 // The 'command interpreter'
 void gdb_monitor(int reason);
+
+// resume needs this
+void gdb_do_single_step();
 
 // ckeck if cause of exception was a breakpoint
 // return breakpoint number, or -1 if none
@@ -88,22 +96,13 @@ int gdb_check_breakpoint()
 	int i;
 
 	pc = rpi2_reg_context.reg.r15;
-	// single stepping 1?
-	if (gdb_step_bkpt[0].trap_address == (void *)pc)
+	// single stepping?
+	if (gdb_step_bkpt.valid)
 	{
-		if (gdb_step_bkpt[0].valid)
+		if (gdb_step_bkpt.trap_address == (void *)pc)
 		{
 			num = GDB_MAX_BREAKPOINTS;
 		}
-	}
-	// single stepping 2?
-	else if (gdb_step_bkpt[1].trap_address == (void *)pc)
-	{
-		if (gdb_step_bkpt[0].valid)
-		{
-			num = GDB_MAX_BREAKPOINTS + 1;
-		}
-
 	}
 	// user breakpoint?
 	else
@@ -127,7 +126,7 @@ void gdb_trap_handler()
 {
 	int break_char = 0;
 	int reason = 0;
-	int trap_num;
+	gdb_trap_num = -1;
 	reason = exception_info;
 #if 0
 	// currently done in rpi2.c
@@ -168,8 +167,8 @@ void gdb_trap_handler()
 			// bkpt (ARM) or bkpt (THUMB)
 			if ((exception_extra == 1) || (exception_extra == 2))
 			{
-				trap_num = gdb_check_breakpoint();
-				if (trap_num == 0)
+				gdb_trap_num = gdb_check_breakpoint();
+				if (gdb_trap_num < 0)
 				{
 					// not one of our breakpoints
 					reason = SIG_USR2;
@@ -241,12 +240,9 @@ void gdb_reset()
 	}
 	gdb_num_bkpts = 0;
 	// clean up single stepping breakpoints
-	gdb_step_bkpt[0].instruction.arm = 0;
-	gdb_step_bkpt[0].trap_address = (void *)0xffffffff;
-	gdb_step_bkpt[0].valid = 0;
-	gdb_step_bkpt[1].instruction.arm = 0;
-	gdb_step_bkpt[1].trap_address = (void *)0xffffffff;
-	gdb_step_bkpt[1].valid = 0;
+	gdb_step_bkpt.instruction.arm = 0;
+	gdb_step_bkpt.trap_address = (void *)0xffffffff;
+	gdb_step_bkpt.valid = 0;
 	gdb_single_stepping = 0;
 	// reset debuggee info
 	gdb_debuggee.start = (void *)0xffffffff;
@@ -315,84 +311,30 @@ int dgb_unset_trap(void *address, int kind)
 	return -1; // failure - not found
 }
 
-int is_jmp_thumb(uint16_t instr)
+void gdb_resume()
 {
-	return 0;
-}
-
-int is_cbranch_thumb(uint16_t instr)
-{
-	return 0;
-}
-
-int is_jmp_arm(uint32_t instr)
-{
-	return 0;
-}
-
-int is_cbranch_arm(uint32_t instr)
-{
-	return 0;
-}
-
-void gdb_resume(int bkptnum)
-{
-	uint32_t *addr_a; // ARM
-	uint16_t *addr_t; // THUMB
 	int i;
-	if (bkptnum > 0)
+	gdb_trap_rec *p;
+	if (gdb_resuming >= 0)
 	{
-		if (bkptnum < GDB_MAX_BREAKPOINTS) // user bkpt
-		{
-			// restore instruction
-			// put breakpoint to next instruction
-			// run old instr
-			// re-apply old breakpoint
-			// restore new instruction
-		}
-		else // single step
-		{
-			// restore instruction(s)
-			for (i=0; i<2; i++)
-			{
-				if (gdb_step_bkpt[i].valid)
-				{
-					if (gdb_step_bkpt[i].trap_kind == RPI2_TRAP_THUMB)
-					{
-						addr_t = (uint16_t *) gdb_step_bkpt[i].trap_address;
-						*addr_t = gdb_step_bkpt[i].instruction.thumb;
-					}
-					else
-					{
-						addr_a = (uint32_t *) gdb_step_bkpt[i].trap_address;
-						*addr_a = gdb_step_bkpt[i].instruction.arm;
-					}
-					gdb_step_bkpt[i].trap_kind = 0;
-					gdb_step_bkpt[i].valid = 0;
-				}
-			}
-			// ARM or THUMB mode?
-			if (rpi2_reg_context.reg.cpsr & 0x20)
-			{
-				// THUMB mode
-				addr_t = (uint16_t *) gdb_step_bkpt[i].trap_address;
-				addr_t++; // next instruction
-				if (is_jmp_thumb(gdb_step_bkpt[0].instruction.thumb))
-				{
-					// jump - find target address
-				}
-				else if (is_cbranch_thumb(gdb_step_bkpt[0].instruction.thumb))
-				{
-					// two possible branches find branch target address
-				}
-				else
-				{
-					// linear execution - next instruction
 
+		if (gdb_resuming < GDB_MAX_BREAKPOINTS) // user bkpt
+		{
+			// re-apply valid breakpoints
+			for (i=0; i<GDB_MAX_BREAKPOINTS; i++)
+			{
+				if (i != gdb_resuming) // skip the breakpoint to be resumed
+				{
+					p = &(gdb_usr_breakpoint[i]);
+					if (p->valid)
+					{
+						rpi2_set_trap(p->trap_address, p->trap_kind);
+					}
 				}
 			}
-			// put breakpoint to next instruction(s)
-			// return
+
+			// single step old instruction
+			gdb_do_single_step();
 		}
 	}
 }
@@ -634,6 +576,7 @@ void gdb_response_not_supported()
 void gdb_resp_target_halted(int reason)
 {
 	int len;
+	char *err = "E00";
 	const int scratch_len = 16;
 	const int resp_buff_len = 128; // should be enough to hold any response
 	char scratchpad[scratch_len]; // scratchpad
@@ -683,14 +626,19 @@ void gdb_resp_target_halted(int reason)
 	case SIG_USR1: // unhandled HW interrupt - no defined response
 		// send 'OUnhandled HW interrupt'
 		len = util_str_copy(resp_buff, "OUnhandled HW interrupt", resp_buff_len);
+		gdb_send_packet(resp_buff, len);
+		len = util_str_copy(resp_buff, err, resp_buff_len);
 		break;
 	case SIG_USR2: // unhandled SW interrupt - no defined response
 		// send 'OUnhandled SW interrupt'
 		len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
+		gdb_send_packet(resp_buff, len);
+		len = util_str_copy(resp_buff, err, resp_buff_len);
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
 		// send 'Ogdb stub started'
 		len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
+		// TODO: check if actual response is needed
 		break;
 	case FINISHED: // program has finished
 		// send 'W<exit status>' response
@@ -702,6 +650,9 @@ void gdb_resp_target_halted(int reason)
 	default:
 		// send 'Ounknown event'
 		len = util_str_copy(resp_buff, "OUnknown event\n", resp_buff_len);
+		gdb_send_packet(resp_buff, len);
+		gdb_response_not_supported();
+		return; // don't send anything more
 		break;
 	}
 	// send response
@@ -722,11 +673,10 @@ void gdb_cmd_cont(char *src, int len)
 	bkptnum = gdb_check_breakpoint();
 	if (bkptnum > 0)
 	{
-		gdb_resume(bkptnum);
+		gdb_resuming = bkptnum;
+		gdb_resume();
 	}
 	gdb_monitor_running = 0; // return
-
-	// is 'response pending' needed?
 }
 
 // g
@@ -909,10 +859,101 @@ void gdb_cmd_restart_program(volatile uint8_t *gdb_in_packet, int packet_len)
 
 }
 
+void gdb_do_single_step(void)
+{
+	instr_next_addr_t next_addr;
+	unsigned int curr_addr;
+	int len;
+	const int resp_buff_len = 128; // should be enough to hold any response
+	char resp_buff[resp_buff_len]; // response buffer
+	char *err = "E01";
+	char *okresp = "OK";
+
+	curr_addr = rpi2_reg_context.reg.r15; // stored PC
+
+	if (gdb_single_stepping_address != 0xffffffff)
+	{
+		if (gdb_single_stepping_address == (uint32_t)curr_addr)
+		{
+			// stop single stepping
+			gdb_single_stepping = 0; // just to be sure
+			gdb_single_stepping_address = 0xffffffff;
+			// send response
+			len = util_str_copy(resp_buff, "OTarget address reached", resp_buff_len);
+			gdb_send_packet((char *)resp_buff, len);
+			gdb_send_packet(okresp, util_str_len(okresp)); // response
+			gdb_monitor_running = 1;
+			return;
+		}
+	}
+	// step
+	next_addr = next_address(curr_addr);
+	if (next_addr.flag & (~INSTR_ADDR_UNPRED) == INSTR_ADDR_UNDEF)
+	{
+		// stop single stepping
+		gdb_single_stepping = 0; // just to be sure
+		gdb_single_stepping_address = 0xffffffff;
+		// send response
+		len = util_str_copy(resp_buff, "ONext instruction is UNDEFINED", resp_buff_len);
+		gdb_send_packet((char *)resp_buff, len); // response
+		gdb_send_packet(err, util_str_len(err));
+		gdb_monitor_running = 1;
+		return;
+	}
+	else if (next_addr.flag & INSTR_ADDR_UNPRED)
+	{
+		// TODO: configuration - allow unpredictables
+		// stop single stepping
+		gdb_single_stepping = 0; // just to be sure
+		gdb_single_stepping_address = 0xffffffff;
+		// send response
+		len = util_str_copy(resp_buff, "ONext instruction is UNPREDICTABLE", resp_buff_len);
+		gdb_send_packet((char *)resp_buff, len);
+		gdb_send_packet(err, util_str_len(err)); // response
+		gdb_monitor_running = 1;
+		return;
+	}
+	// store original instruction (only ARM instruction set supported yet)
+	// TODO: add thumb-mode
+	gdb_step_bkpt.trap_address = (void *) next_addr.address;
+	gdb_step_bkpt.instruction.arm = *((uint32_t *)next_addr.address);
+	gdb_step_bkpt.trap_kind = RPI2_TRAP_ARM;
+	gdb_step_bkpt.valid = 1;
+	// patch single stepping breakpoint
+	rpi2_set_trap(gdb_step_bkpt.trap_address, RPI2_TRAP_ARM);
+	gdb_monitor_running = 0;
+	// Delayed response - sent when stepping is done
+}
+
 // s [addr]
 void gdb_cmd_single_step(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	// gdb_single_stepping = 1;
+	uint32_t address;
+	int len;
+	const int resp_buff_len = 128; // should be enough to hold any response
+	char resp_buff[resp_buff_len]; // response buffer
+	char *err = "E02";
+
+	if (packet_len > 1)
+	{
+		// get hex for address
+		address = util_hex_to_word((char *)gdb_in_packet); // address to binary
+		if (gdb_single_stepping_address == 0xffffffff)
+		{
+			// Start single stepping to address
+			gdb_single_stepping_address = address;
+		}
+		else
+		{
+			// single stepping in progress already (shouldn't happen)
+			len = util_str_copy(resp_buff, "OAlready single stepping", resp_buff_len);
+			gdb_send_packet((char *)resp_buff, len);
+			gdb_send_packet(err, util_str_len(err));
+			return;
+		}
+	}
+	gdb_single_stepping_address = 0xffffffff; // just one single step
+	gdb_do_single_step();
 }
 
 // X addr,len: XX XX ...
@@ -1046,14 +1087,90 @@ void gdb_cmd_delete_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	{
 		gdb_response_not_supported();
 	}
+}
 
+void gdb_restore_breakpoint(gdb_trap_rec *bkpt)
+{
+	if (bkpt->trap_kind == RPI2_TRAP_ARM)
+	{
+		*((uint32_t *)(bkpt->trap_address)) = bkpt->instruction.arm;
+	}
+	else
+	{
+		*((uint16_t *)(bkpt->trap_address)) = bkpt->instruction.thumb;
+		return; // only ARM supported for now
+	}
 }
 
 // handle stuff left pending until exception
 void gdb_handle_pending_state(int reason)
 {
-	// single step?
+	instr_next_addr_t next_addr;
+	unsigned int curr_addr;
+	int len, i;
+	const int resp_buff_len = 128; // should be enough to hold any response
+	char resp_buff[resp_buff_len]; // response buffer
+	// char *err = "E01";
+	char *okresp = "OK";
 
+	curr_addr = rpi2_reg_context.reg.r15; // stored PC
+
+	// break point or single step
+	if (reason == SIG_TRAP)
+	{
+		gdb_monitor_running = 1; // by default
+		// if single step
+		if (gdb_trap_num == GDB_MAX_BREAKPOINTS)
+		{
+			gdb_restore_breakpoint(&gdb_step_bkpt);
+			gdb_step_bkpt.valid = 0; // used -> removed
+			// if single stepping to an address
+			if (gdb_single_stepping_address != 0xffffffff)
+			{
+				if (gdb_single_stepping_address != curr_addr)
+				{
+					gdb_do_single_step();
+					return; // response handled within the call
+				}
+				else
+				{
+					// stop 'automatic' single stepping
+					gdb_single_stepping_address = 0xffffffff;
+				}
+			}
+			if (gdb_resuming >= 0)
+			{
+				// re-apply resumed breakpoint
+				rpi2_set_trap(gdb_usr_breakpoint[gdb_resuming].trap_address,
+						gdb_usr_breakpoint[gdb_resuming].trap_kind);
+				gdb_resuming = -1; // done
+				gdb_monitor_running = 0; // resume kind of continues
+				return;
+			}
+		}
+		else
+		{
+			// all breakpoints be restored - and re-installed at
+			for (i = 0; i < GDB_MAX_BREAKPOINTS; i++)
+			{
+				gdb_restore_breakpoint(&(gdb_usr_breakpoint[i]));
+			}
+		}
+		// response generated later
+	}
+	if (reason == SIG_INT)
+	{
+		if (!gdb_monitor_running)
+		{
+			// program execution stopped by ctrl-C
+			gdb_monitor_running = 1; // by default
+		}
+		else
+		{
+			// Needless ctrl-C - don't bother with response (?)
+			return;
+		}
+	}
 	// stop responses - responses to commands 'c', 's', and the like
 	gdb_resp_target_halted(reason);
 	// go to monitor
@@ -1065,9 +1182,9 @@ void gdb_monitor(int reason)
 	int packet_len;
 	char *ch;
 	char *inpkg = (char *)gdb_in_packet;
+
 	gdb_handle_pending_state(reason);
 
-	gdb_monitor_running = 1;
 	while(gdb_monitor_running)
 	{
 		packet_len = receive_packet(inpkg);

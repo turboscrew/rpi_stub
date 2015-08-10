@@ -3,10 +3,11 @@ ENTRY(_start)
 SECTIONS
 {
 	. = 0x0000;
-	.text :
+	.vector :
 	{
 		start*.o(.vector)
 	}
+
     /* Starts at LOADER_ADDR. */
     . = 0x8000;
     __text_start = .;

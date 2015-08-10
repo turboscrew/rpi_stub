@@ -38,9 +38,7 @@ instr_next_addr_t next_address_arm(unsigned int address)
 	instr_next_addr_t retval;
 	unsigned int instr;
 
-	// TODO: not implemented yet
 	retval = set_undef_addr();
-
 
 	instr = *((unsigned int *) address);
 	retval = ARM_decoder_dispatch(instr);
