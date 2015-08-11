@@ -106,6 +106,17 @@ PROCESS gdb-stub
     return from exception
 ENDPROCESS
 
+The resuming from a breakpoint is a bit messy.
+When a breakpoint fires, the gdb_handle_pending_state is called
+and the breakpoint is written over by the saved (original) instruction.
+
+When resume takes place, a variable 'gdb_resuming' is set (to the index of
+the trapping breakpoint) for resuming from breakpoint and single stepping
+over the "breakpointed" instruction is made.
+
+When the single step fires, the single step handling in gdb_handle_pending_state
+puts the "missing" bkpt in the code and resumes again.
+
 
 single-stepping
 in command interpreter s-command checks the next instruction
@@ -148,7 +159,7 @@ by the earlier 'Z'-command.
 
 
 ------------------------
-Notes and reminders
+Notes and reminders to myself
 
 single-step
 - marker: we need to know if we were single-stepping when we hit breakpoint.

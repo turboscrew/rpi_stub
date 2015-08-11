@@ -320,7 +320,8 @@ void gdb_resume()
 
 		if (gdb_resuming < GDB_MAX_BREAKPOINTS) // user bkpt
 		{
-			// re-apply valid breakpoints
+			// re-apply valid breakpoints - needed?
+			/*
 			for (i=0; i<GDB_MAX_BREAKPOINTS; i++)
 			{
 				if (i != gdb_resuming) // skip the breakpoint to be resumed
@@ -332,7 +333,7 @@ void gdb_resume()
 					}
 				}
 			}
-
+			*/
 			// single step old instruction
 			gdb_do_single_step();
 		}
@@ -1150,11 +1151,14 @@ void gdb_handle_pending_state(int reason)
 		}
 		else
 		{
-			// all breakpoints be restored - and re-installed at
+			// should all breakpoints be restored - and re-installed at resume?
+			/*
 			for (i = 0; i < GDB_MAX_BREAKPOINTS; i++)
 			{
 				gdb_restore_breakpoint(&(gdb_usr_breakpoint[i]));
 			}
+			*/
+			gdb_restore_breakpoint(&(gdb_usr_breakpoint[gdb_trap_num]));
 		}
 		// response generated later
 	}
