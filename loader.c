@@ -10,18 +10,15 @@
 #include "gdb.h"
 #include "io_dev.h"
 
-void main(uint32_t r0, uint32_t r1, uint32_t r2)
+void loader_main()
 {
-	/* kernel parameters - for future use? */
-	(void) r0;
-	(void) r1;
-	(void) r2;
-
 	io_device serial_io;
 
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
-
+	// debug-line
+	// serial_io.put_string("Got into main()\n", 18);
+	
 	/* initialize debugger */
 	gdb_init(&serial_io);
 
@@ -33,4 +30,14 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 		gdb_trap();		
 	}
 
+}
+
+void main(uint32_t r0, uint32_t r1, uint32_t r2)
+{
+	/* kernel parameters - for future use? */
+	(void) r0;
+	(void) r1;
+	(void) r2;
+	
+	loader_main();
 }

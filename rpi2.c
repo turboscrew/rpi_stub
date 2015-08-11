@@ -11,7 +11,8 @@
 // Not pretty, but didn't want to include everything
 extern void serial_irq();
 extern void gdb_trap_handler();
-extern void main(uint32_t r0, uint32_t r1, uint32_t r2);
+// extern void main(uint32_t r0, uint32_t r1, uint32_t r2);
+extern void loader_main();
 
 // Another naughty trick
 #define extern
@@ -64,7 +65,7 @@ void rpi2_set_vectable()
 			"ldr pc, jumptbl+24 @ IRQ\n\t"
 			"ldr pc, jumptbl+28 @ FIRQ\n\t"
 			"jumptbl: @ 8 addresses\n\t"
-			".word 0x1f000000 @ main\n\t"
+			".word loader_main\n\t"
 			".word rpi2_undef_handler\n\t"
 			".word rpi2_svc_handler\n\t"
 			".word rpi2_pabt_handler\n\t"

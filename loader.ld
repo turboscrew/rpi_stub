@@ -1,13 +1,21 @@
 ENTRY(_start)
 
+MEMORY
+{
+	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 256k /* initial */
+	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 256k /* runtime */
+}
+
 SECTIONS
 {
+	/*
 	. = 0x0000;
 	.vector :
 	{
 		start*.o(.vector)
 	}
-
+	*/
+	
     /* Starts at LOADER_ADDR. */
     . = 0x8000;
     __text_start = .;
@@ -16,12 +24,19 @@ SECTIONS
 		/* If special boot section */
         /* KEEP(*(.text.boot)) */
         *(.init)
-        start1*.o(.text)
-        __code_begin = .;
+        start1*.o
+    } >LOAD
+    
+    .note :
+    {
+    	*(.note.*)
+    } >LOAD
+    
+    .text2 :
+    {
+         __code_begin = .;
         *(.text)
-    }
-    /* align to page size */
-    /*    . = ALIGN(4096); */
+    } >EXEC AT>LOAD
     __text_end = .;
  
 
@@ -29,7 +44,7 @@ SECTIONS
     .data :
     {
         *(.data)
-    }
+    } >EXEC AT>LOAD
     __data_end = .;
  
  
@@ -53,7 +68,7 @@ SECTIONS
 		__und_stack = .;
 		. = . + 8192;	/* abrt stack size (gdb-stub) */
 		__abrt_stack = .;
-    }
+    } >EXEC AT>LOAD
     __bss_end = .;
     
     __new_org = 0x1f000000;
