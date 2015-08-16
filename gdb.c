@@ -134,9 +134,9 @@ void gdb_trap_handler()
 	uint32_t irqmask = ~(1<<7);
 	asm volatile (
 			"push r0\n\t"
-			"mrs.w r0, cpsr\n\t"
+			"mrs r0, cpsr\n\t"
 			"and r0, irqmask"
-			"msr.w r0, cpsr\n\t"
+			"msr r0, cpsr\n\t"
 			"pop r0\n\t"
 	);
 #endif
@@ -218,8 +218,6 @@ void gdb_init(io_device *device)
 {
 	/* store I/O device to be used */
 	gdb_iodev = device;
-	/* initialize rpi2 */
-	rpi2_init();
 	/* install trap handler */
 	rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
@@ -1090,7 +1088,7 @@ void gdb_cmd_delete_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	}
 }
 
-void gdb_restore_breakpoint(gdb_trap_rec *bkpt)
+void gdb_restore_breakpoint(volatile gdb_trap_rec *bkpt)
 {
 	if (bkpt->trap_kind == RPI2_TRAP_ARM)
 	{

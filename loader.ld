@@ -8,7 +8,7 @@ MEMORY
 
 SECTIONS
 {
-	/*
+	/* not used
 	. = 0x0000;
 	.vector :
 	{
@@ -56,10 +56,12 @@ SECTIONS
         stacks = .;
 		. = . + 512;	/* fiq stack size */
 		__fiq_stack = .;
-		. = . + 1024;	/* usr & sys stack size (start-up) */
+		. = . + 1024;	/* usr & sys stack size (common) */
 		__usrsys_stack = .;
-		. = . + 1024;	/* irq & svc stack size (serial) */
-		__irqsvc_stack = .;
+		. = . + 1024;	/* svc stack size (start-up) */
+		__svc_stack = .;
+		. = . + 512;	/* irq stack size (serial) */
+		__irq_stack = .;
 		. = . + 512;	/* mon stack size */
 		__mon_stack = .;
 		. = . + 512;	/* hyp stack size */

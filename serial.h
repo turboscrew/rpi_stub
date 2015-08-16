@@ -21,9 +21,7 @@ int serial_put_string(char *st, int n);
 int serial_read(char *buf, int n);
 int serial_write(char *buf, int n);
 
-// serial interrupt handlers
+// serial interrupt handler
 void serial_irq();
-// void serial_rx();
-// void serial_tx();
 
 #endif /* SERIAL_H_ */

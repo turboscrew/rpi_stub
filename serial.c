@@ -10,21 +10,6 @@
 
 /* UART definitions */
 
-// The peripherals base address
-#define PERIPH_BASE 0x3f000000
-
-// The GPIO registers base address.
-#define GPIO_BASE (PERIPH_BASE + 0x200000)
-
-// The GPIO function select for pins 14,15
-#define GPFSEL1 (GPIO_BASE + 0x04)
-
-// Pull up/down for all GPIO pins.
-#define GPPUD (GPIO_BASE + 0x94)
-
-// Pull up/down for specific GPIO pin.
-#define GPPUDCLK0 (GPIO_BASE + 0x98)
-
 // The base address for UART.
 #define UART0_BASE (PERIPH_BASE + 0x201000)
 
@@ -48,7 +33,8 @@
 #define UART0_ITOP   (UART0_BASE + 0x88)
 #define UART0_TDR    (UART0_BASE + 0x8C)
 
-// I/O buffers
+// I/O buffers, we write to tail and read from head
+// buffers are post-incrementing
 #define SER_RX_BUFF_SIZE 1024
 #define SER_TX_BUFF_SIZE 1024
 
@@ -73,26 +59,6 @@ static inline void delay(int32_t count)
 	asm volatile("__delay_%=: subs %[count], %[count], #1; bne __delay_%=\n"
 		 : : [count]"r"(count) : "cc");
 }
-
-// Copies an ISR jump into the interrupt vector
-// Vector: Reset = 0x00, IRQ = 0x18, FIRQ = 0x1C (in case...)
-/*
-void serial_set_vector()
-{
-	asm (
-		"b irqjmp$ @ Skip the vector entry to be copied\n\t"
-		"jumpinstr$:\n\t"
-		"ldr pc, =serial_irq\n\t"
-		"irqjmp$:\n\t"
-		"@ Copy the jump to the vector\n\t"
-		"cpsid i @ Disable interrupts\n\t"
-		"ldr r0, jumpinstr$\n\t"
-		"ldr r1, =0x18\n\t"
-		"str r0, [r1]\n\t"
-		"cpsie i @ Enable interrupts\n\t"
-	);
-}
-*/
 
 int serial_get_ctrl_c()
 {
@@ -122,7 +88,8 @@ void serial_init(io_device *device)
 {
 	uint32_t tmp; // scratchpad
 
-	// Disable UART0 for configuration
+	// Disable UART0 for configuration - sorry, took the only "real" UART,
+	// but with that, uploading is faster and so is debugging
 	*((volatile uint32_t *)UART0_CR) = 0x00000000;
 
 	// Fill up the device structure
@@ -145,7 +112,7 @@ void serial_init(io_device *device)
 	// Setup the GPIO pin 14 & 15.
 
 	// Change pull up/down to pull-down & delay for 150 cycles
-	*((volatile uint32_t *)GPPUD) = 0x00000001; // pull-down for pins 14 & 15
+	*((volatile uint32_t *)GPPUD) = 0x00000000; // pull-down disabled for pins 14 & 15
 	delay(150);
 
 	// Target pull up/down change to pin 14,15 & delay for 150 cycles.
@@ -160,19 +127,16 @@ void serial_init(io_device *device)
 
 	// GPIO 14,15 to UART0 rx & tx
 	tmp = *((volatile uint32_t *)GPFSEL1);
-	tmp = 0x4 << (4 * 3); // pin 14 - the 4th 3-bit group, 4 = alt function 0			tmp = 0x4 << (4 * 3) // pin 14 - the 4th 3-bit group, 4 = alt function 0
-	tmp = 0x4 << (5 * 3); // pin 15 - the 5th 3-bit group
+	tmp &= ~(7<<(4 * 3) | 7<<(5 * 3)); // clear the functions for pins 14 and 15
+	tmp |= 0x4 << (4 * 3); // pin 14 - the 4th 3-bit group, 4 = alt function 0			tmp = 0x4 << (4 * 3) // pin 14 - the 4th 3-bit group, 4 = alt function 0
+	tmp |= 0x4 << (5 * 3); // pin 15 - the 5th 3-bit group
 	*((volatile uint32_t *)GPFSEL1) = tmp;
 
 
-	// Configure UART0 - sorry, took the only "real" UART,
-	// but with that, uploading is faster and so is debugging
+	// Configure UART0
 
 	// Mask off all UART0 interrupts for now
-	*((volatile uint32_t *)UART0_IMSC) = 0x7FF;
-
-	// Clear all UART0 interrupts
-	*((volatile uint32_t *)UART0_ICR) = 0x7FF;
+	*((volatile uint32_t *)UART0_IMSC) = 0x7F2;
 
 	// Set integer & fractional part of baud rate
 	// Divider = UART_CLOCK/(16 * Baud)
@@ -180,7 +144,7 @@ void serial_init(io_device *device)
 	// UART_CLOCK = 3000000; Baud = 115200
 
 	// Divider = 3000000 / (16 * 115200) = 1.627 = ~1
-	// Fractional part register = (.627 * 64) + 0.5 = 40.6 = ~40
+	// Fractional part register = (0.627 * 64) + 0.5 = 40.6 = ~40
 	*((volatile uint32_t *)UART0_IBRD) = 1;
 	*((volatile uint32_t *)UART0_FBRD) = 40;
 
@@ -190,15 +154,8 @@ void serial_init(io_device *device)
 	// Enable FIFO & 8 bit data transmission (1 stop bit, no parity)
 	*((volatile uint32_t *)UART0_LCRH) = (1 << 4) | (1 << 5) | (1 << 6);
 
-	// Set IRQ vector
-	// serial_set_vector();
-	rpi2_set_vector(RPI2_EXC_IRQ, serial_irq);
-
 	// FIFO-interrupt levels: rx 1/2, tx 1/2
 	*((volatile uint32_t *)UART0_IFLS) = (0x2 << 3) | (0x2) ;
-
-	// Mask all UART0 interrupts
-	*((volatile uint32_t *)UART0_IMSC) = 0x7f0;
 
 	// Enable UART0, receive & transfer part of UART
 	*((volatile uint32_t *)UART0_CR) = (1 << 0) | (1 << 8) | (1 << 9);
@@ -206,8 +163,11 @@ void serial_init(io_device *device)
 	// Clear interrupts
 	*((volatile uint32_t *)UART0_ICR) = 0x7ff;
 
-	// Set UART0 interrupt mask
-	*((volatile uint32_t *)UART0_IMSC) = 0x7f0;
+	// Set UART0 interrupt mask (enable almost all)
+	*((volatile uint32_t *)UART0_IMSC) = 0x7F0;
+
+	// Enable uart interrupts
+	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
 
 }
 
@@ -219,24 +179,16 @@ void serial_start()
 
 void serial_start_tx()
 {
-	uint32_t ch;
-
 	// If TX FIFO is empty and transmitter is idle
 	// (If TX FIFO is not empty, transmitter will become busy)
 	if ( (*((volatile uint32_t *)UART0_FR) & (1 << 7))
 			&& (*((volatile uint32_t *)UART0_FR) & (1 << 3)) )
 	{
-		// If stuff in ring buffer
-		if (ser_tx_tail != ser_tx_head)
-		{
-			// read char from ring buffer
-			ch = (uint32_t)ser_tx_buff[ser_tx_head++];
-			ser_tx_tail %= SER_TX_BUFF_SIZE;
-			// write ch in FIFO to wake up transmitter
-			*((volatile uint32_t *)UART0_DR) = ch;
-		}
+		// no messing with tx interrupt
+		asm volatile ("cpsid i\n\t");
+		serial_tx();
+		asm volatile ("cpsie i\n\t");
 	}
-
 }
 
 int serial_get_char()
@@ -272,7 +224,7 @@ int serial_put_char(char c)
 	{
 		// put character to ring buffer
 		ser_tx_buff[ser_tx_tail++] = c;
-		ser_tx_head %= SER_TX_BUFF_SIZE;
+		ser_tx_tail %= SER_TX_BUFF_SIZE;
 	}
 	serial_start_tx();
 
@@ -364,7 +316,7 @@ int serial_write(char *buf, int n)
 		{
 			// put character to ring buffer
 			ser_tx_buff[ser_tx_tail++] = *(buf++);
-			ser_tx_head %= SER_TX_BUFF_SIZE;
+			ser_tx_tail %= SER_TX_BUFF_SIZE;
 			// a character less to write
 			m--;
 		}
@@ -391,8 +343,15 @@ void serial_irq()
 		// Clear transmit interrupt
 		*((volatile uint32_t *)UART0_ICR) = (1<<5);
 	}
-	/* Clear all UART0 interrupts except tx and rx */
-	*((volatile uint32_t *)UART0_ICR) = 0x7cf;
+	if (*((volatile uint32_t *)UART0_MIS) & (1<<6))
+	{
+		/* Rx timeout interrupt */
+		serial_rx();
+		// Clear rx timeout interrupt
+		*((volatile uint32_t *)UART0_ICR) = (1<<6);
+	}
+	/* Clear all UART0 interrupts except tx, rx and rx timeout */
+	*((volatile uint32_t *)UART0_ICR) = 0x782;
 }
 
 // Note: rx only reads rx_head, and only rx writes rx_tail
@@ -419,7 +378,7 @@ void serial_rx()
 		}
 		/* if BRK character (CTRL-C) */
 		/* It can't be handled if it doesn't fit into HW FIFO */
-		if (ch == 3)
+		if ((ch & 0xff) == 3)
 		{
 			/* if CTRL-C handler is in use */
 			if (ser_ctrlc)
@@ -450,7 +409,7 @@ void serial_tx()
 		{
 			// Read char from ring buffer
 			ch = (uint32_t)ser_tx_buff[ser_tx_head++];
-			ser_tx_tail %= SER_TX_BUFF_SIZE;
+			ser_tx_head %= SER_TX_BUFF_SIZE;
 			// Write ch in transmitter
 			*((volatile uint32_t *)UART0_DR) = ch;
 		}
