@@ -33,7 +33,8 @@
 #define IRC_DIS1	(IRC_BASE + 0x21C)
 #define IRC_DIS2	(IRC_BASE + 0x220)
 
-/* exception numbers */
+/* exception numbers - these had to be hardcoded in the
+   exception handlers' assembly code in rpi2.c */
 #define RPI2_EXC_RESET	0
 #define RPI2_EXC_UNDEF	1
 #define RPI2_EXC_SVC	2
@@ -52,21 +53,21 @@
 // also guarantee 32-bit reads and writes
 #define PUT32(address, data) \
     asm volatile (\
-    "str %src, [%dst] \n\t"\
-    :src "=r" (data)\
-    :dst "r" (address):\
+    "str %[src], [%[dst]] \n\t"\
+    :[src] "=r" (data)\
+    :[dst] "r" (address):\
     )
 
 #define GET32(address, data) \
     asm volatile (\
-    "ldr %dst, [%src] \n\t"\
-    :dst "=r" (data)\
-    :src "r" (address):\
+    "ldr %[dst], [%[src]] \n\t"\
+    :[dst] "=r" (data)\
+    :[src] "r" (address):\
     )
 
 // interrupt disable/enable
 #define DISABLE_INTS asm volatile ("cpsid aif\n\t")
-#define ENABLE_INTS asm volatile ("cpsie aif\n\t")
+#define ENABLE_INTS asm volatile ("cpsie if\n\t")
 
 // exception info
 // 8x = SW-caused
@@ -76,7 +77,7 @@ extern volatile int exception_extra;
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of
 // ARMv7-A/R ARM issue C (ARM DDI 0406C.c)
-extern volatile union {
+extern volatile union reg_ctx {
 	unsigned int storage[17]; // without size it would be flexible array member
 	struct {
 		unsigned int r0;

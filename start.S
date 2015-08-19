@@ -37,6 +37,9 @@ cmp r4, r5
 bmi	loop$
 
 // Set up initial stacks
+// ARM stack is conventionally 'Decrement Before'-type
+// = SP points to last used, and is decremented before write
+
 ldr r13, =__svc_stack @ our stack (at startup)
 
 // store our cpsr to r4
@@ -98,7 +101,7 @@ str	r7,[r6], #4
 subs r5, r5, #1
 bne	loop1$
 
-cpsie aif @ enable interrupts
+cpsie if @ enable interrupts
 ldr pc, =start1
 
 @ dummy vectors for exceptions

@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 // Not pretty, but didn't want to include everything
+// TODO: Maybe callbacks later...
 extern void serial_irq();
 extern void gdb_trap_handler();
 // extern void main(uint32_t r0, uint32_t r1, uint32_t r2);
@@ -46,7 +47,10 @@ extern uint32_t jumptbl;
  *
  * BKPT is a bit dangerous, because the debugger LR may be destroyed by PABT.
  * (PABT is asynchronous exception to the same mode as BKPT - ABT)
+ * For now, we keep PABT disabled.
  */
+
+static volatile union reg_ctx irq_ctx;
 
 /* A fixed vector table - copied to 0x0 */
 void rpi2_set_vectable()
@@ -83,71 +87,91 @@ void rpi2_set_vectable()
 			"str r3, [r1], #4\n\t"
 			"cmp r2, r0\n\t"
 			"bmi irqset_loop\n\t"
-			"cpsie aif @ Enable interrupts\n\t"
+			"cpsie if @ Enable interrupts\n\t"
 	);
 }
 
-// must be first action in an exception handler
-// stores register context
-// the stored PC needs to be fixed in the ISR after this
-static inline void save_regs()
+// returns sp, takes lr subtract value
+//
+// for fix for the exception return address
+// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
+// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
+// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
+
+static inline uint32_t push_stackframe(uint32_t var)
 {
 	asm volatile(
-			"@ do we need to disable interrupts?\n\t"
-			"@ cpsid aif @ Disable interrupts\n\t"
+			"push {r0 - r12}\n\t"
+			"mov r5, %[var_reg]\n\t"
+			"mov r4, lr\n\t"
+			"sub r4, r5 @ fix lr\n\t"
+			"mrs r5, spsr\n\t"
+			"mrs r6, cpsr\n\t"
+			"mov r7, sp @ fixed if needed\n\t"
+			"push {r4, r5, r6, r7}\n\t"
+			"mov %[var_reg], sp\n\t"
+			:[var_reg] "=r" (var) : :
+	);
+	return var;
+}
 
-			"@ TODO: check that stack is post decrementing\n\t"
-			"str r0, [sp], #-4 @ push r0 - r0 is needed here\n\t"
-			"ldr r0, =rpi2_reg_context @ r0 -> reg_context\n\t"
-			"@ save the reg context - we'll fix r0 and sp later\n\t"
-			"stmia r0, {r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}\n\t"
-			"str r13, [r0, #+13*4] @ SP not allowed in thumb-stmia\n\t"
-			"str r14, [r0, #+14*4] @ LR not allowed in thumb-stmia\n\t"
-			"@ three more working registers, now that they are already saved\n\t"
-			"push {r1, r2, r3}\n\t"
+static inline void copy_from_stackframe(uint32_t loc)
+{
+	asm volatile(
+			"push {r0 - r12}\n\t"
+			"mov r9, sp\n\t"
+			"push {r9, lr}\n\t"
+
+			"mov sp, %[sp_loc]\n\t"
+			"ldr lr, =rpi2_reg_context @ r0 -> reg_context\n\t"
+
+			"pop {r4, r5, r6, r7}\n\t"
+			"mov sp, r7\n\t"
+			"@ msr cpsr, r6 @ cpsr not copied\n\t"
+			"str r5, [lr, #16*4] @ spsr\n\t"
+			"str r4, [lr, #15*4] @ pc\n\t"
+			"pop {r0 - r12}\n\t"
+			"stmia lr, {r0 - r12}\n\t"
+			"str sp, [lr, #13*4]\n\t"
+
+			"pop {r9, lr}\n\t"
+			"mov sp, r9\n\t"
+			"pop {r0 - r12}\n\t"
+			:[sp_loc] "=r" (loc) ::
+	);
+}
+
+// gets the banked regs from last mode and overwrites the stored
+// registers with them
+static inline void store_banked_regs()
+{
+	asm volatile(
+			"push {r0 - r3}\n\t"
 
 			"eor r2,r2  @ clear exception_extra\n\t"
 			"ldr r1, =exception_extra\n\t"
 			"str r2, [r1]\n\t"
 
-			"@ fix stored sp - we did push r0 before saving sp\n\t"
-			"ldr r1, [r0, #+14*4] @ saved sp\n\t"
-			"add r1, #4 @ r0\n\t"
-			"str r1, [r0, #+14*4]\n\t"
-
-			"@ fix r0 which was pushed at the beginning\n\t"
-			"@ TODO: check stack offset\n\t"
-			"ldr r1, [sp, #+16] @ load old r0\n\t"
-			"str r1, [r0] @ save r0\n\t"
-
-			"@ save old pc - needs fixing (by stored cpsr)\n\t"
-			"str lr, [r0, #+15*4]\n\t"
-
-			"mrs r1, spsr @ save old cpsr\n\t"
-			"str r1, [r0, #+16*4]\n\t"
-
-			"@ find out previous mode for getting old SP + lr\n\t"
-			"@ for debugging only - no need to restore them later\n\t"
-
 			"@ store our cpsr in r3 for restoring at the end\n\t"
-			"mrs r3, cpsr @ store our cpsr to stack\n\t"
+			"mrs r3, cpsr\n\t"
 
 			"@ cpsr with zeroed mode into r2 for easier mode change\n\t"
 			"mvn r2, #0x0f @ clean up mode bits (all modes have bit 4 set)\n\t"
-			"and r2, r1 @ store mode bit masked cpsr in r2\n\t"
+			"and r2, r3\n\t"
 
-			"mrs r1, spsr @ get previous mode cpsr\n\t"
 			"@ check original mode field to find out the old bank\n\t"
 			"@ and switch into that mode to get lr and sp\n\t"
-			"@ getting sp and lr and switching back to our mode is common code\n\t"
+			"@ (and for FIQ the banked regs r8 - r12)\n\t"
+			"mrs r1, spsr @ get previous mode cpsr\n\t"
 			"and r1, #0x0f @ extract mode field (bit 4 always set)\n\t"
 
 			"@ USR mode?\n\t"
 			"@ USR and SYS use the same registers, but sys is privileged\n\t"
 			"@ from user mode we couldn't get back in our original mode\n\t"
+			"@ so, if mode is USR, replace with mode SYS\n\t"
 			"cmp r1, #0x00 @ USR?\n\t"
 			"bne 1f\n\t"
-			"mov r1, #0x0F @ set SYS\n\t"
+			"mov r1, #0x0f @ set SYS\n\t"
 
 			"1:\n\t"
 			"@ set the mode\n\t"
@@ -159,80 +183,136 @@ static inline void save_regs()
 			"bne 2f\n\t"
 			"ldr r0, =rpi2_reg_context+8*4 @ r0 -> reg_context.r8\n\t"
 			"stmia r0, {r8,r9,r10,r11,r12}\n\t"
-			"ldr r0, =rpi2_reg_context	@ restore r0 -> reg_context\n\t"
+			"b 3f @ back to 'mainstream'\n\t"
 
 			"2:\n\t"
 			"@ if our own mode, LR was overwritten\n\t"
-			"@ by the exception and they are already stored\n\t"
+			"@ by the exception and SP and SPSR are already stored\n\t"
 			"cmp r1, #0x07 @ ABT?\n\t"
 			"bne 3f\n\t"
 			"b 4f @ skip this phase\n\t"
 
 			"3:\n\t"
 			"@ Other modes\n\t"
+			"ldr r0, =rpi2_reg_context	@ r0 -> reg_context\n\t"
 			"mov r1, sp\n\t"
 			"mov r2, lr\n\t"
 			"str r1, [r0, #13*4]\n\t"
-			"str r2, [r0, #13*4]\n\t"
+			"str r2, [r0, #14*4]\n\t"
+
 			"4:\n\t"
 			"@ back to our original mode\n\t"
 			"msr cpsr, r3 @ \n\t"
-			"@ restore working registers\n\t"
-			"pop {r1, r2, r3}\n\t"
-			"ldr r0, [sp, #+4]! @ pop r0\n\t"
-
-			"@ cpsie aif @ Enable interrupts\n\t"
+			"pop {r0 - r3}\n\t"
 	);
 }
 
-// must be last action in an exception handler
-// loads register context and returns from exception
-static inline void load_regs()
+// sets the banked regs from the stored registers and writes them
+// into the banked regs of the mode in stored cpsr
+static inline void load_banked_regs()
 {
 	asm volatile(
-			"@ load common regs\n\t"
+			"push {r0 - r3}\n\t"
 
-			"@ restoring sp matters in our own mode only\n\t"
-			"@ in this mode we've already lost the old lr\n\t"
-			"@ - overwritten by the exception\n\t"
-			"@ in other modes lr and sp are banked - and safe\n\t"
+			"ldr r0, =rpi2_reg_context	@ r0 -> reg_context\n\t"
 
-			"@ cpsid aif @ Disable interrupts\n\t"
+			"@ store our cpsr in r3 for restoring at the end\n\t"
+			"mrs r3, cpsr\n\t"
 
-			"@ prepare r0, r1 and r2 into our stack\n\t"
-			"ldr r0, =rpi2_reg_context\n\t"
-			"ldr r1, [r0]\n\t"
-			"ldr r2, [r0, #4]\n\t"
-			"ldr r3, [r0, #8]\n\t"
-			"push {r1, r2, r3}\n\t"
+			"@ cpsr with zeroed mode into r2 for easier mode change\n\t"
+			"mvn r2, #0x0f @ clean up mode bits (all modes have bit 4 set)\n\t"
+			"and r2, r3\n\t"
 
-			"@ store our cpsr\n\t"
-			"mrs r2, cpsr\n\t"
+			"@ check original mode field to find out the old bank\n\t"
+			"@ and switch into that mode to get lr and sp\n\t"
+			"@ (and for FIQ the banked regs r8 - r12)\n\t"
+			"ldr r1, [r0, #16*4] @ get previous mode cpsr\n\t"
+			"and r1, #0x0f @ extract mode field (bit 4 always set)\n\t"
 
-			"@ set target mode to load registers\n\t"
-			"ldr r1, [r0, #+16*4]\n\t"
-			"msr cpsr, r1 @ \n\t"
+			"@ USR mode?\n\t"
+			"@ USR and SYS use the same registers, but sys is privileged\n\t"
+			"@ from user mode we couldn't get back in our original mode\n\t"
+			"@ so, if mode is USR, replace with mode SYS\n\t"
+			"cmp r1, #0x00 @ USR?\n\t"
+			"bne 1f\n\t"
+			"mov r1, #0x0f @ set SYS\n\t"
 
-			"add r0, #12 @ r4\n\t"
-			"ldmia r0, {r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}\n\t"
-			"ldr r13, [r0, #+13*4] @ SP not recommended in ldmia\n\t"
+			"1:\n\t"
+			"@ set the mode\n\t"
+			"orr r2, r2, r1\n\t"
+			"msr cpsr_c, r2 @ \n\t"
 
-			"@ restore mode\n\t"
+			"@ if FIQ-mode, load banked regs 8-12\n\t"
+			"cmp r1, #0x01 @ FIQ?\n\t"
+			"bne 2f\n\t"
+			"ldr r0, =rpi2_reg_context+8*4 @ r0 -> reg_context.r8\n\t"
+			"ldmia r0, {r8,r9,r10,r11,r12}\n\t"
+			"ldr r0, =rpi2_reg_context	@ restore r0 -> reg_context\n\t"
+			"b 3f @ back to 'mainstream'\n\t"
+
+			"2:\n\t"
+			"@ if our own mode, LR was overwritten\n\t"
+			"@ by the exception and SP and SPSR will be handled in\n\t"
+			"@ due course\n\t"
+			"cmp r1, #0x07 @ ABT?\n\t"
+			"bne 3f\n\t"
+			"b 4f @ skip this phase\n\t"
+
+			"3:\n\t"
+			"@ Other modes\n\t"
+			"ldr r1, [r0, #13*4]\n\t"
+			"ldr r2, [r0, #14*4]\n\t"
+			"mov r1, sp\n\t"
+			"mov r2, lr\n\t"
+
+			"4:\n\t"
+			"@ back to our original mode\n\t"
 			"msr cpsr, r3 @ \n\t"
 
-			"@ load old pc (stored pc to current lr)\n\t"
-			"ldr lr, [r0, #+15]\n\t"
+			"pop {r0 - r3}\n\t"
+	);
+}
 
-			"@ restore spsr\n\t"
-			"ldr r1, [r0, #+16*4]\n\t"
-			"msr spsr, r1 @ \n\t"
+static inline void copy_to_stackframe(uint32_t loc)
+{
+	asm volatile(
+			"push {r0 - r12}\n\t"
+			"mov r9, sp\n\t"
+			"push {r9, lr}\n\t"
 
-			"pop {r0, r1, r2}\n\t"
+			"mov sp, %[sp_loc]\n\t"
+			"ldr lr, =rpi2_reg_context @ r0 -> reg_context\n\t"
 
-			"@ cpsie aif @ Enable interrupts\n\t"
+			"ldr sp, [lr, #13*4]\n\t"
+			"ldmda lr, {r0 - r12}\n\t"
+			"push {r0 - r12}\n\t"
+			"ldr r4, [lr, #15*4] @ pc\n\t"
+			"ldr r5, [lr, #16*4] @ spsr\n\t"
+			"mrs r6, cpsr\n\t"
+			"mov r7, sp\n\t"
+			"push {r4, r5, r6, r7}\n\t"
+
+			"pop {r9, lr}\n\t"
+			"mov sp, r9\n\t"
+			"pop {r0 - r12}\n\t"
+			:[sp_loc] "=r" (loc) ::
+	);
+}
+
+// pops a frame from stack and returns
+static inline void pop_stackframe()
+{
+	asm volatile(
+			"pop {r4, r5, r6, r7}\n\t"
+			"mov sp, r7\n\t"
+			"msr cpsr, r6\n\t"
+			"msr spsr, r5\n\t"
+			"mov lr, r4\n\t"
+			"pop {r0 - r12}\n\t"
 			"subs pc, lr, #0 @ pc = lr - #0; cpsr = spsr\n\t"
 	);
 }
+
 
 // exception handlers
 
@@ -244,56 +324,91 @@ void rpi2_trap_handler()
 	gdb_trap_handler();
 }
 
+// The exception handlers
+// Some of them are split in two parts: the primary and secondary and some
+// are working as primary and secondary combined
+// The primaries are attributed as 'naked'so that C function prologue
+// doesn't disturb the stack before the exception stack frame is pushed
+// into the stack, because we return from exception before we get to the
+// C function epilogue, and we'd return with unbalanced stack.
+// Naked functions shouldn't have any actual C-code in them.
+//
+// The secondary does the actual work
+
+void rpi2_undef_handler() __attribute__ ((naked));
 void rpi2_undef_handler()
 {
-	save_regs();
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(4);
+	copy_from_stackframe(sp_value);
+	store_banked_regs();
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	rpi2_reg_context.reg.r15 -= 4;
+	// exception_info = RPI2_EXC_UNDEF;
+	// rpi2_trap_handler();
+	asm volatile (
+			"push {r0, r1}\n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #1 @ RPI2_EXC_UNDEF\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1}\n\t"
+			"bl rpi2_trap_handler\n\t"
+	);
 
-	exception_info = RPI2_EXC_UNDEF;
-	rpi2_trap_handler();
-	load_regs();
+	load_banked_regs();
+	copy_to_stackframe(sp_value);
+	pop_stackframe();
 }
 
+void rpi2_svc_handler() __attribute__ ((naked));
 void rpi2_svc_handler()
 {
-	save_regs();
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(0);
+	copy_from_stackframe(sp_value);
+	store_banked_regs();
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// rpi2_reg_context.reg.r15 -= 0;
+	// exception_info = RPI2_EXC_SVC;
+	// rpi2_trap_handler();
+	asm volatile (
+			"push {r0, r1}\n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #2 @ RPI2_EXC_SVC\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1}\n\t"
+			"bl rpi2_trap_handler\n\t"
+	);
 
-	exception_info = RPI2_EXC_SVC;
-	rpi2_trap_handler();
-	load_regs();
+	load_banked_regs();
+	copy_to_stackframe(sp_value);
+	pop_stackframe();
 }
 
+void rpi2_dabt_handler() __attribute__ ((naked));
 void rpi2_dabt_handler()
 {
-	save_regs();
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(8);
+	copy_from_stackframe(sp_value);
+	store_banked_regs();
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	rpi2_reg_context.reg.r15 -= 8;
+	// exception_info = RPI2_EXC_DABT;
+	// rpi2_trap_handler();
+	asm volatile (
+			"push {r0, r1}\n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #4 @ RPI2_EXC_DABT\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1}\n\t"
+			"bl rpi2_trap_handler\n\t"
+	);
 
-	exception_info = RPI2_EXC_DABT;
-	rpi2_trap_handler();
-	load_regs();
+	load_banked_regs();
+	copy_to_stackframe(sp_value);
+	pop_stackframe();
 }
 
-void rpi2_irq_handler()
+void rpi2_irq_handler2(uint32_t stack_frame_addr)
 {
-	save_regs();
-
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	rpi2_reg_context.reg.r15 -= 4;
 
 	// IRQ2 pending
 	if (*((volatile uint32_t *)IRC_PENDB) & (1<<9))
@@ -306,43 +421,76 @@ void rpi2_irq_handler()
 		else
 		{
 			// unhandled IRQ
+			copy_from_stackframe(stack_frame_addr);
+			store_banked_regs();
+
 			exception_info = RPI2_EXC_IRQ;
 			rpi2_trap_handler();
+
+			load_banked_regs();
+			copy_to_stackframe(stack_frame_addr);
 		}
 	}
 	else
 	{
 		// unhandled IRQ
+		copy_from_stackframe(stack_frame_addr);
+		store_banked_regs();
+
 		exception_info = RPI2_EXC_IRQ;
 		rpi2_trap_handler();
+
+		load_banked_regs();
+		copy_to_stackframe(stack_frame_addr);
 	}
-	load_regs();
 }
 
+void rpi2_irq_handler() __attribute__ ((naked));
+void rpi2_irq_handler()
+{
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(4);
+
+	// rpi2_irq_handler2(sp_value);
+	asm volatile (
+			"ldr r0, [%[spv]]\n\t"
+			"bl rpi2_irq_handler2\n\t"
+			:[spv] "=r"(sp_value) : :
+	);
+
+	pop_stackframe();
+}
+
+void rpi2_firq_handler() __attribute__ ((naked));
 void rpi2_firq_handler()
 {
-	save_regs();
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(4);
+	copy_from_stackframe(sp_value);
+	store_banked_regs();
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	rpi2_reg_context.reg.r15 -= 4;
+	// exception_info = RPI2_EXC_FIQ;
+	// rpi2_trap_handler();
+	asm volatile (
+			"push {r0, r1}\n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #7 @ RPI2_EXC_FIQ\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1}\n\t"
+			"bl rpi2_trap_handler\n\t"
+	);
 
-	// unhandled FIQ
-	exception_info = RPI2_EXC_FIQ;
-	rpi2_trap_handler();
-	load_regs();
+	load_banked_regs();
+	copy_to_stackframe(sp_value);
+	pop_stackframe();
 }
 
-void rpi2_pabt_handler()
+void rpi2_pabt_handler2(uint32_t stack_frame_addr)
 {
 	uint32_t *p;
-	save_regs();
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	rpi2_reg_context.reg.r15 -= 4;
+	copy_from_stackframe(stack_frame_addr);
+	store_banked_regs();
 
 	exception_info = RPI2_EXC_PABT;
 	// TODO: check
@@ -360,7 +508,25 @@ void rpi2_pabt_handler()
 		exception_extra = 2; // trap (THUMB)
 	}
 	rpi2_trap_handler();
-	load_regs();
+
+	load_banked_regs();
+	copy_to_stackframe(stack_frame_addr);
+}
+
+void rpi2_pabt_handler() __attribute__ ((naked));
+void rpi2_pabt_handler()
+{
+	static volatile uint32_t sp_value;
+	sp_value = push_stackframe(4);
+
+	// rpi2_pabt_handler2(sp_value);
+	asm volatile (
+			"ldr r0, [%[spv]]\n\t"
+			"bl rpi2_pabt_handler2\n\t"
+			:[spv] "=r"(sp_value) : :
+	);
+
+	pop_stackframe();
 }
 
 void rpi2_set_vector(int excnum, void *handler)
