@@ -27,6 +27,14 @@ extern uint32_t jumptbl;
 #define TRAP_INSTR_T 0xbe00
 #define TRAP_INSTR_A 0xe1200070
 
+/* delay() borrowed from OSDev.org */
+static inline void delay(int32_t count)
+{
+	asm volatile("__delay_%=: subs %[count], %[count], #1; bne __delay_%=\n"
+		 : : [count]"r"(count) : "cc");
+}
+
+
 /*
  * Exceptions are handled as follows:
  * First exception handler stores the processor context and fixes the return address.
@@ -50,12 +58,10 @@ extern uint32_t jumptbl;
  * For now, we keep PABT disabled.
  */
 
-static volatile union reg_ctx irq_ctx;
-
 /* A fixed vector table - copied to 0x0 */
 void rpi2_set_vectable()
 {
-	asm (
+	asm volatile (
 			".globl jumptbl\n\t"
 			"b irqset @ Skip the vector table to be copied\n\t"
 			"jumpinstr:\n\t"
@@ -85,8 +91,8 @@ void rpi2_set_vectable()
 			"irqset_loop:\n\t"
 			"ldr r3, [r0], #4 @ word (auto-increment)\n\t"
 			"str r3, [r1], #4\n\t"
-			"cmp r2, r0\n\t"
-			"bmi irqset_loop\n\t"
+			"cmp r0, r2\n\t"
+			"bls irqset_loop\n\t"
 			"cpsie if @ Enable interrupts\n\t"
 	);
 }
@@ -597,4 +603,104 @@ void rpi2_init()
 	 * mcr p14, 0, r1, 0, 1, 0
 	 */
 	rpi2_set_vectable();
+}
+
+/*
+ * for debugging
+ */
+void rpi2_init_led()
+{
+	uint32_t tmp; // scratchpad
+	uint32_t tmp2; // scratchpad
+
+	// Setup the GPIO pin 47 (ACT-led)
+	// Setup the GPIO pin 47 (ACT-led)
+
+	// Change disable pull up/down & delay for 150 cycles
+	*((volatile uint32_t *)GPPUD) = 0x00000000; // pull-down disabled for pin 47
+	delay(150);
+
+	// Target pull up/down change to pin 47 & delay for 150 cycles.
+	*((volatile uint32_t *)GPPUDCLK1) = (1 << 15);
+	delay(150);
+
+	// Remove pull up/down change
+	*((volatile uint32_t *)GPPUD) = 0x00000000;
+
+	// Write 0 to GPPUDCLK1 to 'un-target' the pull up/down change
+	*((volatile uint32_t *)GPPUDCLK1) = 0x00000000;
+
+	// set led off by default
+	*((volatile uint32_t *)GPIO_CLRREG1) = (1 << 15);
+
+	// GPIO 47 to output
+	tmp = *((volatile uint32_t *)GPFSEL4);
+	//tmp2 = 7 << 21;
+	tmp2 = 0x00e00000;
+	tmp &= ~(tmp2); // clear the functions for pin 47
+	//tmp2 = 1 << 21;
+	tmp2 = 0x00200000;
+	tmp |= (tmp2); // pin 47 to output
+	*((volatile uint32_t *)GPFSEL4) = tmp;
+
+	// set led off by default
+	//*((volatile uint32_t *)GPIO_CLRREG1) = (1 << 15);
+}
+
+void rpi2_led_off()
+{
+	*((volatile uint32_t *)GPIO_CLRREG1) = (1<<15);
+}
+
+void rpi2_led_on()
+{
+	*((volatile uint32_t *)GPIO_SETREG1) = (1 << 15);
+}
+
+void rpi2_delay_ms(unsigned int ms_count)
+{
+	int i, j;
+	for (i=0; i< ms_count; i++)
+	{
+		// delay 1 ms
+		for (j=0; j<300; j++)
+		{
+			asm volatile("nop\n\t");
+			// delay(600); // 1us
+		}
+	}
+}
+
+static inline void dummy()
+{
+	asm volatile("nop\n\t");
+}
+
+
+void rpi2_delay_loop(unsigned int loop_count)
+{
+	int i,j;
+	for (i=0; i< loop_count; i++)
+	{
+		// delay 1 ms
+		for (j=0; j<300; j++)
+		{
+			dummy();
+		}
+	}
+}
+
+void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count)
+{
+	uint32_t i,j;
+
+	for (i=0; i<count; i++)
+	{
+		rpi2_led_on();
+		//rpi2_delay_ms(on_ms);
+		rpi2_delay_loop(on_ms);
+		rpi2_led_off();
+		//rpi2_delay_ms(off_ms);
+		rpi2_delay_loop(off_ms);
+	}
 }

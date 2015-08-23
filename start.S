@@ -10,99 +10,123 @@
 .extern __und_stack
 .extern __abrt_stack
 .extern __new_org
-.extern start1
+.extern start1_fun
 
 .globl _start
 
-.text
+.sect .init
+
 _start:
 
-// Entry point for the kernel.
-// r15 -> should begin execution at 0x8000.
-// r0 -> 0x00000000
-// r1 -> 0x00000C42
-// r2 -> 0x00000100 - start of ATAGS
-// preserve these registers as argument for kernel_main
+	// Entry point for the kernel.
+	// r15 -> should begin execution at 0x8000.
+	// r0 -> 0x00000000
+	// r1 -> 0x00000C42
+	// r2 -> 0x00000100 - start of ATAGS
+	// preserve these registers as argument for kernel_main
 
-cpsid aif @ disable interrupts
+	// cpsid aif @ disable interrupts
 
-// copy loader/stub into upper memory
-ldr r4, =__code_begin
-ldr	r5, =__bss_end
-ldr	r6, =__new_org
+	/* skip for now
+	// copy loader/stub into upper memory
+	ldr r4, =__code_begin
+	ldr	r5, =__bss_end
+	ldr	r6, =__new_org
 loop$:
-ldr r7,[r4], #4
-str	r7,[r6], #4
-cmp r4, r5
-bmi	loop$
+	ldr r7,[r4], #4
+	str	r7,[r6], #4
+	cmp r4, r5
+	bls	loop$
+	*/
 
-// Set up initial stacks
-// ARM stack is conventionally 'Decrement Before'-type
-// = SP points to last used, and is decremented before write
+	// Set up initial stacks
+	// ARM stack is conventionally 'Decrement Before'-type
+	// = SP points to last used, and is decremented before write
 
-ldr r13, =__svc_stack @ our stack (at startup)
+	ldr r13, =__svc_stack @ our stack (at startup)
 
-// store our cpsr to r4
-mrs r6, cpsr
-mov r4, r6
+	/*
+	// store our cpsr to r4
+	mrs r6, cpsr
+	mov r4, r6
 
-// cpsr with zeroed mode into r2 for easier mode change
-ldr r5, =0xfffffff0 @ clean up mode bits
-and r6, r5 @ store mode bit masked cpsr in r6
+	// cpsr with zeroed mode into r2 for easier mode change
+	mvn r5, #0x0f @ clean up mode bits (load 0xfffffff0)
+	and r6, r5 @ store mode bit masked cpsr in r6
 
-// handle FIQ mode
-orr r5, r6, #0x01 @ set FIQ mode
-msr cpsr, r5
-ldr r13, =__fiq_stack @ fast interrupt mode stack
+	// handle FIQ mode
+	orr r5, r6, #0x01 @ set FIQ mode
+	msr cpsr, r5
+	ldr r13, =__fiq_stack @ fast interrupt mode stack
 
-// handle user and system modes - common sp and lr
-// but sys is privileged
-orr r5, r6, #0x0f @ set system mode
-msr cpsr, r5
-ldr r13, =__usrsys_stack @ system and user mode stack
+	// handle user and system modes - common sp and lr
+	// but sys is privileged
+	orr r5, r6, #0x0f @ set system mode
+	msr cpsr, r5
+	ldr r13, =__usrsys_stack @ system and user mode stack
 
-//handle IRQ mode
-orr r1, r2, #0x03 @ set IRQ mode
-msr cpsr_c, r5
-ldr r13, =__irq_stack @ irq mode stack
+	//handle IRQ mode
+	orr r1, r2, #0x03 @ set IRQ mode
+	msr cpsr_c, r5
+	ldr r13, =__irq_stack @ irq mode stack
+	*/
+	// handle monitor mode
+	/* probably won't work due to non-secure mode
+	orr r1, r2, #0x06 @ set monitor mode
+	msr cpsr_c, r5
+	ldr r13, =__mon_stack @ monitor mode stack
+	*/
+	/*
+	// handle hyp mode
+	orr r1, r2, #0x0a @ set hyp mode
+	msr cpsr_c, r5
+	ldr r13, =__hyp_stack @ hypervisor mode stack
+	*/
+	/*
+	// handle und mode
+	orr r1, r2, #0x0b @ set und mode
+	msr cpsr_c, r5
+	ldr r13, =__und_stack @ undefined instruction mode stack
 
-// handle monitor mode
-/* probably won't work due to non-secure mode
-orr r1, r2, #0x06 @ set monitor mode
-msr cpsr_c, r5
-ldr r13, =__mon_stack @ monitor mode stack
-*/
+	// handle abort modes
+	orr r5, r6, #0x07 @ set abort mode
+	msr cpsr_c, r5
+	ldr r13, =__abrt_stack @ abort mode stack
 
-// handle hyp mode
-orr r1, r2, #0x0a @ set hyp mode
-msr cpsr_c, r5
-ldr r13, =__hyp_stack @ hypervisor mode stack
-
-// handle und mode
-orr r1, r2, #0x0b @ set und mode
-msr cpsr_c, r5
-ldr r13, =__und_stack @ undefined instruction mode stack
-
-// handle abort modes
-orr r5, r6, #0x07 @ set abort mode
-msr cpsr_c, r5
-ldr r13, =__abrt_stack @ abort mode stack
-
-// return to our original mode
-msr cpsr, r4
-
-@ copy vectors
-ldr r4, =_Int_vectors
-mov	r5, #16
-mov	r6, #0
+	// return to our original mode
+	msr cpsr, r4
+	*/
+	@ copy vectors
+	ldr r4, =_Int_vectors
+	mov	r5, #16
+	mov	r6, #0
 loop1$:
-ldr r7,[r4], #4
-str	r7,[r6], #4
-subs r5, r5, #1
-bne	loop1$
+	ldr r7,[r4], #4
+	str	r7,[r6], #4
+	subs r5, r5, #1
+	bne	loop1$
 
-cpsie if @ enable interrupts
-ldr pc, =start1
+	bl debug_leds
+
+	ldr r0, =0x500 @ led on - half a second
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 3 times
+	bl debug_blink
+
+	//cpsie if @ enable interrupts
+	// ldr r0, =start1_fun
+	// bl r0
+	ldr pc, =start1_fun
+	// bl start1_fun
+
+boot_fault:
+	mov r0, #0x500 @ led on - half a second
+	mov r1, #0x500 @ led off - half a second
+	mov r2, #5  @ 5 times
+	bl debug_blink
+	mov r3, #0x5000 @ 5 s pause
+	bl debug_wait
+	b boot_fault
 
 @ dummy vectors for exceptions
 .align 4
@@ -127,14 +151,145 @@ _Int_vectors:
 
 	// dummy exception handlers
 	gen_exc_0:
+	push {lr}
+
+	ldr r0, =0x500 @ led on - half a second
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r0, =0x1000 @ led on - 1 second
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r3, =0x5000 @ 5 s pause
+	bl debug_wait
+	b gen_exc_0
+
+	pop {lr}
 	subs pc, lr, #0 @ return from exception
 
 	gen_exc_2:
+	push {lr}
+
+	mov r0, #0x500 @ led on - half a second
+	mov r1, #0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	mov r0, #0x8000 @ led on - 8 seconds
+	mov r1, #0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	mov r3, #0x5000 @ 5 s pause
+	bl debug_wait
+	b gen_exc_2
+
+	pop {lr}
 	subs pc, lr, #2 @ return from exception (Thumb only)
 
 	gen_exc_4:
+	push {lr}
+
+	ldr r0, =0x500 @ led on - half a second
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r0, =0x2000 @ led on - 2 seconds
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r3, =0x5000 @ 5 s pause
+	bl debug_wait
+	b gen_exc_4
+
+	pop {lr}
 	subs pc, lr, #4 @ return from exception
 
 	gen_exc_8:
+	push {lr}
+
+	ldr r0, =0x500 @ led on - half a second
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r0, =0x4000 @ led on - 4 seconds
+	ldr r1, =0x500 @ led off - half a second
+	mov r2, #3  @ 5 times
+	bl debug_blink
+	ldr r3, =0x5000 @ 5 s pause
+	bl debug_wait
+	b gen_exc_8
+
+	pop {lr}
 	subs pc, lr, #8 @ return from exception
+
+debug_leds:
+	mov r2, #150 @ delay count
+	mov r3, #150 @ delay count
+	ldr r1, =0x8000 @ 1 << 15
+	mov r0, #0
+	@mov r6, r0
+	@movt r6, #0x3f20 @ GPIO base
+	ldr r6, =0x3f200000
+	str r0, [r6, #0x94] @ 0 -> GPPUD
+loop2$:
+	subs	r2, r2, #1 @ delay 150 cycles
+	bne loop2$
+	str r1, [r6, #0x9c] @ 0 -> GPPUDCLK1
+loop3$:
+	subs	r3, r3, #1 @ delay 150 cycles
+	bne loop3$
+	str r0, [r6, #0x94] @ 0 -> GPPUD
+	str r0, [r6, #0x9c] @ 0 -> GPPUDCLK1
+
+	str r1, [r6, #0x2c] @ (1<<15) -> GPIO_CLRREG1
+
+	ldr r3, [r6, #0x10] @ read GPFSEL4
+	ldr r4, =0x00e00000
+	bic r3, r4
+	@bic	r3, #0xe00000
+	mov r2, #0x1 @ or with 1 << 21 (output)
+	lsl r2, #21
+	orr r3, r2
+	str r3, [r6, #0x10] @ write GPFSEL4
+	bx lr
+
+debug_wait: @ ms count in r0
+	push {r8, r9, r10, lr}
+	mov r8, r0
+	bl debug_wait1
+	pop {r8, r9, r10, lr}
+	bx lr
+
+debug_wait1: @ ms count in r8
+	cmp	r8, #0
+	bxeq	lr
+	mov	r10, #0
+loop4$:
+	ldr	r9, =0x0000061a
+loop5$:
+	nop	{0}
+	subs	r9, r9, #1
+	bne loop5$
+	add	r10, r10, #1
+	cmp	r10, r8
+	bne loop4$
+	bx	lr
+
+debug_blink: @ r0=on, r1=off, r2=count, 0x1000 ~ 1s
+	push {r6, r7, r8, r9, r10, lr}
+	ldr r6, =0x8000 @ 1 << 15
+	@mov r7, #0
+	@movt r7, #0x3f20
+	ldr r7, =0x3f200000 @ GPIO base
+loop8$:
+	str r6, [r7,#0x20] @ (1<<15) -> GPIO_SETREG1
+	mov r8, r0 @ on
+	bl debug_wait1
+	str r6, [r7,#0x2c] @ (1<<15) -> GPIO_CLRREG1
+	mov r8, r1
+	bl debug_wait1
+	subs r2, #1
+	bne loop8$
+	pop {r6, r7, r8, r9, r10, lr}
+	bx lr
 

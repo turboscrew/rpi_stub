@@ -7,24 +7,14 @@ MEMORY
 }
 
 SECTIONS
-{
-	/* not used
-	. = 0x0000;
-	.vector :
-	{
-		start*.o(.vector)
-	}
-	*/
-	
+{	
     /* Starts at LOADER_ADDR. */
     . = 0x8000;
     __text_start = .;
     .text :
     {
-		/* If special boot section */
-        /* KEEP(*(.text.boot)) */
         *(.init)
-        start1*.o
+        /* start1.o */
     } >LOAD
     
     .note :
@@ -34,9 +24,10 @@ SECTIONS
     
     .text2 :
     {
-         __code_begin = .;
+        __code_begin = .;
+        /* *(EXCLUDE_FILE(*start1.o) .text) */
         *(.text)
-    } >EXEC AT>LOAD
+    } >LOAD /* >EXEC AT>LOAD */
     __text_end = .;
  
 
@@ -44,7 +35,7 @@ SECTIONS
     .data :
     {
         *(.data)
-    } >EXEC AT>LOAD
+    } >LOAD /* >EXEC AT>LOAD */
     __data_end = .;
  
  
@@ -58,9 +49,9 @@ SECTIONS
 		__fiq_stack = .;
 		. = . + 1024;	/* usr & sys stack size (common) */
 		__usrsys_stack = .;
-		. = . + 1024;	/* svc stack size (start-up) */
+		. = . + 2048;	/* svc stack size (start-up) */
 		__svc_stack = .;
-		. = . + 512;	/* irq stack size (serial) */
+		. = . + 2048;	/* irq stack size (serial) */
 		__irq_stack = .;
 		. = . + 512;	/* mon stack size */
 		__mon_stack = .;
@@ -70,7 +61,7 @@ SECTIONS
 		__und_stack = .;
 		. = . + 8192;	/* abrt stack size (gdb-stub) */
 		__abrt_stack = .;
-    } >EXEC AT>LOAD
+    } >LOAD /* >EXEC AT>LOAD */
     __bss_end = .;
     
     __new_org = 0x1f000000;

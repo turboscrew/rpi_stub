@@ -15,8 +15,17 @@
 #define GPIO_BASE (PERIPH_BASE + 0x200000)
 
 #define GPFSEL1 (GPIO_BASE + 0x04)	// The GPIO function select (for pins 14,15)
+#define GPFSEL4 (GPIO_BASE + 0x10)	// The GPIO function select (for pin 47)
+#define GPIO47_SELBITS (21)	// The GPIO function select (for pin 47)
+#define GPIO_SETREG0 (GPIO_BASE + 0x1c)	// The GPIO set register (for pin 47)
+#define GPIO_SETREG1 (GPIO_BASE + 0x20)	// The GPIO set register (for pin 47)
+#define GPIO_CLRREG0 (GPIO_BASE + 0x28)	// The GPIO clear register (for pin 47)
+#define GPIO_CLRREG1 (GPIO_BASE + 0x2c)	// The GPIO clear register (for pin 47)
+#define GPIO47_MASK (1 << 15)	// The GPIO47 output mask (for pin 47)
+
 #define GPPUD (GPIO_BASE + 0x94)	// Pull up/down for all GPIO pins
 #define GPPUDCLK0 (GPIO_BASE + 0x98) // Pull up/down for specific GPIO pin
+#define GPPUDCLK1 (GPIO_BASE + 0x9C) // Pull up/down for specific GPIO pin
 
 // The IRC base address
 #define IRC_BASE (PERIPH_BASE + 0xB000)
@@ -105,5 +114,14 @@ void rpi2_trap();
 void rpi2_init();
 void rpi2_set_trap(void *address, int kind);
 void rpi2_pend_trap();
+
+/* for debugging */
+// ACT-led: gpio 47, active high
+void rpi2_init_led();
+void rpi2_led_off();
+void rpi2_led_on();
+void rpi2_delay_ms(unsigned int ms_count);
+void rpi2_delay_loop(unsigned int loop_count);
+void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count);
 
 #endif /* RPI2_H_ */

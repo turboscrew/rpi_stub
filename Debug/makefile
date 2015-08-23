@@ -27,7 +27,7 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 SECONDARY_FLASH += \
-loader.hex \
+loader.bin \
 
 SECONDARY_SIZE += \
 loader.siz \
@@ -40,13 +40,13 @@ all: loader.elf
 loader.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C Linker'
-	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Wl,-Map,"loader.map" -ffreestanding -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Wl,-Map,"loader.map" -v -ffreestanding -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-loader.hex: loader.elf
+loader.bin: loader.elf
 	@echo 'Invoking: Cross ARM GNU Create Flash Image'
-	arm-linux-gnueabihf-objcopy -O ihex "loader.elf"  "loader.hex"
+	arm-linux-gnueabihf-objcopy -O binary "loader.elf"  "loader.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
