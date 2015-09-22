@@ -12,6 +12,8 @@
 #include "gdb.h"
 #include "instr.h"
 
+//#define DEBUG_GDB
+
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
 // SIG_TRAP = bkpt
@@ -81,6 +83,10 @@ static volatile uint8_t gdb_tmp_packet[GDB_MAX_MSG_LEN]; // for building packets
 // flag: 0 = return to debuggee, 1 = stay in monitor
 static volatile int gdb_monitor_running = 0;
 
+#ifdef DEBUG_GDB
+static char scratchpad[16]; // scratchpad for debugging
+#endif
+
 // The 'command interpreter'
 void gdb_monitor(int reason);
 
@@ -126,6 +132,10 @@ void gdb_trap_handler()
 {
 	int break_char = 0;
 	int reason = 0;
+#ifdef DEBUG_GDB
+	char *msg;
+	static char scratchpad[16];
+#endif
 	gdb_trap_num = -1;
 	reason = exception_info;
 #if 0
@@ -140,7 +150,21 @@ void gdb_trap_handler()
 			"pop r0\n\t"
 	);
 #endif
-	// check if breakpoint or actual pabt
+
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_trap_handler\r\nexception_info = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, exception_info);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	msg = " exception_extra = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, exception_extra);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
+
 	if (serial_get_ctrl_c() == 1)
 	{
 		// ctrl-C pressed
@@ -165,7 +189,7 @@ void gdb_trap_handler()
 			break;
 		case RPI2_EXC_PABT:
 			// bkpt (ARM) or bkpt (THUMB)
-			if ((exception_extra == 1) || (exception_extra == 2))
+			if ((exception_extra == RPI2_TRAP_ARM) || (exception_extra == RPI2_TRAP_THUMB))
 			{
 				gdb_trap_num = gdb_check_breakpoint();
 				if (gdb_trap_num < 0)
@@ -179,6 +203,14 @@ void gdb_trap_handler()
 					reason = SIG_TRAP;
 				}
 			}
+			else if (exception_extra == RPI2_TRAP_INITIAL)
+			{
+#ifdef DEBUG_GDB
+				msg = "\r\nALOHA\r\n";
+				gdb_iodev->put_string(msg, util_str_len(msg)+1);
+#endif
+				reason = ALOHA;
+			}
 			else // pabt
 			{
 				reason = SIG_BUS;
@@ -191,6 +223,9 @@ void gdb_trap_handler()
 			reason = SIG_ILL;
 			break;
 		case RPI2_EXC_SVC:
+			reason = SIG_USR2;
+			break;
+		case RPI2_EXC_AUX:
 			reason = SIG_USR2;
 			break;
 		case RPI2_EXC_IRQ:
@@ -219,7 +254,7 @@ void gdb_init(io_device *device)
 	/* store I/O device to be used */
 	gdb_iodev = device;
 	/* install trap handler */
-	rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
+	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
 	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
 	return;
@@ -581,6 +616,8 @@ void gdb_resp_target_halted(int reason)
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
 
+	gdb_monitor_running = 1; // by default
+
 	if (reason == 0)
 	{
 		// No debuggee yet
@@ -645,6 +682,7 @@ void gdb_resp_target_halted(int reason)
 		// put exit status value into message
 		util_byte_to_hex(scratchpad, gdb_debuggee.status);
 		len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+		// gdb_monitor_running = 0; // TODO: check
 		break;
 	default:
 		// send 'Ounknown event'
@@ -1184,14 +1222,35 @@ void gdb_monitor(int reason)
 	int packet_len;
 	char *ch;
 	char *inpkg = (char *)gdb_in_packet;
+#ifdef DEBUG_GDB
+	char *msg;
+#endif
+
+#ifdef DEBUG_GDB
+	msg = "\r\nEntering GDB-monitor\r\nreason = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, reason);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+#endif
 
 	gdb_handle_pending_state(reason);
+
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_monitor_running = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, gdb_monitor_running);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 
 	while(gdb_monitor_running)
 	{
 		packet_len = receive_packet(inpkg);
 		if (packet_len < 0)
 		{
+			rpi2_led_off();
 			// BRK?
 			if (packet_len == -3)
 			{
@@ -1216,6 +1275,7 @@ void gdb_monitor(int reason)
 		{
 			if (packet_len == 0)
 			{
+				rpi2_led_off();
 				// dummy
 				continue;
 			}
@@ -1225,6 +1285,7 @@ void gdb_monitor(int reason)
 
 			if (packet_len == 1)
 			{
+				rpi2_led_on();
 				// ACK received
 				if (*ch == '+')
 				{
@@ -1238,7 +1299,7 @@ void gdb_monitor(int reason)
 					continue; // for now
 				}
 			}
-
+			rpi2_led_on();
 			// unbroken packet received
 			gdb_packet_ack();
 

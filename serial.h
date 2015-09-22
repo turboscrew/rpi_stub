@@ -22,6 +22,14 @@ int serial_read(char *buf, int n);
 int serial_write(char *buf, int n);
 
 // serial interrupt handler
-void serial_irq();
+void enable_uart0_ints();
+void disable_uart0_ints();
+unsigned int serial_get_rx_dropped();
+
+// waits until transmit fifo is empty and writes the string
+// directly in the tx fifo and returns the number of chars
+// actually sent
+// MAX 16 chars at a time
+int serial_raw_puts(char *str);
 
 #endif /* SERIAL_H_ */

@@ -58,7 +58,7 @@ C_DEPS += \
 %.o: ../%.S
 	@echo 'Building file: $<'
 	@echo 'Invoking: Cross ARM GNU Assembler'
-	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -x assembler-with-cpp -v -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -c -o "$@" "$<"
+	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -x assembler-with-cpp -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -c -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

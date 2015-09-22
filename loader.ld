@@ -2,8 +2,8 @@ ENTRY(_start)
 
 MEMORY
 {
-	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 256k /* initial */
-	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 256k /* runtime */
+	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 512k /* initial */
+	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 512k /* runtime */
 }
 
 SECTIONS
@@ -14,18 +14,20 @@ SECTIONS
     .text :
     {
         *(.init)
-        /* start1.o */
+        *start1.o(.text)
+        *start1.o(.data)
+        *start1.o(.bss)
+        *(.text.startup)
     } >LOAD
     
-    .note :
+    .text2 ALIGN(0x1000):
     {
-    	*(.note.*)
-    } >LOAD
-    
-    .text2 :
-    {
-        __code_begin = .;
-        /* *(EXCLUDE_FILE(*start1.o) .text) */
+         __code_begin = .;
+        *loader.o(.text)
+        *rpi2.o(.text)
+        *serial.o(.text)
+        *util.o(EXCLUDE_FILE(*instr_util.o).text)
+        *gdb.o(.text)
         *(.text)
     } >LOAD /* >EXEC AT>LOAD */
     __text_end = .;
@@ -40,7 +42,7 @@ SECTIONS
  
  
     __bss_start = .;
-    .bss :
+    .bss ALIGN(0x8):
     {
         bss = .;
         *(.bss)
@@ -49,9 +51,9 @@ SECTIONS
 		__fiq_stack = .;
 		. = . + 1024;	/* usr & sys stack size (common) */
 		__usrsys_stack = .;
-		. = . + 2048;	/* svc stack size (start-up) */
+		. = . + 16384;	/* svc stack size (start-up) */
 		__svc_stack = .;
-		. = . + 2048;	/* irq stack size (serial) */
+		. = . + 4096;	/* irq stack size (serial) */
 		__irq_stack = .;
 		. = . + 512;	/* mon stack size */
 		__mon_stack = .;
@@ -59,11 +61,24 @@ SECTIONS
 		__hyp_stack = .;
 		. = . + 512;	/* und stack size */
 		__und_stack = .;
-		. = . + 8192;	/* abrt stack size (gdb-stub) */
+		. = . + 16384;	/* abrt stack size (gdb-stub) */
 		__abrt_stack = .;
     } >LOAD /* >EXEC AT>LOAD */
     __bss_end = .;
     
     __new_org = 0x1f000000;
+
+
+	/* gcc-generated crap */
+    .note :
+    {
+    	*(.note.*)
+    } >LOAD
+    
+    .debug :
+    {
+    	*(.debug*)
+    } >LOAD
+    
     __end = .;
 }

@@ -42,6 +42,31 @@
 #define IRC_DIS1	(IRC_BASE + 0x21C)
 #define IRC_DIS2	(IRC_BASE + 0x220)
 
+/* UART0 definitions */
+
+// The base address for UART.
+#define UART0_BASE (PERIPH_BASE + 0x201000)
+
+// The UART registers
+#define UART0_DR     (UART0_BASE + 0x00)
+#define UART0_RSRECR (UART0_BASE + 0x04)
+#define UART0_FR     (UART0_BASE + 0x18)
+#define UART0_ILPR   (UART0_BASE + 0x20)
+#define UART0_IBRD   (UART0_BASE + 0x24)
+#define UART0_FBRD   (UART0_BASE + 0x28)
+#define UART0_LCRH   (UART0_BASE + 0x2C)
+#define UART0_CR     (UART0_BASE + 0x30)
+#define UART0_IFLS   (UART0_BASE + 0x34)
+#define UART0_IMSC   (UART0_BASE + 0x38)
+#define UART0_RIS    (UART0_BASE + 0x3C)
+#define UART0_MIS    (UART0_BASE + 0x40)
+#define UART0_ICR    (UART0_BASE + 0x44)
+#define UART0_DMACR  (UART0_BASE + 0x48)
+#define UART0_ITCR   (UART0_BASE + 0x80)
+#define UART0_ITIP   (UART0_BASE + 0x84)
+#define UART0_ITOP   (UART0_BASE + 0x88)
+#define UART0_TDR    (UART0_BASE + 0x8C)
+
 /* exception numbers - these had to be hardcoded in the
    exception handlers' assembly code in rpi2.c */
 #define RPI2_EXC_RESET	0
@@ -49,7 +74,7 @@
 #define RPI2_EXC_SVC	2
 #define RPI2_EXC_PABT	3
 #define RPI2_EXC_DABT	4
-#define RPI2_EXC_UNUSED	5
+#define RPI2_EXC_AUX	5
 #define RPI2_EXC_IRQ	6
 #define RPI2_EXC_FIQ	7
 #define RPI2_EXC_TRAP	3
@@ -57,9 +82,12 @@
 
 #define RPI2_TRAP_ARM 1
 #define RPI2_TRAP_THUMB 2
+#define RPI2_TRAP_PABT 3
+#define RPI2_TRAP_INITIAL 15
 
 // for reading and writing registers
 // also guarantee 32-bit reads and writes
+/*
 #define PUT32(address, data) \
     asm volatile (\
     "str %[src], [%[dst]] \n\t"\
@@ -73,10 +101,10 @@
     :[dst] "=r" (data)\
     :[src] "r" (address):\
     )
-
+*/
 // interrupt disable/enable
-#define DISABLE_INTS asm volatile ("cpsid aif\n\t")
-#define ENABLE_INTS asm volatile ("cpsie if\n\t")
+
+#define SYNC asm volatile ("dsb\n\tisb\n\t")
 
 // exception info
 // 8x = SW-caused
@@ -120,8 +148,9 @@ void rpi2_pend_trap();
 void rpi2_init_led();
 void rpi2_led_off();
 void rpi2_led_on();
-void rpi2_delay_ms(unsigned int ms_count);
 void rpi2_delay_loop(unsigned int loop_count);
 void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count);
 
+// debug-debug
+void rpi2_check_debug();
 #endif /* RPI2_H_ */

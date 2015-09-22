@@ -46,13 +46,13 @@ loader.elf: $(OBJS) $(USER_OBJS)
 
 loader.bin: loader.elf
 	@echo 'Invoking: Cross ARM GNU Create Flash Image'
-	arm-linux-gnueabihf-objcopy -O binary "loader.elf"  "loader.bin"
+	arm-linux-gnueabihf-objcopy -O binary "loader.elf"  kernel7.img
 	@echo 'Finished building: $@'
 	@echo ' '
 
 loader.siz: loader.elf
 	@echo 'Invoking: Cross ARM GNU Print Size'
-	arm-linux-gnueabihf-size --format=berkeley "loader.elf"
+	arm-linux-gnueabihf-size --format=berkeley --totals "loader.elf"
 	@echo 'Finished building: $@'
 	@echo ' '
 

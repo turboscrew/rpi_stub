@@ -8,31 +8,6 @@
 #include "rpi2.h"
 #include "serial.h"
 
-/* UART definitions */
-
-// The base address for UART.
-#define UART0_BASE (PERIPH_BASE + 0x201000)
-
-// The UART registers
-#define UART0_DR     (UART0_BASE + 0x00)
-#define UART0_RSRECR (UART0_BASE + 0x04)
-#define UART0_FR     (UART0_BASE + 0x18)
-#define UART0_ILPR   (UART0_BASE + 0x20)
-#define UART0_IBRD   (UART0_BASE + 0x24)
-#define UART0_FBRD   (UART0_BASE + 0x28)
-#define UART0_LCRH   (UART0_BASE + 0x2C)
-#define UART0_CR     (UART0_BASE + 0x30)
-#define UART0_IFLS   (UART0_BASE + 0x34)
-#define UART0_IMSC   (UART0_BASE + 0x38)
-#define UART0_RIS    (UART0_BASE + 0x3C)
-#define UART0_MIS    (UART0_BASE + 0x40)
-#define UART0_ICR    (UART0_BASE + 0x44)
-#define UART0_DMACR  (UART0_BASE + 0x48)
-#define UART0_ITCR   (UART0_BASE + 0x80)
-#define UART0_ITIP   (UART0_BASE + 0x84)
-#define UART0_ITOP   (UART0_BASE + 0x88)
-#define UART0_TDR    (UART0_BASE + 0x8C)
-
 // I/O buffers, we write to tail and read from head
 // buffers are post-incrementing
 #define SER_RX_BUFF_SIZE 1024
@@ -46,7 +21,9 @@ volatile int ser_tx_head = 0;
 volatile int ser_tx_tail = 0;
 volatile char ser_tx_buff[SER_TX_BUFF_SIZE];
 
-volatile int ser_ctrlc;
+volatile uint32_t ser_rx_dropped_count = 0;
+
+volatile int ser_handle_ctrlc = 0;
 void (*ser_ctrlc_handler)();
 volatile int ser_ctrl_c = 0;
 
@@ -58,6 +35,39 @@ static inline void delay(int32_t count)
 {
 	asm volatile("__delay_%=: subs %[count], %[count], #1; bne __delay_%=\n"
 		 : : [count]"r"(count) : "cc");
+}
+
+static inline uint32_t disable_save_ints()
+{
+	uint32_t status;
+	asm volatile (
+			"mrs %[var_reg], cpsr\n\t"
+			"dsb\n\t"
+			"cpsid aif\n\t"
+			:[var_reg] "=r" (status)::
+	);
+	return status;
+}
+
+static inline void restore_ints(uint32_t status)
+{
+	asm volatile (
+			"msr cpsr_fsxc, %[var_reg]\n\t"
+			::[var_reg] "r" (status):
+	);
+}
+
+unsigned int serial_get_rx_dropped()
+{
+	unsigned int retval;
+	uint32_t cpsr_store;
+
+	cpsr_store = disable_save_ints();
+	retval = (unsigned int)ser_rx_dropped_count;
+	ser_rx_dropped_count = 0;
+	restore_ints(cpsr_store);
+
+	return retval;
 }
 
 int serial_get_ctrl_c()
@@ -74,12 +84,12 @@ void serial_set_ctrlc(void *handler)
 	{
 		/* enable ctrl-C detection */
 		ser_ctrlc_handler = (void (*)()) handler;
-		ser_ctrlc = 1;
+		ser_handle_ctrlc = 1;
 	}
 	else
 	{
 		/* disable ctrl-C detection */
-		ser_ctrlc = 0;
+		ser_handle_ctrlc = 0;
 		ser_ctrlc_handler = 0;
 	}
 }
@@ -88,9 +98,16 @@ void serial_init(io_device *device)
 {
 	uint32_t tmp; // scratchpad
 
+	// Disable uart interrupts
+	// Writing a 1 to a bit will clear the corresponding IRQ enable bit.
+	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+
 	// Disable UART0 for configuration - sorry, took the only "real" UART,
 	// but with that, uploading is faster and so is debugging
 	*((volatile uint32_t *)UART0_CR) = 0x00000000;
+
+	// Flush FIFOs by disabling them
+	*((volatile uint32_t *)UART0_LCRH) = 0;
 
 	// Fill up the device structure
 	device->get_char = serial_get_char;
@@ -112,7 +129,7 @@ void serial_init(io_device *device)
 	// Setup the GPIO pin 14 & 15.
 
 	// Change pull up/down to pull-down & delay for 150 cycles
-	*((volatile uint32_t *)GPPUD) = 0x00000000; // pull-down disabled for pins 14 & 15
+	*((volatile uint32_t *)GPPUD) = 0x00000002; // pull-up for pins 14 & 15
 	delay(150);
 
 	// Target pull up/down change to pin 14,15 & delay for 150 cycles.
@@ -135,9 +152,6 @@ void serial_init(io_device *device)
 
 	// Configure UART0
 
-	// Mask off all UART0 interrupts for now
-	*((volatile uint32_t *)UART0_IMSC) = 0x7F2;
-
 	// Set integer & fractional part of baud rate
 	// Divider = UART_CLOCK/(16 * Baud)
 	// Fraction part register = (Fractional part * 64) + 0.5
@@ -147,9 +161,6 @@ void serial_init(io_device *device)
 	// Fractional part register = (0.627 * 64) + 0.5 = 40.6 = ~40
 	*((volatile uint32_t *)UART0_IBRD) = 1;
 	*((volatile uint32_t *)UART0_FBRD) = 40;
-
-	// Flush FIFOs by disabling them
-	*((volatile uint32_t *)UART0_LCRH) = 0;
 
 	// Enable FIFO & 8 bit data transmission (1 stop bit, no parity)
 	*((volatile uint32_t *)UART0_LCRH) = (1 << 4) | (1 << 5) | (1 << 6);
@@ -163,12 +174,13 @@ void serial_init(io_device *device)
 	// Clear interrupts
 	*((volatile uint32_t *)UART0_ICR) = 0x7ff;
 
-	// Set UART0 interrupt mask (enable almost all)
-	*((volatile uint32_t *)UART0_IMSC) = 0x7F0;
+	// Set UART0 interrupt mask
+	// HIGH = enable, tx int enabled at write
+	*((volatile uint32_t *)UART0_IMSC) = 0x7D2;
+	//*((volatile uint32_t *)UART0_IMSC) = (7 << 4);
 
-	// Enable uart interrupts
+	// Enable uart0 interrupt
 	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
-
 }
 
 void serial_start()
@@ -177,18 +189,80 @@ void serial_start()
 	return;
 }
 
+void enable_uart0_ints()
+{
+	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+}
+
+void disable_uart0_ints()
+{
+	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+}
+
+// waits until transmit fifo is empty and writes the string
+// directly in the tx fifo and returns the number of chars
+// actually sent
+// MAX 16 chars at a time
+int serial_raw_puts(char *str)
+{
+	int i;
+
+	SYNC;
+	// wait until tx fifo becomes empty
+	while (!(*((volatile uint32_t *)UART0_FR) & (1 << 7))) ;
+
+	i=0;
+	while (i < 16)
+	{
+		if (*str == '\0')
+		{
+			*((volatile uint32_t *)UART0_DR) = (uint32_t)(*(str));
+			break;
+		}
+
+		// Write char in transmitter
+		*((volatile uint32_t *)UART0_DR) = (uint32_t)(*(str++));
+		i++;
+
+	}
+	return i;
+}
+
 void serial_start_tx()
 {
-	// If TX FIFO is empty and transmitter is idle
-	// (If TX FIFO is not empty, transmitter will become busy)
-	if ( (*((volatile uint32_t *)UART0_FR) & (1 << 7))
-			&& (*((volatile uint32_t *)UART0_FR) & (1 << 3)) )
-	{
-		// no messing with tx interrupt
-		asm volatile ("cpsid i\n\t");
-		serial_tx();
-		asm volatile ("cpsie i\n\t");
-	}
+	uint32_t cpsr_store;
+
+	// no messing with tx interrupt
+	cpsr_store = disable_save_ints();
+	// re-enable tx interrupts
+	*((volatile uint32_t *)UART0_IMSC) |= (1<<5);
+
+	(void) serial_tx();
+
+	// Clear transmit interrupt - probably not needed
+	//*((volatile uint32_t *)UART0_ICR) = (1<<5);
+
+	restore_ints(cpsr_store);
+}
+
+int serial_tx_full()
+{
+	return (ser_tx_tail + 1 == ser_tx_head);
+}
+
+int serial_tx_empty()
+{
+	return (ser_tx_tail == ser_tx_head);
+}
+
+int serial_rx_full()
+{
+	return (ser_rx_tail + 1 == ser_rx_head);
+}
+
+int serial_rx_empty()
+{
+	return (ser_rx_tail == ser_rx_head);
 }
 
 int serial_get_char()
@@ -210,13 +284,11 @@ int serial_get_char()
 	return (int) ch;
 }
 
-int serial_put_char(char c)
+int serial_write_char(char c)
 {
 	// if tx buffer is full
 	if (ser_tx_tail + 1 == ser_tx_head)
 	{
-		// make sure transmitter is awake
-		serial_start_tx();
 		// don't write, return error
 		return -1;
 	}
@@ -226,9 +298,18 @@ int serial_put_char(char c)
 		ser_tx_buff[ser_tx_tail++] = c;
 		ser_tx_tail %= SER_TX_BUFF_SIZE;
 	}
-	serial_start_tx();
 
 	return 0; // success
+}
+
+int serial_put_char(char c)
+{
+	if(!serial_write_char(c))
+	{
+		serial_start_tx();
+		return 0;
+	}
+	return -1; // success
 }
 
 // n is max string length
@@ -248,7 +329,7 @@ int serial_put_string(char *st, int n)
 		if (m <= n)
 		{
 			// -1 means that FIFO is full
-			if (serial_put_char(*(st++)) == -1)
+			if (serial_write_char(*(st++)) == -1)
 			{
 				break;
 			}
@@ -259,8 +340,12 @@ int serial_put_string(char *st, int n)
 		}
 		else break;
 	}
+
+	if (m > 0) serial_start_tx();
+
 	return m;
 }
+
 
 // Read from the ring buffer
 int serial_read(char *buf, int n)
@@ -288,22 +373,13 @@ int serial_read(char *buf, int n)
 	}
 	return n - m; // characters actually got
 }
+
 // Write to the ring buffer
 int serial_write(char *buf, int n)
 {
 	int m = n; // count
 
-	// If data to be sent
-	// (This also takes care of negative n)
-	if (m > 0)
-	{
-		if ( serial_put_char(*(buf++)) )
-		{
-			return 0; // No chars written
-		}
-		m--;
-	}
-	// read one by one to let more space to emerge
+	// write one by one to let more space to emerge
 	while (m > 0)
 	{
 		// if tx buffer is full
@@ -321,37 +397,47 @@ int serial_write(char *buf, int n)
 			m--;
 		}
 	}
+	serial_start_tx();
 	return n - m; // characters actually written
-
 }
 
 /* IRQ routines */
 
 void serial_irq()
 {
-	if (*((volatile uint32_t *)UART0_MIS) & (1<<4))
+	uint32_t status;
+
+	status = *((volatile uint32_t *)UART0_MIS);
+	SYNC;
+
+	// clear all UART0 interrupts except tx, rx and rx timeout
+	// this should happen early enough due to the pipeline and
+	// write buffer
+	*((volatile uint32_t *)UART0_ICR) = 0x782; //all other
+	//*((volatile uint32_t *)UART0_ICR) = 0x7f2; // all official
+	//*((volatile uint32_t *)UART0_ICR) = 0x7ff; // all
+
+	if (status & (1<<4))
 	{
 		/* Rx interrupt */
 		serial_rx();
 		// Clear receive interrupt
-		*((volatile uint32_t *)UART0_ICR) = (1<<4);
+		//*((volatile uint32_t *)UART0_ICR) = (1<<4);
 	}
-	if (*((volatile uint32_t *)UART0_MIS) & (1<<5))
+	if (status & (1<<5))
 	{
 		/* Tx interrupt */
 		serial_tx();
 		// Clear transmit interrupt
-		*((volatile uint32_t *)UART0_ICR) = (1<<5);
+		//*((volatile uint32_t *)UART0_ICR) = (1<<5);
 	}
-	if (*((volatile uint32_t *)UART0_MIS) & (1<<6))
+	if (status & (1<<6))
 	{
 		/* Rx timeout interrupt */
 		serial_rx();
 		// Clear rx timeout interrupt
-		*((volatile uint32_t *)UART0_ICR) = (1<<6);
+		//*((volatile uint32_t *)UART0_ICR) = (1<<6);
 	}
-	/* Clear all UART0 interrupts except tx, rx and rx timeout */
-	*((volatile uint32_t *)UART0_ICR) = 0x782;
 }
 
 // Note: rx only reads rx_head, and only rx writes rx_tail
@@ -359,6 +445,39 @@ void serial_irq()
 void serial_rx()
 {
 	uint32_t ch;
+
+	SYNC;
+	// if buffer is full
+	if (ser_rx_tail + 1 == ser_rx_head)
+	{
+		// if receive fifo is full
+		if (*((volatile uint32_t *)UART0_FR) & (1 << 6))
+		{
+			// if we don't clear the interrupt, we'll be here all the time
+			// and no one has a chance to read anything
+			// if the first option doesn't work, the second option should
+			// just more characters lost
+#if 1
+			// drop a char and clear the interrupt - if next
+			// received character re-assignes the interrupt
+			// At least a char-time for someone to read
+			ch = *((volatile uint32_t *)UART0_DR);
+			ser_rx_dropped_count++;
+			// Clear receive interrupt
+			*((volatile uint32_t *)UART0_ICR) = (1<<4);
+
+#else
+			// while receive fifo generates interrupt
+			// drop characters to clear the interrupt
+			while (*((volatile uint32_t *)UART0_MIS) & (1<<4))
+			{
+				// Read char in ch
+				ch = *((volatile uint32_t *)UART0_DR);
+				ser_rx_dropped_count++;
+			}
+#endif
+		}
+	}
 	// While buffer is not full
 	while (ser_rx_tail + 1 != ser_rx_head)
 	{
@@ -381,7 +500,7 @@ void serial_rx()
 		if ((ch & 0xff) == 3)
 		{
 			/* if CTRL-C handler is in use */
-			if (ser_ctrlc)
+			if (ser_handle_ctrlc)
 			{
 				ser_ctrl_c = 1;
 				ser_ctrlc_handler();
@@ -393,9 +512,13 @@ void serial_rx()
 // Note: tx only reads tx_tail, and only tx writes tx_head
 // Even simultaneous read and write shouldn't cause problems
 // (Well, serial_start_tx() does too, if interrupts are not happening)
+// returns number of chars written, or -1 if buffer was empty on call
+// to make it usable also for polling
 void serial_tx()
 {
 	uint32_t ch;
+
+	SYNC;
 	// While buffer is not empty
 	while (ser_tx_tail != ser_tx_head)
 	{
@@ -407,11 +530,21 @@ void serial_tx()
 		}
 		else
 		{
-			// Read char from ring buffer
+			// get char from ring buffer
 			ch = (uint32_t)ser_tx_buff[ser_tx_head++];
 			ser_tx_head %= SER_TX_BUFF_SIZE;
 			// Write ch in transmitter
 			*((volatile uint32_t *)UART0_DR) = ch;
 		}
+	}
+	// if buffer is empty
+	if (ser_tx_tail == ser_tx_head)
+	{
+		// to keep continuous tx interrupts from happening
+		// when there is no data to send,
+		// disable tx interrupts - re-enabled at write
+		*((volatile uint32_t *)UART0_IMSC) &= ~(1<<5);
+		// Clear transmit interrupt
+		//*((volatile uint32_t *)UART0_ICR) = (1<<5);
 	}
 }

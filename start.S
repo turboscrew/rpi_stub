@@ -11,9 +11,10 @@
 .extern __abrt_stack
 .extern __new_org
 .extern start1_fun
-
+.extern dbg_print
 .globl _start
-
+.globl debug_blink
+.globl debug_wait
 .sect .init
 
 _start:
@@ -39,17 +40,33 @@ loop$:
 	bls	loop$
 	*/
 
+	/* Enable caches & branch prediction */
+#if 0
+	@ actlr
+	@ bit 6 = enable coherent reqs
+	MRC p15, 0, r1, c1, c0, 0 ; Read SCTLR into Rt
+	movw r0, #0x1804 @ bin 0000000001000000
+	@ movt r0, #0x00 redundant
+	orr r1, r0
+	MCR p15, 0, r1, c1, c0, 0 ; Write Rt to SCTLR
+	@ sctlr
+	@ bit 12 = I-cache, bit 11 = branch pred, bit 2 = D-cache
+	MRC p15, 0, r1, c1, c0, 0 ; Read SCTLR into Rt
+	movw r0, #0x1804 @ bin 0001100000000100
+	@ movt r0, #0x00 redundant
+	orr r1, r0
+	MCR p15, 0, r1, c1, c0, 0 ; Write Rt to SCTLR
+#endif
 	// Set up initial stacks
 	// ARM stack is conventionally 'Decrement Before'-type
 	// = SP points to last used, and is decremented before write
 
 	ldr r13, =__svc_stack @ our stack (at startup)
 
-	/*
+
 	// store our cpsr to r4
 	mrs r6, cpsr
 	mov r4, r6
-
 	// cpsr with zeroed mode into r2 for easier mode change
 	mvn r5, #0x0f @ clean up mode bits (load 0xfffffff0)
 	and r6, r5 @ store mode bit masked cpsr in r6
@@ -66,25 +83,30 @@ loop$:
 	ldr r13, =__usrsys_stack @ system and user mode stack
 
 	//handle IRQ mode
-	orr r1, r2, #0x03 @ set IRQ mode
+	orr r5, r6, #0x02 @ set IRQ mode
 	msr cpsr_c, r5
 	ldr r13, =__irq_stack @ irq mode stack
+
+	//handle SVC mode - our mode: skip
+	/*
+	orr r5, r6, #0x03 @ set IRQ mode
+	msr cpsr_c, r5
+	ldr r13, =__svc_stack @ irq mode stack
 	*/
+
 	// handle monitor mode
-	/* probably won't work due to non-secure mode
-	orr r1, r2, #0x06 @ set monitor mode
+	// probably won't work due to non-secure state
+	orr r5, r6, #0x06 @ set monitor mode
 	msr cpsr_c, r5
 	ldr r13, =__mon_stack @ monitor mode stack
-	*/
-	/*
+
 	// handle hyp mode
-	orr r1, r2, #0x0a @ set hyp mode
+	orr r5, r6, #0x0a @ set hyp mode
 	msr cpsr_c, r5
 	ldr r13, =__hyp_stack @ hypervisor mode stack
-	*/
-	/*
+
 	// handle und mode
-	orr r1, r2, #0x0b @ set und mode
+	orr r5, r6, #0x0b @ set und mode
 	msr cpsr_c, r5
 	ldr r13, =__und_stack @ undefined instruction mode stack
 
@@ -95,8 +117,8 @@ loop$:
 
 	// return to our original mode
 	msr cpsr, r4
-	*/
-	@ copy vectors
+
+	@ copy vectors - will be overwritten later
 	ldr r4, =_Int_vectors
 	mov	r5, #16
 	mov	r6, #0
@@ -106,17 +128,24 @@ loop1$:
 	subs r5, r5, #1
 	bne	loop1$
 
-	bl debug_leds
+	bl init_debug_led
 
+/*
+	mov r3, #0x5000 @ 5 s pause
+	bl debug_wait
 	ldr r0, =0x500 @ led on - half a second
 	ldr r1, =0x500 @ led off - half a second
 	mov r2, #3  @ 3 times
 	bl debug_blink
-
-	//cpsie if @ enable interrupts
-	// ldr r0, =start1_fun
-	// bl r0
-	ldr pc, =start1_fun
+	mov r3, #0x5000 @ 5 s pause
+	bl debug_wait
+*/
+	//cpsie aif @ enable interrupts
+	//dsb
+	//isb
+	ldr r0, =start1_fun
+	blx r0
+	// ldr pc, =start1_fun
 	// bl start1_fun
 
 boot_fault:
@@ -150,9 +179,8 @@ _Int_vectors:
 	.word gen_exc_4
 
 	// dummy exception handlers
-	gen_exc_0:
-	push {lr}
-
+gen_exc_0:
+1:
 	ldr r0, =0x500 @ led on - half a second
 	ldr r1, =0x500 @ led off - half a second
 	mov r2, #3  @ 5 times
@@ -163,14 +191,10 @@ _Int_vectors:
 	bl debug_blink
 	ldr r3, =0x5000 @ 5 s pause
 	bl debug_wait
-	b gen_exc_0
+	b 1b @ eternal loop
 
-	pop {lr}
-	subs pc, lr, #0 @ return from exception
-
-	gen_exc_2:
-	push {lr}
-
+gen_exc_2:
+2:
 	mov r0, #0x500 @ led on - half a second
 	mov r1, #0x500 @ led off - half a second
 	mov r2, #3  @ 5 times
@@ -181,14 +205,10 @@ _Int_vectors:
 	bl debug_blink
 	mov r3, #0x5000 @ 5 s pause
 	bl debug_wait
-	b gen_exc_2
+	b 2b @ eternal loop
 
-	pop {lr}
-	subs pc, lr, #2 @ return from exception (Thumb only)
-
-	gen_exc_4:
-	push {lr}
-
+gen_exc_4:
+3:
 	ldr r0, =0x500 @ led on - half a second
 	ldr r1, =0x500 @ led off - half a second
 	mov r2, #3  @ 5 times
@@ -199,14 +219,10 @@ _Int_vectors:
 	bl debug_blink
 	ldr r3, =0x5000 @ 5 s pause
 	bl debug_wait
-	b gen_exc_4
+	b 3b @ eternal loop
 
-	pop {lr}
-	subs pc, lr, #4 @ return from exception
-
-	gen_exc_8:
-	push {lr}
-
+gen_exc_8:
+4:
 	ldr r0, =0x500 @ led on - half a second
 	ldr r1, =0x500 @ led off - half a second
 	mov r2, #3  @ 5 times
@@ -217,12 +233,9 @@ _Int_vectors:
 	bl debug_blink
 	ldr r3, =0x5000 @ 5 s pause
 	bl debug_wait
-	b gen_exc_8
+	b 4b @ eternal loop
 
-	pop {lr}
-	subs pc, lr, #8 @ return from exception
-
-debug_leds:
+init_debug_led:
 	mov r2, #150 @ delay count
 	mov r3, #150 @ delay count
 	ldr r1, =0x8000 @ 1 << 15
@@ -231,13 +244,13 @@ debug_leds:
 	@movt r6, #0x3f20 @ GPIO base
 	ldr r6, =0x3f200000
 	str r0, [r6, #0x94] @ 0 -> GPPUD
-loop2$:
+5:
 	subs	r2, r2, #1 @ delay 150 cycles
-	bne loop2$
+	bne 5b
 	str r1, [r6, #0x9c] @ 0 -> GPPUDCLK1
-loop3$:
+6:
 	subs	r3, r3, #1 @ delay 150 cycles
-	bne loop3$
+	bne 6b
 	str r0, [r6, #0x94] @ 0 -> GPPUD
 	str r0, [r6, #0x9c] @ 0 -> GPPUDCLK1
 
@@ -253,9 +266,10 @@ loop3$:
 	str r3, [r6, #0x10] @ write GPFSEL4
 	bx lr
 
-debug_wait: @ ms count in r0
+debug_wait: @ ms count in r3
 	push {r8, r9, r10, lr}
-	mov r8, r0
+	mov r8, r3
+	@lsl r8, #2
 	bl debug_wait1
 	pop {r8, r9, r10, lr}
 	bx lr
@@ -265,7 +279,9 @@ debug_wait1: @ ms count in r8
 	bxeq	lr
 	mov	r10, #0
 loop4$:
-	ldr	r9, =0x0000061a
+	@ldr	r9, =0x0000061a
+	ldr	r9, =0x0000028a
+	@ldr	r9, =0x00000a28
 loop5$:
 	nop	{0}
 	subs	r9, r9, #1
@@ -276,20 +292,21 @@ loop5$:
 	bx	lr
 
 debug_blink: @ r0=on, r1=off, r2=count, 0x1000 ~ 1s
-	push {r6, r7, r8, r9, r10, lr}
+	push {r0, r1, r6, r7, r8, r9, r10, lr}
 	ldr r6, =0x8000 @ 1 << 15
 	@mov r7, #0
 	@movt r7, #0x3f20
 	ldr r7, =0x3f200000 @ GPIO base
-loop8$:
+loop6$:
 	str r6, [r7,#0x20] @ (1<<15) -> GPIO_SETREG1
 	mov r8, r0 @ on
 	bl debug_wait1
 	str r6, [r7,#0x2c] @ (1<<15) -> GPIO_CLRREG1
-	mov r8, r1
+	mov r8, r1 @ off
 	bl debug_wait1
 	subs r2, #1
-	bne loop8$
-	pop {r6, r7, r8, r9, r10, lr}
+	bne loop6$
+
+	pop {r0, r1, r6, r7, r8, r9, r10, lr}
 	bx lr
 

@@ -110,6 +110,8 @@ void util_word_to_hex(char *dst, unsigned int w)
 	dst +=2;
 	byte = (unsigned char)(w & 0xff);
 	util_byte_to_hex(dst, byte);
+	dst +=2;
+	*dst = 0;
 }
 
 // bin (escaped binary) to byte
@@ -172,14 +174,14 @@ int util_str_cmp(char *str1, char *str2)
 int util_str_copy(char *dest, char *src, int max_count)
 {
 	int cnt = 0;
+
+	if (max_count <= 0) return cnt;
 	while (*src != '\0')
 	{
 		*(dest++) = *(src++);
 		cnt++;
-		if (max_count >= 0)
-		{
-			if (cnt > max_count) break;
-		}
+
+		if (cnt >= max_count) break;
 	}
 	*dest = '\0'; // add end-of-string
 	return cnt;
@@ -193,7 +195,7 @@ int util_append_str(char *dst, char *src, int max)
 	// find end of dst string
 	while (*dst != '\0')
 	{
-		if (i >= max) return -1; // no end-of-string found
+		if (i >= max-1) return -1; // no end-of-string found
 		dst++;
 		i++;
 	}

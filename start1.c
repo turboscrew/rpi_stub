@@ -32,11 +32,15 @@ void start1_fun()
 	}
 #endif
 	// rpi2_init_led(); already done in start.S
+	/*
 	while(1)
 	{
-		rpi2_led_blink(3000, 500, 3);
+		//rpi2_led_blink(1000, 1000, 3);
 		rpi2_delay_loop(5000);
 	}
+	*/
+	//rpi2_led_blink(1000, 100, 5);
+
 	// here we could set up 'boot parameters'
 	(void) main(0, 0, 0);
 }
