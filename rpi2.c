@@ -28,7 +28,7 @@ extern void loader_main();
 extern void gdb_trap_handler(); // TODO: make callback
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
-
+volatile uint32_t rpi2_ctrl_c_flag;
 #define TRAP_INSTR_T 0xbe00
 #define TRAP_INSTR_A 0xe1200070
 
@@ -115,6 +115,155 @@ void rpi2_set_vectable()
 			"cpsie aif @ Enable interrupts\n\t"
 			"pop {r0, r1, r2, r3}\n\t"
 	);
+}
+
+void rpi2_dump_stack(uint32_t mode)
+{
+	uint32_t p;
+	uint32_t lnk;
+	char *pp;
+	int i, bad;
+	uint32_t tmp;
+	static char scratchpad[16];
+
+	bad = 0;
+	pp = "\r\nSTACK DUMP\r\n";
+	do {i = serial_raw_puts(pp); pp += i;} while (i);
+
+	switch (mode & 0xf)
+	{
+	case 0:
+		serial_raw_puts("\r\nUSR MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_usr\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_usr\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 1:
+		serial_raw_puts("\r\nFIQ MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_fiq\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_fiq\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 2:
+		serial_raw_puts("\r\nIRQ MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_irq\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_irq\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 3:
+		serial_raw_puts("\r\nSVC MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_svc\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_svc\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 6:
+		serial_raw_puts("\r\nMON MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_mon\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_mon\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 7:
+		serial_raw_puts("\r\nABT MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_abt\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_abt\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 10:
+		serial_raw_puts("\r\nHYP MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_hyp\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], ELR_hyp\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 11:
+		serial_raw_puts("\r\nUND MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_und\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_und\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	case 15:
+		serial_raw_puts("\r\nSYS MODE: ");
+		asm volatile (
+				"mrs %[retreg], SP_usr\n\t"
+				:[retreg] "=r" (p)::
+		);
+		asm volatile (
+				"mrs %[retreg], LR_usr\n\t"
+				:[retreg] "=r" (lnk)::
+		);
+		break;
+	default:
+		serial_raw_puts("\r\nBAD MODE: ");
+		util_word_to_hex(scratchpad, mode & 0x1f);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\n");
+		p = 0;
+		lnk = 0;
+		bad = 1;
+		break;
+	}
+	if (bad == 0)
+	{
+		// dump stack
+		serial_raw_puts("SP = ");
+		util_word_to_hex(scratchpad, p);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts(" LR = ");
+		util_word_to_hex(scratchpad, lnk);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\n");
+		p &= (~3); // ensure alignment
+		for (i=0; i<16; i++)
+		{
+			tmp = *((uint32_t *)p);
+			util_word_to_hex(scratchpad, p);
+			serial_raw_puts(scratchpad);
+			serial_raw_puts(" : ");
+			util_word_to_hex(scratchpad, tmp);
+			serial_raw_puts(scratchpad);
+			serial_raw_puts("\r\n");
+			p += 4;
+		}
+	}
 }
 
 #if 1
@@ -786,26 +935,42 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		//exception_info = RPI2_EXC_IRQ;
 		//rpi2_trap_handler();
 #ifdef DEBUG_IRQ
-			p = "\r\nIRQ EXCEPTION\r\n";
-			do {i = serial_raw_puts(p); p += i;} while (i);
+		p = "\r\nIRQ EXCEPTION\r\n";
+		do {i = serial_raw_puts(p); p += i;} while (i);
 
-			serial_raw_puts("exc_addr: ");
-			util_word_to_hex(scratchpad, exc_addr);
-			serial_raw_puts(scratchpad);
-			serial_raw_puts("\r\nSPSR: ");
-			util_word_to_hex(scratchpad, exc_cpsr);
-			serial_raw_puts(scratchpad);
-			tmp = *((volatile uint32_t *)IRC_PENDB);
-			serial_raw_puts("\r\nPENDB: ");
-			util_word_to_hex(scratchpad, tmp);
-			serial_raw_puts(scratchpad);
-			serial_raw_puts("\r\n");
+		serial_raw_puts("exc_addr: ");
+		util_word_to_hex(scratchpad, exc_addr);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\nSPSR: ");
+		util_word_to_hex(scratchpad, exc_cpsr);
+		serial_raw_puts(scratchpad);
+		tmp = *((volatile uint32_t *)IRC_PENDB);
+		serial_raw_puts("\r\nPENDB: ");
+		util_word_to_hex(scratchpad, tmp);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\n");
 #endif
 
 		//load_banked_regs();
 		//copy_to_stackframe(stack_frame_addr);
 	}
 
+#if 1
+	// if crtl-C, dump exception info (for now)
+	if (rpi2_ctrl_c_flag)
+	{
+		rpi2_ctrl_c_flag = 0;
+		serial_raw_puts("\r\nCTRL-C\r\n");
+		serial_raw_puts("exc_addr: ");
+		util_word_to_hex(scratchpad, exc_addr);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\nSPSR: ");
+		util_word_to_hex(scratchpad, exc_cpsr);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\n");
+		rpi2_dump_stack(exc_cpsr);
+	}
+#endif
 	// return frame address and (fixed) return address
 	asm volatile (
 			"mov r4, %[sp_reg]\n\t"
@@ -1058,6 +1223,10 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	else
 	{
 		exception_extra = RPI2_TRAP_PABT; // prefetch abort
+#ifdef DEBUG_PABT
+		pp = "\r\nPrefetch Abort\r\n";
+		do {i = serial_raw_puts(pp); pp += i;} while (i);
+#endif
 	}
 	rpi2_trap_handler();
 
@@ -1137,6 +1306,7 @@ void rpi2_pend_trap()
 {
 	/* set pending flag for Prefetch Abort exception */
 	// TODO: pend Prefetch Abort
+	rpi2_ctrl_c_flag = 1; // for now
 }
 
 void rpi2_check_debug()
@@ -1228,6 +1398,7 @@ void rpi2_init()
 	uint32_t *tmp3;
 	exception_info = RPI2_EXC_NONE;
 	exception_extra = 0;
+	rpi2_ctrl_c_flag = 0;
 	/* calculate debug register file base address */
 	/*
 	 * get DBGDRAR

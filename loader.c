@@ -12,6 +12,9 @@
 #include "io_dev.h"
 #include "util.h"
 
+// put the SW into 'echo-mode' instead of starting gdb-stub
+#define SERIAL_TEST
+
 io_device serial_io;
 
 // split in 'main' and 'loader_main', because GCC wants to
@@ -35,6 +38,8 @@ void loader_main()
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
 
+	serial_io.set_ctrlc((void *)rpi2_pend_trap);
+	
 	// debug-line
 	msg = "Finally! Got into main()\r\n";
 	i=0;
@@ -45,8 +50,8 @@ void loader_main()
 	rpi2_led_blink(1000, 1000, 3);
 	rpi2_delay_loop(3000);
 
-#if 0		
-	//  dump vectors
+#if 1		
+	//  dump vectors (debug)
 	len = 0;
 	len = util_str_copy(dbg_buff, "vectors: addr, value\r\n", dbg_buff_len);
 	for (i=0; i< 16; i++)
@@ -72,7 +77,8 @@ void loader_main()
 	}
 #endif
 
-/*
+#if 1
+	// test SVC exception handling
 	msg = "trying SVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
 	// a little delay for serial output
@@ -80,8 +86,9 @@ void loader_main()
 	asm volatile ("svc #0\n\t");
 	msg = "returned from SVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
-*/
-/*
+#endif
+#if 0
+	// test PABT exception handling
 	msg = "\r\ntrying BKPT\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
 	// a little delay for serial output
@@ -91,8 +98,9 @@ void loader_main()
 	//i=0;
 	//do {i = serial_raw_puts(msg); msg += i;} while (i);
 	serial_io.put_string(msg, util_str_len(msg)+1);
-*/
-/*	
+#endif
+#if 0
+	// test SMC exception handling
 	msg = "trying SMC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
 	// a little delay for serial output
@@ -100,8 +108,9 @@ void loader_main()
 	asm volatile ("smc #0\n\t");
 	msg = "returned from SMC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
-*/	
-/*	
+#endif
+#if 0
+	// test HVC exception handling
 	msg = "trying HVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
 	// a little delay for serial output
@@ -109,25 +118,60 @@ void loader_main()
 	asm volatile ("hvc #0\n\t");
 	msg = "returned from HVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
-*/	
-	msg = "\r\nentering main loop\r\n";
-	// serial_io.put_string(msg, util_str_len(msg)+1);
+#endif
 
-#if 0	
+#ifdef SERIAL_TEST	
+	// serial test mode
+	msg = "\r\nEntering main loop\r\n";
+	serial_io.put_string(msg, util_str_len(msg)+1);
+
 	// echo-loop for testing serial I/O
 	while (1)
 	{			
 		// echo
+#if 0
+		// test serial_read()
 		len = serial_io.read(dbg_buff, 512);
-		//len = serial_read(dbg_buff, 512);
-		
+#else
+		// test serial_get_char()
+		for (tmp1=0; tmp1<512; tmp1++)
+		{
+			i = serial_io.get_char();
+			if (i < 0) break;
+			dbg_buff[tmp1] = (char)i;
+		}
+		len = (int) tmp1;
+#endif
 		if (len > 0)
 		{
 			i = 0;
 			while (i < len)
 			{
+#if 0
+				// test serial_write()
 				tmp1 = serial_io.write(dbg_buff+i, len-i);
 				i += tmp1;
+				if (i < len) rpi2_led_on(); // buffer full
+				else rpi2_led_off();
+#else
+				// test serial_put_string()
+				tmp1 = util_cpy_substr(scratchpad, dbg_buff+i, ' ', 16-2);
+				i += tmp1;
+				if (dbg_buff[i] == ' ')
+				{
+					scratchpad[tmp1++] = ' ';
+					scratchpad[tmp1] = '\0';
+					i++; // skip delimiter
+				}
+				tmp2 = 0;
+				while (tmp2 < tmp1)
+				{
+					tmp3 = serial_io.put_string(scratchpad+tmp2, 16-tmp2);
+					tmp2 += tmp3;
+					if (tmp3 < tmp1) rpi2_led_on(); // buffer full
+					else rpi2_led_off();
+				}
+#endif
 			}
 		}
 		
@@ -141,9 +185,7 @@ void loader_main()
 			serial_raw_puts("\r\n");
 		}
 	}
-#endif
-
-#if 1	// Not this yet
+#else
 	/* initialize debugger */
 	gdb_init(&serial_io);
 

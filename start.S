@@ -28,7 +28,6 @@ _start:
 
 	// cpsid aif @ disable interrupts
 
-	/* skip for now
 	// copy loader/stub into upper memory
 	ldr r4, =__code_begin
 	ldr	r5, =__bss_end
@@ -38,7 +37,6 @@ loop$:
 	str	r7,[r6], #4
 	cmp r4, r5
 	bls	loop$
-	*/
 
 	/* Enable caches & branch prediction */
 #if 0

@@ -40,19 +40,19 @@ all: loader.elf
 loader.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C Linker'
-	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Wl,-Map,"loader.map" -v -ffreestanding -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -mthumb -O2  -g -T "/home/jaa/workspace/test/loader/loader.ld" -nostartfiles -nodefaultlibs -nostdlib -Xlinker --gc-sections -Wl,-Map,"loader.map" -o "loader.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 loader.bin: loader.elf
 	@echo 'Invoking: Cross ARM GNU Create Flash Image'
-	arm-linux-gnueabihf-objcopy -O binary "loader.elf"  kernel7.img
+	arm-linux-gnueabihf-objcopy -O binary "loader.elf"  "loader.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 loader.siz: loader.elf
 	@echo 'Invoking: Cross ARM GNU Print Size'
-	arm-linux-gnueabihf-size --format=berkeley --totals "loader.elf"
+	arm-linux-gnueabihf-size --format=berkeley -x --totals "loader.elf"
 	@echo 'Finished building: $@'
 	@echo ' '
 

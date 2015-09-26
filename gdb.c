@@ -205,10 +205,6 @@ void gdb_trap_handler()
 			}
 			else if (exception_extra == RPI2_TRAP_INITIAL)
 			{
-#ifdef DEBUG_GDB
-				msg = "\r\nALOHA\r\n";
-				gdb_iodev->put_string(msg, util_str_len(msg)+1);
-#endif
 				reason = ALOHA;
 			}
 			else // pabt
@@ -479,15 +475,31 @@ int gdb_read_bin_data(uint8_t *bindata, int count, uint8_t *outdata, int max)
 // -4 = Other error
 int receive_packet(char *dst)
 {
-	int len = 0;
+	int len;
 	int ch;
 	int tmp;
 	int checksum;
 	int chksum;
-	while (gdb_iodev->get_char() != (int)'$'); // Wait for '$'
+	while ((ch = gdb_iodev->get_char()) != (int)'$') // Wait for '$'
+	{
+		// fake ack/nack packets
+		if ((char)ch == '+')
+		{
+			len = util_str_copy(dst, "+", 2);
+			return len;
+		}
+		else if ((char)ch == '-')
+		{
+			len = util_str_copy(dst, "-", 2);
+			return len;
+		}
+	}
 	// receive payload
+	len = 0;
+	checksum = 0;
 	while ((ch = gdb_iodev->get_char()) != (int)'#')
 	{
+		if (ch == -1) continue; // wait for char
 		// break-character received
 		if (ch == 3)
 		{
@@ -495,8 +507,9 @@ int receive_packet(char *dst)
 			break;
 		}
 		// calculate checksum
-		checksum += (unsigned char) ch;
+		checksum += ch;
 		checksum %= 256;
+
 		// copy payload data
 		*(dst++) = (char) ch;
 		len++;
@@ -507,12 +520,15 @@ int receive_packet(char *dst)
 			break;
 		}
 	}
+
+	*dst = '\0'; // end-NUL
 	// if no errors this far, handle checksum
 	if (len > 0)
 	{
 		// get first checksum hex digit and check for BRK
 		// the '#' gets dropped
-		if ((ch = gdb_iodev->get_char()) == 3)
+		while ((ch = gdb_iodev->get_char()) == -1);
+		if (ch == 3)
 		{
 			return -3; // BRK
 		}
@@ -524,7 +540,8 @@ int receive_packet(char *dst)
 		}
 
 		// get second checksum hex digit and check for BRK
-		if ((ch = gdb_iodev->get_char()) == 3)
+		while ((ch = gdb_iodev->get_char()) == -1);
+		if (ch == 3)
 		{
 			return -3; // BRK
 		}
@@ -588,12 +605,14 @@ int gdb_send_packet(char *src, int count)
 
 void gdb_packet_ack()
 {
-	gdb_iodev->put_string("$+#2b", 6);
+	//gdb_iodev->put_string("$+#2b", 6);
+	gdb_iodev->put_char('+');
 }
 
 void gdb_packet_nack()
 {
-	gdb_iodev->put_string("$-#2d", 6);
+	//gdb_iodev->put_string("$-#2d", 6);
+	gdb_iodev->put_char('-');
 }
 
 void gdb_response_not_supported()
@@ -673,8 +692,10 @@ void gdb_resp_target_halted(int reason)
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
 		// send 'Ogdb stub started'
-		len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
-		// TODO: check if actual response is needed
+		//len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
+		//gdb_send_packet(resp_buff, len);
+		// application terminated with status 0
+		len = util_str_copy(resp_buff, "W00", resp_buff_len);
 		break;
 	case FINISHED: // program has finished
 		// send 'W<exit status>' response
@@ -855,38 +876,86 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 }
 
 // q
-void gdb_cmd_common_query(volatile uint8_t *gdb_in_packet, int packet_len)
+void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 {
 	int len;
-	const int scratch_len = 16;
+	char *msg;
+	char *packet;
+	const int scratch_len = 32;
 	const int resp_buff_len = 128; // should be enough to hold any response
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
 	// q name params
 	// qSupported [:gdbfeature [;gdbfeature]... ]
 	// PacketSize=bytes  value required
+	packet = (char *)gdb_packet;
+	resp_buff[0] = '\0';
 	if (packet_len > 1)
 	{
-		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ':', scratch_len);
-		gdb_in_packet += len+1; // skip address and delimiter
+		len = util_cpy_substr(scratchpad, packet, ':', scratch_len);
+#ifdef DEBUG_GDB
+		gdb_iodev->put_string("cmd: ", 6);
+		gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+#endif
+		packet += len+1; // skip the read and delimiter
 		if (util_str_cmp(scratchpad, "Supported") == 0)
 		{
-			// reply: 'stubfeature [;stubfeature]...'
-			// 'name=value', 'name+' or 'name-'
-			len = util_str_copy(resp_buff, "PacketSize=", resp_buff_len);
-			util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
-			gdb_send_packet(resp_buff, len + 8);
+#if 0
+			packet_len -= (len + 1);
+			while (packet_len > 0)
+			{
+				len = util_cpy_substr(scratchpad, packet, ';', scratch_len);
+				packet += len+1; // the read and delimiter
+				packet_len -= (len + 1);
+#ifdef DEBUG_GDB
+				gdb_iodev->put_string("\r\nparam: ", 12);
+				gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+#endif
+				// reply: 'stubfeature [;stubfeature]...'
+				// 'name=value', 'name+' or 'name-'
+
+				if (util_str_cmp(scratchpad, "PacketSize") == 0)
+				{
+					len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+					len = util_append_str(resp_buff, "=", resp_buff_len);
+					util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
+					len = util_str_len(resp_buff);
+				}
+				else
+				{
+					/* unsupported feature */
+					len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+					len = util_append_str(resp_buff, "-", resp_buff_len);
+				}
+				if (packet_len > 0)
+				{
+					len = util_append_str(resp_buff, ";", resp_buff_len);
+				}
+			}
+#ifdef DEBUG_GDB
+			gdb_iodev->put_string("resp: ", 8);
+			gdb_iodev->put_string(resp_buff, util_str_len(resp_buff)+1);
+			gdb_iodev->put_string("\r\n", 3);
+#endif
+#else
+
+			len = util_str_copy(resp_buff, "swbreak+;PacketSize=", resp_buff_len);
+			util_word_to_hex(scratchpad, GDB_MAX_MSG_LEN);
+			len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+#endif
+			gdb_send_packet(resp_buff, len);
 		}
-		if (util_str_cmp(scratchpad, "Offset") == 0)
+		else if (util_str_cmp(scratchpad, "Offset") == 0)
 		{
 			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
 			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
 			util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
 			gdb_send_packet(resp_buff, len + 8);
 		}
-
-		gdb_response_not_supported(); // for now
-		return;
+		else
+		{
+			gdb_response_not_supported(); // for now
+		}
 	}
 }
 
@@ -1221,6 +1290,7 @@ void gdb_monitor(int reason)
 {
 	int packet_len;
 	char *ch;
+	char scratchpad[16];
 	char *inpkg = (char *)gdb_in_packet;
 #ifdef DEBUG_GDB
 	char *msg;
@@ -1248,26 +1318,49 @@ void gdb_monitor(int reason)
 	while(gdb_monitor_running)
 	{
 		packet_len = receive_packet(inpkg);
+#ifdef DEBUG_GDB
 		if (packet_len < 0)
 		{
-			rpi2_led_off();
+			util_word_to_hex(scratchpad, -packet_len);
+			scratchpad[8]='\0'; // end-nul
+			gdb_iodev->put_string("\r\npacket_len= -", 18);
+			gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+		}
+		else
+		{
+			util_word_to_hex(scratchpad, -packet_len);
+			scratchpad[8]='\0'; // end-nul
+			gdb_iodev->put_string("\r\npacket_len= ", 18);
+			gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+			if (packet_len > 0)
+			{
+				gdb_iodev->put_string(inpkg, packet_len+1);
+			}
+		}
+		gdb_iodev->put_string("\r\n", 3);
+#endif
+		if (packet_len < 0)
+		{
 			// BRK?
 			if (packet_len == -3)
 			{
 				// send ACK
-				gdb_packet_ack();
+				//gdb_packet_ack(); comes in as sideband data
 				// clear BRK
 				gdb_iodev->get_ctrl_c();
 				// flush input - read until ctrl-c
 				while (gdb_iodev->get_char() != 3);
 				continue;
 			}
-			else // corrupted packer
+			else // corrupted packet
 			{
 				// send NACK
 				gdb_packet_nack();
 				// flush, re-read
 				packet_len = 0;
+#ifdef DEBUG_GDB
+			gdb_iodev->put_string("\r\nsent nack\r\n", 16);
+#endif
 				continue;
 			}
 		}
@@ -1275,33 +1368,43 @@ void gdb_monitor(int reason)
 		{
 			if (packet_len == 0)
 			{
-				rpi2_led_off();
 				// dummy
 				continue;
 			}
 
-			// Handle packet ch points to beginning of buffer
+			// packet ch points to beginning of buffer
 			ch = inpkg;
 
+			// TODO: add retransmission
 			if (packet_len == 1)
 			{
-				rpi2_led_on();
 				// ACK received
 				if (*ch == '+')
 				{
-					// allow new message to be sent
+#ifdef DEBUG_GDB
+					gdb_iodev->put_string("\r\ngot ack\r\n", 13);
+#endif
+					// flush, re-read
+					packet_len = 0;
 					continue; // for now
 				}
 				// NACK received
 				if (*ch == '-')
 				{
-					// resend
+#ifdef DEBUG_GDB
+					gdb_iodev->put_string("\r\ngot nack\r\n", 13);
+#endif
+					// flush, re-read
+					packet_len = 0;
 					continue; // for now
 				}
 			}
-			rpi2_led_on();
+
 			// unbroken packet received
 			gdb_packet_ack();
+#ifdef DEBUG_GDB
+			gdb_iodev->put_string("\r\nsent ack\r\n", 16);
+#endif
 
 			// Commands
 			switch (*ch)

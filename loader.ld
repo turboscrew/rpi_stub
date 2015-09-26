@@ -3,7 +3,7 @@ ENTRY(_start)
 MEMORY
 {
 	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 512k /* initial */
-	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 512k /* runtime */
+	EXEC (rwx) : ORIGIN = 0x1e000000, LENGTH = 512k /* runtime */
 }
 
 SECTIONS
@@ -20,7 +20,9 @@ SECTIONS
         *(.text.startup)
     } >LOAD
     
-    .text2 ALIGN(0x1000):
+    /* .text2 ALIGN(0x1000): */
+    /* .text2 0x1e000000 : AT(0x8300) */
+    .text2 0x1e000000:
     {
          __code_begin = .;
         *loader.o(.text)
@@ -29,15 +31,15 @@ SECTIONS
         *util.o(EXCLUDE_FILE(*instr_util.o).text)
         *gdb.o(.text)
         *(.text)
-    } >LOAD /* >EXEC AT>LOAD */
+    } /*>EXEC*/ AT>LOAD
     __text_end = .;
  
 
  	__data_start = .;
-    .data :
+    .data 0x1e007000:
     {
         *(.data)
-    } >LOAD /* >EXEC AT>LOAD */
+    } /*>EXEC*/ AT>LOAD
     __data_end = .;
  
  
@@ -63,10 +65,10 @@ SECTIONS
 		__und_stack = .;
 		. = . + 16384;	/* abrt stack size (gdb-stub) */
 		__abrt_stack = .;
-    } >LOAD /* >EXEC AT>LOAD */
+    } /*>EXEC*/ AT>LOAD
     __bss_end = .;
     
-    __new_org = 0x1f000000;
+    __new_org = 0x1e000000;
 
 
 	/* gcc-generated crap */

@@ -92,7 +92,8 @@ void util_byte_to_hex(char *dst, unsigned char b)
 {
 	char ch;
 	*(dst++) = util_nib_to_hex((int) ((b >> 4) & 0x0f));
-	*dst = util_nib_to_hex((int) (b & 0x0f));
+	*(dst++) = util_nib_to_hex((int) (b & 0x0f));
+	*dst = 0;
 }
 
 // word to hex
@@ -162,9 +163,9 @@ int util_str_len(char *p)
 // compare strings - 0 = equal
 int util_str_cmp(char *str1, char *str2)
 {
-	while (*str1== *str2)
+	while (*str1== *(str2++))
 	{
-		if (*str1 == '\0') return 0;
+		if (*(str1++) == '\0') return 0;
 	}
 	return 1; // not equal
 }
@@ -195,16 +196,17 @@ int util_append_str(char *dst, char *src, int max)
 	// find end of dst string
 	while (*dst != '\0')
 	{
-		if (i >= max-1) return -1; // no end-of-string found
 		dst++;
 		i++;
+		if (i >= max-1) return i; // no end-of-string found
 	}
 	// copy until end of src string - overwrite end-of-string of dst
 	while (*src != '\0')
 	{
-		if (i >= (max-1)) return -1; // dst buffer too short
 		*(dst++) = *(src++);
 		i++;
+
+		if (i >= (max -1)) break; // dest buffer too small
 	}
 	*dst = '\0'; // add end-of-string
 	return i; // total length of dst excluding the '\0'
@@ -218,9 +220,10 @@ int util_cpy_substr(char *dst, char *src, char delim, int max)
 	int i = 0;
 	while (*src != delim)
 	{
-		if (i >= (max -1)) return -1; // dest buffer too small
+		if (*src == '\0') break;
 		*(dst++) = *(src++);
 		i++;
+		if (i >= (max -1)) break;
 	}
 	*dst = '\0';
 	return i;

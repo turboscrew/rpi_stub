@@ -152,7 +152,7 @@ void serial_init(io_device *device)
 
 	// Configure UART0
 
-	// Set integer & fractional part of baud rate
+	// Set integer & fractional part of baud rate (115200 baud)
 	// Divider = UART_CLOCK/(16 * Baud)
 	// Fraction part register = (Fractional part * 64) + 0.5
 	// UART_CLOCK = 3000000; Baud = 115200
@@ -245,24 +245,22 @@ void serial_start_tx()
 	restore_ints(cpsr_store);
 }
 
-int serial_tx_full()
+int serial_tx_free()
 {
-	return (ser_tx_tail + 1 == ser_tx_head);
+	if (ser_tx_tail > ser_tx_head)
+	{
+		return (ser_tx_head + SER_TX_BUFF_SIZE - ser_tx_tail);
+	}
+	return (ser_tx_head - ser_tx_tail);
 }
 
-int serial_tx_empty()
+int serial_rx_used()
 {
-	return (ser_tx_tail == ser_tx_head);
-}
-
-int serial_rx_full()
-{
-	return (ser_rx_tail + 1 == ser_rx_head);
-}
-
-int serial_rx_empty()
-{
-	return (ser_rx_tail == ser_rx_head);
+	if (ser_rx_head > ser_rx_tail)
+	{
+		return (ser_rx_tail + SER_RX_BUFF_SIZE - ser_rx_head);
+	}
+	return (ser_rx_tail - ser_rx_head);
 }
 
 int serial_get_char()
@@ -281,6 +279,7 @@ int serial_get_char()
 		ch = ser_rx_buff[ser_rx_head++];
 		ser_rx_head %= SER_RX_BUFF_SIZE;
 	}
+	SYNC;
 	return (int) ch;
 }
 
@@ -298,7 +297,7 @@ int serial_write_char(char c)
 		ser_tx_buff[ser_tx_tail++] = c;
 		ser_tx_tail %= SER_TX_BUFF_SIZE;
 	}
-
+	SYNC;
 	return 0; // success
 }
 
@@ -346,7 +345,6 @@ int serial_put_string(char *st, int n)
 	return m;
 }
 
-
 // Read from the ring buffer
 int serial_read(char *buf, int n)
 {
@@ -371,6 +369,7 @@ int serial_read(char *buf, int n)
 			m--;
 		}
 	}
+	SYNC;
 	return n - m; // characters actually got
 }
 
@@ -466,6 +465,18 @@ void serial_rx()
 			// Clear receive interrupt
 			*((volatile uint32_t *)UART0_ICR) = (1<<4);
 
+			/* if BRK character (CTRL-C) */
+			/* It can't be handled if it doesn't fit into HW FIFO */
+			if ((ch & 0xff) == 3)
+			{
+				/* if CTRL-C handler is in use */
+				if (ser_handle_ctrlc)
+				{
+					ser_ctrl_c = 1;
+					ser_ctrlc_handler();
+				}
+			}
+
 #else
 			// while receive fifo generates interrupt
 			// drop characters to clear the interrupt
@@ -474,6 +485,18 @@ void serial_rx()
 				// Read char in ch
 				ch = *((volatile uint32_t *)UART0_DR);
 				ser_rx_dropped_count++;
+
+				/* if BRK character (CTRL-C) */
+				/* It can't be handled if it doesn't fit into HW FIFO */
+				if ((ch & 0xff) == 3)
+				{
+					/* if CTRL-C handler is in use */
+					if (ser_handle_ctrlc)
+					{
+						ser_ctrl_c = 1;
+						ser_ctrlc_handler();
+					}
+				}
 			}
 #endif
 		}
@@ -491,22 +514,24 @@ void serial_rx()
 		{
 			// Read char in ch
 			ch = *((volatile uint32_t *)UART0_DR);
+			/* if BRK character (CTRL-C) */
+			/* It can't be handled if it doesn't fit into HW FIFO */
+			if ((ch & 0xff) == 3)
+			{
+				/* if CTRL-C handler is in use */
+				if (ser_handle_ctrlc)
+				{
+					ser_ctrl_c = 1;
+					ser_ctrlc_handler();
+					continue;
+				}
+			}
 			// Store in ring buffer
 			ser_rx_buff[ser_rx_tail++] = (char)(ch & 0xff);
 			ser_rx_tail %= SER_RX_BUFF_SIZE;
 		}
-		/* if BRK character (CTRL-C) */
-		/* It can't be handled if it doesn't fit into HW FIFO */
-		if ((ch & 0xff) == 3)
-		{
-			/* if CTRL-C handler is in use */
-			if (ser_handle_ctrlc)
-			{
-				ser_ctrl_c = 1;
-				ser_ctrlc_handler();
-			}
-		}
 	}
+	SYNC;
 }
 
 // Note: tx only reads tx_tail, and only tx writes tx_head
@@ -547,4 +572,5 @@ void serial_tx()
 		// Clear transmit interrupt
 		//*((volatile uint32_t *)UART0_ICR) = (1<<5);
 	}
+	SYNC;
 }

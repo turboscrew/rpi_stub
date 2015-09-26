@@ -21,6 +21,9 @@ int serial_put_string(char *st, int n);
 int serial_read(char *buf, int n);
 int serial_write(char *buf, int n);
 
+int serial_tx_free();
+int serial_rx_used();
+
 // serial interrupt handler
 void enable_uart0_ints();
 void disable_uart0_ints();
