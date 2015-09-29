@@ -13,15 +13,15 @@
 #define SER_RX_BUFF_SIZE 1024
 #define SER_TX_BUFF_SIZE 1024
 
-volatile int ser_rx_head = 0;
-volatile int ser_rx_tail = 0;
+volatile int ser_rx_head;
+volatile int ser_rx_tail;
 volatile char ser_rx_buff[SER_RX_BUFF_SIZE];
 
-volatile int ser_tx_head = 0;
-volatile int ser_tx_tail = 0;
+volatile int ser_tx_head;
+volatile int ser_tx_tail;
 volatile char ser_tx_buff[SER_TX_BUFF_SIZE];
 
-volatile uint32_t ser_rx_dropped_count = 0;
+volatile uint32_t ser_rx_dropped_count;
 
 volatile int ser_handle_ctrlc = 0;
 void (*ser_ctrlc_handler)();
@@ -125,6 +125,11 @@ void serial_init(io_device *device)
 	ser_rx_tail = 0;
 	ser_tx_head = 0;
 	ser_tx_tail = 0;
+	ser_rx_dropped_count = 0;
+
+	// init ctrl-C handling
+	ser_handle_ctrlc = 0;
+	ser_ctrl_c = 0;
 
 	// Setup the GPIO pin 14 & 15.
 

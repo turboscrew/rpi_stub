@@ -1,6 +1,6 @@
 .extern __code_begin
-.extern __text_end
-.extern __bss_end
+.extern __load_start
+.extern __load_end
 .extern __fiq_stack
 .extern __usrsys_stack
 .extern __svc_stack
@@ -29,9 +29,9 @@ _start:
 	// cpsid aif @ disable interrupts
 
 	// copy loader/stub into upper memory
-	ldr r4, =__code_begin
-	ldr	r5, =__bss_end
-	ldr	r6, =__new_org
+	ldr r4, =__load_start
+	ldr	r5, =__load_end
+	ldr	r6, =__code_begin
 loop$:
 	ldr r7,[r4], #4
 	str	r7,[r6], #4

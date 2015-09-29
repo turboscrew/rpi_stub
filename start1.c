@@ -13,10 +13,9 @@ extern int main(uint32_t, uint32_t, uint32_t);
 // In case relocation needs to be done here
 // #define DO_RELOC_HERE
 #ifdef DO_RELOC_HERE
+extern char __load_start;
+extern char __load_end;
 extern char __code_begin;
-extern char __text_end;
-extern char __bss_end;
-extern char __new_org;
 #endif
 
 void start1_fun()
@@ -24,9 +23,9 @@ void start1_fun()
 	uint32_t i;
 #ifdef DO_RELOC_HERE
 	char *s, *d;
-	s = &__code_begin;
-	d = &__new_org;
-	while (s <= &__bss_end)
+	s = &__load_start;
+	d = &__code_begin;
+	while (s <= &__load_end)
 	{
 		*(d++) = *(s++);
 	}

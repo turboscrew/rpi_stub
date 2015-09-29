@@ -12,7 +12,7 @@
 #include "gdb.h"
 #include "instr.h"
 
-//#define DEBUG_GDB
+#define DEBUG_GDB
 
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
@@ -37,15 +37,6 @@
 
 #define GDB_MAX_BREAKPOINTS 64
 #define GDB_MAX_MSG_LEN 1024
-
-// program
-typedef struct {
-	void *start;
-	uint32_t size; // load size
-	void *entry;
-	void *curr_addr;
-	uint8_t status;
-} gdb_program_rec;
 
 // breakpoint
 typedef struct {
@@ -249,6 +240,15 @@ void gdb_init(io_device *device)
 {
 	/* store I/O device to be used */
 	gdb_iodev = device;
+	// number of breakpoints in use
+	gdb_num_bkpts = 0;
+
+	gdb_single_stepping = 0; // flag: 0 = currently not single stepping
+	gdb_single_stepping_address = 0xffffffff; // not valid
+	gdb_trap_num = -1; // breakpoint number
+	gdb_resuming = -1; // flag for single stepping over resumed breakpoint
+	// flag: 0 = return to debuggee, 1 = stay in monitor
+	gdb_monitor_running = 0;
 	/* install trap handler */
 	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
@@ -695,7 +695,7 @@ void gdb_resp_target_halted(int reason)
 		//len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
 		// application terminated with status 0
-		len = util_str_copy(resp_buff, "W00", resp_buff_len);
+		len = util_str_copy(resp_buff, "S05", resp_buff_len);
 		break;
 	case FINISHED: // program has finished
 		// send 'W<exit status>' response

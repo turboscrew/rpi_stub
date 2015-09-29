@@ -17,6 +17,8 @@
 
 io_device serial_io;
 
+extern volatile gdb_program_rec gdb_debuggee;
+
 // split in 'main' and 'loader_main', because GCC wants to
 // put 'main' into a special section - now 'loader_main' can
 // be relocated into upper memory more easily 
@@ -31,14 +33,12 @@ void loader_main()
 	const int dbg_buff_len = 512;
 	static char scratchpad[16]; // scratchpad
 	static char dbg_buff[512]; // message buffer
-
+	static char scratch2[16];
 	/* initialize rpi2 */
 	rpi2_init();
 
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
-
-	serial_io.set_ctrlc((void *)rpi2_pend_trap);
 	
 	// debug-line
 	msg = "Finally! Got into main()\r\n";
@@ -50,7 +50,7 @@ void loader_main()
 	rpi2_led_blink(1000, 1000, 3);
 	rpi2_delay_loop(3000);
 
-#if 1		
+#if 0		
 	//  dump vectors (debug)
 	len = 0;
 	len = util_str_copy(dbg_buff, "vectors: addr, value\r\n", dbg_buff_len);
@@ -86,6 +86,15 @@ void loader_main()
 	asm volatile ("svc #0\n\t");
 	msg = "returned from SVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
+	asm volatile (
+			"mrs %[retreg], cpsr\n\t"
+			:[retreg] "=r" (tmp1) ::
+	);
+	msg = "cpsr = ";
+	serial_io.put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, tmp1);
+	serial_io.put_string(scratchpad, 9);
+	serial_io.put_string("\r\n", 3);
 #endif
 #if 0
 	// test PABT exception handling
@@ -155,8 +164,9 @@ void loader_main()
 				else rpi2_led_off();
 #else
 				// test serial_put_string()
-				tmp1 = util_cpy_substr(scratchpad, dbg_buff+i, ' ', 16-2);
-				i += tmp1;
+				if ((len-i) < 15) tmp1 = util_cpy_substr(scratchpad, dbg_buff+i, ' ', len+1-i);
+				else tmp1 = util_cpy_substr(scratchpad, dbg_buff+i, ' ', 16);
+				i += tmp1;				
 				if (dbg_buff[i] == ' ')
 				{
 					scratchpad[tmp1++] = ' ';
@@ -195,6 +205,7 @@ void loader_main()
 		gdb_reset();
 		/* enter gdb monitor */
 		gdb_trap();
+		
 	}
 #endif
 }

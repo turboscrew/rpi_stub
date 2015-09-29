@@ -115,7 +115,7 @@ extern volatile int exception_extra;
 // for lr in exception, see pages B1-1172 and B1-1173 of
 // ARMv7-A/R ARM issue C (ARM DDI 0406C.c)
 extern volatile union reg_ctx {
-	unsigned int storage[17]; // without size it would be flexible array member
+	unsigned int storage[18]; // without size it would be flexible array member
 	struct {
 		unsigned int r0;
 		unsigned int r1;
@@ -134,6 +134,7 @@ extern volatile union reg_ctx {
 		unsigned int r14; // LR
 		unsigned int r15; // PC
 		unsigned int cpsr;
+		unsigned int spsr;
 	} reg;
 } rpi2_reg_context;
 
