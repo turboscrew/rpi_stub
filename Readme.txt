@@ -1,3 +1,11 @@
+Copyright (C) 2015 Juha Aaltonen
+
+
+STANDALONE GDB STUB
+for Raspberry Pi 2B
+
+
+
 WORK IN PROGRESS - DOESN'T WORK YET.
 
 This is my very first RPi(2) project ever, and first ever project that

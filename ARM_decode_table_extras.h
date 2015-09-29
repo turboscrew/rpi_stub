@@ -1,9 +1,22 @@
 /*
- * ARM_decode_table_extras.h
- *
- *  Created on: May 17, 2015
- *      Author: jaa
- */
+ARM_decode_table_extras.h
+
+Copyright (C) 2015 Juha Aaltonen
+
+This file is part of standalone gdb stub for Raspberry Pi 2B.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 arm_bra_blx_lbl,
 arm_bra_bx_r,

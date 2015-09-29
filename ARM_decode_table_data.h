@@ -1,3 +1,23 @@
+/*
+ARM_decode_table_data.h
+
+Copyright (C) 2015 Juha Aaltonen
+
+This file is part of standalone gdb stub for Raspberry Pi 2B.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 {0x01200020,0x0FF000F0,arm_bra_bx_r,arm_branch}, // BXJ<c> <Rm>
 {0x01200010,0x0FF000F0,arm_bra_blx_lbl,arm_branch}, // BX<c> <Rm>
 {0x01200030,0x0FF000F0,arm_bra_bxj_r,arm_branch}, // BLX<c> <Rm>
