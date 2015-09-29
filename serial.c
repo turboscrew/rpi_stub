@@ -128,9 +128,10 @@ void serial_init(io_device *device)
 	ser_rx_dropped_count = 0;
 
 	// init ctrl-C handling
+#ifndef DEBUG_CTRLC
 	ser_handle_ctrlc = 0;
 	ser_ctrl_c = 0;
-
+#endif
 	// Setup the GPIO pin 14 & 15.
 
 	// Change pull up/down to pull-down & delay for 150 cycles

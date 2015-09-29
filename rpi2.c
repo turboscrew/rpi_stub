@@ -9,8 +9,10 @@
 #include <stdint.h>
 #include "util.h"
 
-// our stack limit (from linker script)
-//extern char __usrsys_stack;
+// TODO: separate context storages for each exception/core + one for gdb-stub?
+// maybe a context storage stack or array? Only unhandled exceptions goto gdb-stub
+// TODO: pseudo-vector for IRQs other than UART0? Only unhandled IRQs goto gdb-stub
+// TODO: Both IRQ and PABT can be shared
 
 extern void serial_irq(); // this shouldn't be public, so it's not in serial.h
 extern int serial_raw_puts(char *str); // used for debugging - may be removed
@@ -26,7 +28,9 @@ extern void loader_main();
 #include "rpi2.h"
 #undef extern
 
-#define DEBUG_CTRLC
+// moved to rpi2.h
+//#define DEBUG_CTRLC
+
 #define DEBUG_UNDEF
 #define DEBUG_SVC
 #define DEBUG_AUX
@@ -38,8 +42,6 @@ extern void loader_main();
 // debug for context handling
 //#define DEBUG_REG_CONTEXT
 
-// number of re-enters to SVC, 0 = original only
-#define VOODOOVAL 2
 
 #define TRAP_INSTR_T 0xbe00
 #define TRAP_INSTR_A 0xe1200070
@@ -48,7 +50,14 @@ extern void gdb_trap_handler(); // TODO: make callback
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
 volatile uint32_t rpi2_ctrl_c_flag;
+
+// repeated SVC - for debugging
+// #define DEBUG_SVC_VOODOO
+#ifdef DEBUG_SVC_VOODOO
+// number of re-enters to SVC, 0 = original only - for debug
+#define VOODOOVAL 0
 volatile uint32_t rpi2_voodoo; // for SVC handler debugging
+#endif
 
 extern char __fiq_stack;
 extern char __usrsys_stack;
@@ -59,6 +68,7 @@ extern char __hyp_stack;
 extern char __und_stack;
 extern char __abrt_stack;
 
+// some debug variables
 volatile uint32_t rpi2_tmp1;
 volatile uint32_t rpi2_tmp2;
 volatile uint32_t rpi2_tmp3;
@@ -152,10 +162,64 @@ void rpi2_set_vectable()
 void rpi2_dump_context()
 {
 	char *pp;
-	uint32_t i;
+	uint32_t i, tmp, tmp2;
 	static char scratchpad[16];
+	uint32_t mode, sp;
+	uint32_t stack_base, stack_size;
+
+	mode = (uint32_t)rpi2_reg_context.reg.cpsr;
+	sp = (uint32_t)rpi2_reg_context.reg.r13;
+	switch (mode & 0xf)
+	{
+	case 0:
+		serial_raw_puts("\r\nUSR MODE ");
+		pp = &__usrsys_stack;
+		break;
+	case 1:
+		serial_raw_puts("\r\nFIQ MODE ");
+		pp = &__fiq_stack;
+		break;
+	case 2:
+		serial_raw_puts("\r\nIRQ MODE ");
+		pp = &__irq_stack;
+		break;
+	case 3:
+		serial_raw_puts("\r\nSVC MODE ");
+		pp = &__svc_stack;
+		break;
+	case 6:
+		serial_raw_puts("\r\nMON MODE ");
+		pp = &__mon_stack;
+		break;
+	case 7:
+		serial_raw_puts("\r\nABT MODE ");
+		pp = &__abrt_stack;
+		break;
+	case 10:
+		serial_raw_puts("\r\nHYP MODE ");
+		pp = &__hyp_stack;
+		break;
+	case 11:
+		serial_raw_puts("\r\nUND MODE ");
+		pp = &__und_stack;
+		break;
+	case 15:
+		serial_raw_puts("\r\nSYS MODE ");
+		pp = &__usrsys_stack;
+		break;
+	default:
+		serial_raw_puts("\r\nBAD MODE ");
+		util_word_to_hex(scratchpad, mode & 0x1f);
+		serial_raw_puts(scratchpad);
+		pp = 0;
+		break;
+	}
+	stack_base = (uint32_t)pp;
+
 	pp = "\r\nREGISTER DUMP\r\n";
 	do {i = serial_raw_puts(pp); pp += i;} while (i);
+	serial_raw_puts("\r\nregister : ");
+	serial_raw_puts("data\r\n");
 	for (i=0; i<18; i++)
 	{
 		util_word_to_hex(scratchpad, i);
@@ -166,8 +230,74 @@ void rpi2_dump_context()
 		serial_raw_puts("\r\n");
 	}
 
+	pp = "\r\nSTACK DUMP\r\n";
+	do {i = serial_raw_puts(pp); pp += i;} while (i);
+
+	if (stack_base == 0)
+	{
+		serial_raw_puts("SP base = ");
+		serial_raw_puts("unknown");
+	}
+	else
+	{
+		// dump stack
+		serial_raw_puts("SP base = ");
+		util_word_to_hex(scratchpad, stack_base);
+		serial_raw_puts(scratchpad);
+	}
+
+	serial_raw_puts(" SP = ");
+	util_word_to_hex(scratchpad, sp);
+	serial_raw_puts(scratchpad);
+
+	if (stack_base == 0)
+	{
+		serial_raw_puts("\r\nstack size: ");
+		serial_raw_puts("unknown");
+		tmp2 = 16;
+		stack_size = 0;
+	}
+	else
+	{
+		stack_size = (stack_base - sp);
+		serial_raw_puts("\r\nstack size: ");
+		util_word_to_hex(scratchpad, stack_size);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts(" bytes");
+		tmp2 = stack_size/4; // stack size in words
+		// limit dump to 16 words
+		if (tmp2 > 16)
+		{
+			tmp2 = 16;
+		}
+	}
+	if (sp != (sp & ~3))
+	{
+		sp &= (~3); // ensure alignment
+		serial_raw_puts("\r\nSP aligned ");
+		serial_raw_puts("to: ");
+		util_word_to_hex(scratchpad, sp);
+		serial_raw_puts(scratchpad);
+		tmp2++; // one more word to include the 'partial word'
+	}
+
+	serial_raw_puts("\r\naddress  : ");
+	serial_raw_puts("data\r\n");
+	for (i=0; i<tmp2; i++)
+	{
+		tmp = *((uint32_t *)sp);
+		util_word_to_hex(scratchpad, sp);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts(" : ");
+		util_word_to_hex(scratchpad, tmp);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\n");
+		sp += 4;
+	}
 }
 
+#if 0
+// for debug
 void rpi2_dump_stack(uint32_t mode)
 {
 	uint32_t p;
@@ -184,6 +314,8 @@ void rpi2_dump_stack(uint32_t mode)
 			"mrs %[retreg], cpsr\n\t"
 			:[retreg] "=r" (our_mode)::
 	);
+#if 0
+	// for debug
 	asm volatile (
 			"mov %[retreg], sp\n\t"
 			:[retreg] "=r" (p)::
@@ -193,22 +325,24 @@ void rpi2_dump_stack(uint32_t mode)
 			"mov %[retreg], lr\n\t"
 			:[retreg] "=r" (lnk)::
 	);
+#endif
 
 	serial_raw_puts("mode: ");
 	util_word_to_hex(scratchpad, mode);
 	serial_raw_puts(scratchpad);
+#if 0
 	serial_raw_puts(" our mode: ");
 	util_word_to_hex(scratchpad, our_mode);
 	serial_raw_puts(scratchpad);
-	our_mode &= 0xf;
-
-
+#endif
 	// NOTE: mrs (banked regs) is unpredictable if accessing
 	// regs of our own mode
+	our_mode &= 0xf;
+
 	switch (mode & 0xf)
 	{
 	case 0:
-		serial_raw_puts("\r\nUSR MODE: ");
+		serial_raw_puts("\r\nUSR MODE ");
 		pp = &__usrsys_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -221,7 +355,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 1:
-		serial_raw_puts("\r\nFIQ MODE: ");
+		serial_raw_puts("\r\nFIQ MODE ");
 		pp = &__fiq_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -234,7 +368,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 2:
-		serial_raw_puts("\r\nIRQ MODE: ");
+		serial_raw_puts("\r\nIRQ MODE ");
 		pp = &__irq_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -247,10 +381,9 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 3:
-		serial_raw_puts("\r\nSVC MODE: ");
+		serial_raw_puts("\r\nSVC MODE ");
 		pp = &__svc_stack;
 		if ((mode & 0xf) == our_mode) break;
-		serial_raw_puts("\r\nOTH MODE: ");
 		asm volatile (
 				"mrs %[retreg], SP_svc\n\t"
 				:[retreg] "=r" (p)::
@@ -261,7 +394,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 6:
-		serial_raw_puts("\r\nMON MODE: ");
+		serial_raw_puts("\r\nMON MODE ");
 		pp = &__mon_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -274,7 +407,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 7:
-		serial_raw_puts("\r\nABT MODE: ");
+		serial_raw_puts("\r\nABT MODE ");
 		pp = &__abrt_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -287,7 +420,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 10:
-		serial_raw_puts("\r\nHYP MODE: ");
+		serial_raw_puts("\r\nHYP MODE ");
 		pp = &__hyp_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -300,7 +433,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 11:
-		serial_raw_puts("\r\nUND MODE: ");
+		serial_raw_puts("\r\nUND MODE ");
 		pp = &__und_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -313,7 +446,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	case 15:
-		serial_raw_puts("\r\nSYS MODE: ");
+		serial_raw_puts("\r\nSYS MODE ");
 		pp = &__usrsys_stack;
 		if ((mode & 0xf) == our_mode) break;
 		asm volatile (
@@ -326,7 +459,7 @@ void rpi2_dump_stack(uint32_t mode)
 		);
 		break;
 	default:
-		serial_raw_puts("\r\nBAD MODE: ");
+		serial_raw_puts("\r\nBAD MODE ");
 		util_word_to_hex(scratchpad, mode & 0x1f);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
@@ -394,7 +527,7 @@ void rpi2_dump_stack(uint32_t mode)
 		}
 	}
 }
-
+#endif
 
 // save processor context
 static inline void write_context()
@@ -669,7 +802,6 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #endif
 
 #ifdef DEBUG_UNDEF
@@ -758,14 +890,13 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #endif
 
 	exception_info = RPI2_EXC_SVC;
 	// rpi2_trap_handler();
 
-#ifdef DEBUG_SVC
-	// cause SVC-loop
+#ifdef DEBUG_SVC_VOODOO
+	// cause SVC-loop - for debugging
 	if (rpi2_voodoo)
 	{
 		serial_raw_puts("\r\nVOODOO: ");
@@ -917,9 +1048,7 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// situation (configuration), like SMC or ...
 	// rpi2_reg_context.reg.r14 -= 0; // LR
 
-	exception_info = RPI2_EXC_AUX;
-
-	#ifdef DEBUG_AUX
+#ifdef DEBUG_AUX
 	p = "\r\nAUX EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
 
@@ -931,8 +1060,8 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #else
+	exception_info = RPI2_EXC_AUX;
 	rpi2_trap_handler();
 #endif
 
@@ -952,7 +1081,7 @@ void rpi2_aux_handler()
 			"push {r0,r1} @ stack correction\n\t"
 	);
 
-	// rpi2_undef_handler2() // - No C in naked function
+	// rpi2_aux_handler2() // - No C in naked function
 	asm volatile (
 			"mov r0, sp\n\t"
 			"mov r1, lr\n\t"
@@ -1005,10 +1134,9 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #endif
 
-#ifdef DEBUG_UNDEF
+#ifdef DEBUG_DABT
 	// we don't want to continue
 	while (1)
 	{
@@ -1018,7 +1146,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		rpi2_delay_loop(1000);
 	}
 #else
-	exception_info = RPI2_EXC_UNDEF;
+	exception_info = RPI2_EXC_DABT;
 	rpi2_trap_handler();
 #endif
 }
@@ -1037,7 +1165,7 @@ void rpi2_dabt_handler()
 			"push {r0,r1} @ stack correction\n\t"
 	);
 
-	// rpi2_undef_handler2() // - No C in naked function
+	// rpi2_dabt_handler() // - No C in naked function
 	asm volatile (
 			"mov r0, sp\n\t"
 			"mov r1, lr\n\t"
@@ -1110,7 +1238,6 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			serial_raw_puts(scratchpad);
 			serial_raw_puts("\r\n");
 			rpi2_dump_context();
-			rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #else
 			exception_info = RPI2_EXC_IRQ;
 			rpi2_trap_handler();
@@ -1136,7 +1263,6 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
 		rpi2_dump_context();
-		rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #else
 		exception_info = RPI2_EXC_IRQ;
 		rpi2_trap_handler();
@@ -1157,7 +1283,6 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
 		rpi2_dump_context();
-		rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 	}
 #endif
 }
@@ -1273,7 +1398,6 @@ void rpi2_firq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #else
 	exception_info = RPI2_EXC_FIQ;
 	rpi2_trap_handler();
@@ -1382,7 +1506,6 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context();
-	rpi2_dump_stack(rpi2_reg_context.reg.cpsr);
 #endif
 
 #if 0
@@ -1638,7 +1761,9 @@ void rpi2_init()
 	rpi2_ctrl_c_flag = 0;
 	serial_set_ctrlc((void *)rpi2_pend_trap);
 #endif
+#ifdef DEBUG_SVC_VOODOO
 	rpi2_voodoo = VOODOOVAL; // double-call SVC
+#endif
 	/* calculate debug register file base address */
 	/*
 	 * get DBGDRAR

@@ -8,6 +8,9 @@
 #ifndef RPI2_H_
 #define RPI2_H_
 
+// needs to be here to be visible to both rpi2 and serial
+#define DEBUG_CTRLC
+
 // The peripherals base address
 #define PERIPH_BASE 0x3f000000
 
