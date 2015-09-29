@@ -13,7 +13,7 @@
 #include "util.h"
 
 // put the SW into 'echo-mode' instead of starting gdb-stub
-#define SERIAL_TEST
+//#define SERIAL_TEST
 
 io_device serial_io;
 
@@ -77,7 +77,7 @@ void loader_main()
 	}
 #endif
 
-#if 1
+#if 0
 	// test SVC exception handling
 	msg = "trying SVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);

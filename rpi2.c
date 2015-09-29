@@ -32,11 +32,11 @@ extern void loader_main();
 //#define DEBUG_CTRLC
 
 #define DEBUG_UNDEF
-#define DEBUG_SVC
-#define DEBUG_AUX
+//#define DEBUG_SVC
+//#define DEBUG_AUX
 #define DEBUG_DABT
-#define DEBUG_IRQ
-#define DEBUG_FIQ
+//#define DEBUG_IRQ
+//#define DEBUG_FIQ
 //#define DEBUG_PABT
 
 // debug for context handling
@@ -893,7 +893,7 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 #endif
 
 	exception_info = RPI2_EXC_SVC;
-	// rpi2_trap_handler();
+	rpi2_trap_handler();
 
 #ifdef DEBUG_SVC_VOODOO
 	// cause SVC-loop - for debugging
@@ -1668,6 +1668,7 @@ void rpi2_pend_trap()
 	rpi2_ctrl_c_flag = 1; // for now
 }
 
+// for dumping info about debug HW
 void rpi2_check_debug()
 {
 	int i;
@@ -1762,6 +1763,7 @@ void rpi2_init()
 	serial_set_ctrlc((void *)rpi2_pend_trap);
 #endif
 #ifdef DEBUG_SVC_VOODOO
+	// for debugging
 	rpi2_voodoo = VOODOOVAL; // double-call SVC
 #endif
 	/* calculate debug register file base address */
@@ -1790,10 +1792,11 @@ void rpi2_init()
 			: [retreg] "=r" (tmp1)::
 	);
 
-	tmp1 &= 0xfffff000;
-	tmp3 = (uint32_t *) tmp1;
-	tmp2 = *tmp3;
-	tmp2 &= 0xfffff000;
+	// calculate debug registers base address from debug ROM address (DBGRAR)
+	tmp1 &= 0xfffff000; // debug ROM address
+	tmp3 = (uint32_t *) tmp1; // to pointer
+	tmp2 = *tmp3; // get first debug peripheral entry
+	tmp2 &= 0xfffff000; // get the base address offset (from debug ROM)
 	dbg_reg_base = (tmp1 + tmp2);
 #endif
 	/* All interrupt vectors to point to dummy interrupt handler? */
@@ -1819,7 +1822,7 @@ void rpi2_init()
 	 * mcr p14, 0, r1, 0, 1, 0
 	 */
 
-	rpi2_set_vectable();
+	rpi2_set_vectable(); // write exception vectors
 }
 
 #if 0
