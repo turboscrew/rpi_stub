@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "gdb.h"
 #include "instr.h"
 
-#define DEBUG_GDB
+//#define DEBUG_GDB
 
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
@@ -266,6 +266,9 @@ void gdb_init(io_device *device)
 	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
 	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
+#ifdef DEBUG_GDB
+	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
+#endif
 	return;
 }
 
@@ -647,8 +650,20 @@ void gdb_resp_target_halted(int reason)
 	const int resp_buff_len = 128; // should be enough to hold any response
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
+#ifdef DEBUG_GDB
+	char *msg;
+#endif
 
 	gdb_monitor_running = 1; // by default
+
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_monitor_running(1) = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, gdb_monitor_running);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 
 	if (reason == 0)
 	{
@@ -726,8 +741,24 @@ void gdb_resp_target_halted(int reason)
 		return; // don't send anything more
 		break;
 	}
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_monitor_running(2) = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, gdb_monitor_running);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 	// send response
 	gdb_send_packet(resp_buff, len);
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_monitor_running(3) = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, gdb_monitor_running);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 }
 
 // c [addr]
@@ -888,7 +919,65 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	gdb_send_packet(resp_str, util_str_len(resp_str));
 }
 
-// q
+void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
+{
+	int len;
+	char *msg;
+	char *packet;
+	const int scratch_len = 32;
+	const int resp_buff_len = 128; // should be enough to hold any response
+	char scratchpad[scratch_len]; // scratchpad
+	char resp_buff[resp_buff_len]; // response buffer
+
+	packet = (char *)gdb_packet;
+	resp_buff[0] = '\0';
+	if (packet_len > 1)
+	{
+		len = util_cpy_substr(scratchpad, packet, ':', scratch_len);
+#ifdef DEBUG_GDB
+		gdb_iodev->put_string("cmd: ", 6);
+		gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
+		packet += len+1; // skip the read and delimiter
+		if (util_str_cmp(scratchpad, "Hg0") == 0)
+		{
+			len = util_str_copy(resp_buff, "OK", resp_buff_len);
+			gdb_send_packet(resp_buff, len);
+		}
+		else if (util_str_cmp(scratchpad, "Hg-1") == 0)
+		{
+#if 0
+			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
+			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
+#else
+			// next step/cont involves all threads
+			len = util_str_copy(resp_buff, "OK", resp_buff_len);
+#endif
+			gdb_send_packet(resp_buff, len);
+		}
+		else if (util_str_cmp(scratchpad, "Hc-1") == 0)
+		{
+#if 0
+			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
+			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
+#else
+			// next step/cont involves all threads
+			len = util_str_copy(resp_buff, "OK", resp_buff_len);
+#endif
+			gdb_send_packet(resp_buff, len);
+		}
+		else
+		{
+			gdb_response_not_supported(); // for now
+		}
+
+	}
+}
+
+// q - for single core bare metal, fake single process (PID = 1)
+// If non-SMP config, the cores are different targets, if SMP-config,
+// then ad-hoc way to switch cores
 void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 {
 	int len;
@@ -909,9 +998,10 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 #ifdef DEBUG_GDB
 		gdb_iodev->put_string("cmd: ", 6);
 		gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+		gdb_iodev->put_string("\r\n", 3);
 #endif
 		packet += len+1; // skip the read and delimiter
-		if (util_str_cmp(scratchpad, "Supported") == 0)
+		if (util_str_cmp(scratchpad, "qSupported") == 0)
 		{
 #if 0
 			packet_len -= (len + 1);
@@ -958,12 +1048,35 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 #endif
 			gdb_send_packet(resp_buff, len);
 		}
-		else if (util_str_cmp(scratchpad, "Offset") == 0)
+		else if (util_str_cmp(scratchpad, "qOffset") == 0)
 		{
 			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
 			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
-			util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
-			gdb_send_packet(resp_buff, len + 8);
+			gdb_send_packet(resp_buff, len);
+		}
+		else if (util_str_cmp(scratchpad, "qC") == 0)
+		{
+			// reply: 'QC1' - current thread id = 1
+			// reply: <empty> - NULL-thread is used
+#if 0
+			len = util_str_copy(resp_buff, "QC1", resp_buff_len);
+			gdb_send_packet(resp_buff, len);
+#else
+			gdb_response_not_supported(); // empty response - NULL-thread
+#endif
+		}
+		else if (util_str_cmp(scratchpad, "qAttached") == 0)
+		{
+			// reply: '1' - Attached to existing process
+			// reply: '0' - new process created
+			len = util_str_copy(resp_buff, "1", resp_buff_len);
+			gdb_send_packet(resp_buff, len);
+		}
+		else if (util_str_cmp(scratchpad, "qSymbol") == 0)
+		{
+			// reply: 'OK' - Offer to provide symbol values (none)
+			len = util_str_copy(resp_buff, "OK", resp_buff_len);
+			gdb_send_packet(resp_buff, len);
 		}
 		else
 		{
@@ -1231,7 +1344,9 @@ void gdb_handle_pending_state(int reason)
 	char resp_buff[resp_buff_len]; // response buffer
 	// char *err = "E01";
 	char *okresp = "OK";
-
+#ifdef DEBUG_GDB
+	char *msg;
+#endif
 	curr_addr = rpi2_reg_context.reg.r15; // stored PC
 
 	// break point or single step
@@ -1296,6 +1411,14 @@ void gdb_handle_pending_state(int reason)
 	// stop responses - responses to commands 'c', 's', and the like
 	gdb_resp_target_halted(reason);
 	// go to monitor
+#ifdef DEBUG_GDB
+	msg = "\r\ngdb_monitor_running(4) = ";
+	gdb_iodev->put_string(msg, util_str_len(msg)+1);
+	util_word_to_hex(scratchpad, gdb_monitor_running);
+	scratchpad[8]='\0'; // end-nul
+	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 }
 
 /* The main debugger loop */
@@ -1320,7 +1443,7 @@ void gdb_monitor(int reason)
 	gdb_handle_pending_state(reason);
 
 #ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running = ";
+	msg = "\r\ngdb_monitor_running(5) = ";
 	gdb_iodev->put_string(msg, util_str_len(msg)+1);
 	util_word_to_hex(scratchpad, gdb_monitor_running);
 	scratchpad[8]='\0'; // end-nul
@@ -1341,10 +1464,11 @@ void gdb_monitor(int reason)
 		}
 		else
 		{
-			util_word_to_hex(scratchpad, -packet_len);
+			util_word_to_hex(scratchpad, packet_len);
 			scratchpad[8]='\0'; // end-nul
 			gdb_iodev->put_string("\r\npacket_len= ", 18);
 			gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
+			gdb_iodev->put_string("\r\n", 3);
 			if (packet_len > 0)
 			{
 				gdb_iodev->put_string(inpkg, packet_len+1);
@@ -1444,7 +1568,7 @@ void gdb_monitor(int reason)
 				gdb_cmd_set_regs(++inpkg, packet_len);
 				break;
 			case 'H':	// set thread - dummy
-				gdb_response_not_supported(); // for now
+				gdb_cmd_set_thread(inpkg, packet_len);
 				break;
 			case 'k':	// kill
 				gdb_response_not_supported(); // for now
@@ -1462,7 +1586,7 @@ void gdb_monitor(int reason)
 				gdb_cmd_write_reg(++inpkg, packet_len);
 				break;
 			case 'q':	// query + (support)
-				gdb_cmd_common_query(++inpkg, packet_len);
+				gdb_cmd_common_query(inpkg, packet_len);
 				break;
 			case 'Q':	// set
 				gdb_response_not_supported(); // for now

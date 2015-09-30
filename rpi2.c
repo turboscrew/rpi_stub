@@ -62,6 +62,7 @@ extern void gdb_trap_handler(); // TODO: make callback
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
 volatile uint32_t rpi2_ctrl_c_flag;
+volatile rpi2_reg_context_t rpi2_irq_context;
 
 // repeated SVC - for debugging
 // #define DEBUG_SVC_VOODOO
@@ -171,7 +172,7 @@ void rpi2_set_vectable()
 	);
 }
 
-void rpi2_dump_context()
+void rpi2_dump_context(volatile rpi2_reg_context_t *context)
 {
 	char *pp;
 	uint32_t i, tmp, tmp2;
@@ -179,8 +180,8 @@ void rpi2_dump_context()
 	uint32_t mode, sp;
 	uint32_t stack_base, stack_size;
 
-	mode = (uint32_t)rpi2_reg_context.reg.cpsr;
-	sp = (uint32_t)rpi2_reg_context.reg.r13;
+	mode = (uint32_t)context->reg.cpsr;
+	sp = (uint32_t)context->reg.r13;
 	switch (mode & 0xf)
 	{
 	case 0:
@@ -237,7 +238,7 @@ void rpi2_dump_context()
 		util_word_to_hex(scratchpad, i);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts(" : ");
-		util_word_to_hex(scratchpad, rpi2_reg_context.storage[i]);
+		util_word_to_hex(scratchpad, context->storage[i]);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
 	}
@@ -547,8 +548,8 @@ static inline void write_context()
 	// NOTE: mrs (banked regs) is unpredictable if accessing
 	// regs of our own mode
 	asm volatile(
-			"push {r12}\n\t"
-			"ldr r12, =rpi2_reg_context\n\t"
+			"@push {r12}\n\t"
+			"@ldr r12, =rpi2_reg_context\n\t"
 			"stmia r12, {r0 - r11}\n\t"
 			"mov r0, r12\n\t"
 			"pop {r12}\n\t"
@@ -654,7 +655,7 @@ static inline void read_context()
 	// NOTE: msr (banked regs) is unpredictable if accessing
 	// regs of our own mode
 	asm volatile(
-			"ldr r0, =rpi2_reg_context\n\t"
+			"@ldr r0, =rpi2_reg_context\n\t"
 			"@ mode specifics\n\t"
 			"ldr r1, [r0, #4*16] @ cpsr\n\t"
 			"msr spsr_fsxc, r1\n\t"
@@ -800,7 +801,7 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r14 -= 4; // LR
+	rpi2_reg_context.reg.r15 -= 4; // PC
 
 #ifdef DEBUG_UNDEF
 	p = "\r\nUNDEFINED EXCEPTION\r\n";
@@ -813,7 +814,7 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #endif
 
 #ifdef DEBUG_UNDEF
@@ -834,6 +835,10 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 void rpi2_undef_handler()
 {
 	// store processor context
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	write_context();
 
 	asm volatile (
@@ -859,7 +864,8 @@ void rpi2_undef_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
-	);
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
+);
 
 	// restore processor context
 	read_context();
@@ -885,7 +891,7 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	// rpi2_reg_context.reg.r14 -= 0; // LR
+	// rpi2_reg_context.reg.r15 -= 0; // PC
 
 #ifdef DEBUG_SVC
 	p = "\r\nSVC EXCEPTION\r\n";
@@ -901,7 +907,7 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #endif
 
 	exception_info = RPI2_EXC_SVC;
@@ -937,6 +943,11 @@ void dbg_out(uint32_t val)
 
 void rpi2_svc_handler()
 {
+	// store processor context
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	write_context();
 
 	asm volatile (
@@ -964,6 +975,7 @@ void rpi2_svc_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
 //#define DEBUG_REG_CONTEXT
@@ -990,8 +1002,11 @@ void rpi2_svc_handler()
 			"bl dbg_out\n\t"
 			"pop {r0 - r3}\n\t"
 
-			"mov r0, r3\n\t"
-			"bl rpi2_dump_stack\n\t"
+			"@mov r0, r3\n\t"
+			"@bl rpi2_dump_stack\n\t"
+			"@movw r0, #:lower16:rpi2_reg_context\n\t"
+			"@movt r0, #:upper16:rpi2_reg_context\n\t"
+			"ldr r0, =rpi2_reg_context\n\t"
 			"bl rpi2_dump_context\n\t"
 			"pop {r0 - r3}\n\t"
 			"push {r0 - r3}\n\t"
@@ -1058,7 +1073,7 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	//
 	// AUX is often used for SW interrupts - other instructions or different
 	// situation (configuration), like SMC or ...
-	// rpi2_reg_context.reg.r14 -= 0; // LR
+	// rpi2_reg_context.reg.r15 -= 0; // PC
 
 #ifdef DEBUG_AUX
 	p = "\r\nAUX EXCEPTION\r\n";
@@ -1071,7 +1086,7 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #else
 	exception_info = RPI2_EXC_AUX;
 	rpi2_trap_handler();
@@ -1082,6 +1097,10 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 void rpi2_aux_handler()
 {
 	// store processor context
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	write_context();
 
 	asm volatile (
@@ -1107,6 +1126,7 @@ void rpi2_aux_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
 	// restore processor context
@@ -1132,7 +1152,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r14 -= 8; // LR
+	rpi2_reg_context.reg.r15 -= 8; // PC
 
 #ifdef DEBUG_DABT
 	p = "\r\nDABT EXCEPTION\r\n";
@@ -1145,7 +1165,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #endif
 
 #ifdef DEBUG_DABT
@@ -1166,6 +1186,10 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 void rpi2_dabt_handler()
 {
 	// store processor context
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	write_context();
 
 	asm volatile (
@@ -1191,6 +1215,7 @@ void rpi2_dabt_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
 	// restore processor context
@@ -1220,7 +1245,7 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r14 -= 4; // LR
+	rpi2_irq_context.reg.r15 -= 4; // PC
 
 	// IRQ2 pending
 	if (*((volatile uint32_t *)IRC_PENDB) & (1<<19))
@@ -1249,7 +1274,7 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			util_word_to_hex(scratchpad, tmp);
 			serial_raw_puts(scratchpad);
 			serial_raw_puts("\r\n");
-			rpi2_dump_context();
+			rpi2_dump_context(&rpi2_irq_context);
 #else
 			exception_info = RPI2_EXC_IRQ;
 			rpi2_trap_handler();
@@ -1274,7 +1299,7 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		util_word_to_hex(scratchpad, tmp);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
-		rpi2_dump_context();
+		rpi2_dump_context(&rpi2_irq_context);
 #else
 		exception_info = RPI2_EXC_IRQ;
 		rpi2_trap_handler();
@@ -1294,12 +1319,12 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		util_word_to_hex(scratchpad, exc_cpsr);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
-		rpi2_dump_context();
+		rpi2_dump_context(&rpi2_irq_context);
 	}
 #endif
 }
 
-#if 1
+#if 0
 void rpi2_irq_handler()
 {
 	asm volatile (
@@ -1344,6 +1369,10 @@ void rpi2_irq_handler()
 #else
 void rpi2_irq_handler()
 {
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_irq_context\n\t"
+	);
 	// store processor context
 	write_context();
 
@@ -1370,6 +1399,7 @@ void rpi2_irq_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_irq_context @ for read_context\n\t"
 	);
 
 	// restore processor context
@@ -1396,7 +1426,7 @@ void rpi2_firq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r14 -= 4; // LR
+	rpi2_reg_context.reg.r15 -= 4; // PC
 
 #ifdef DEBUG_FIQ
 	p = "\r\nFIQ EXCEPTION\r\n";
@@ -1409,7 +1439,7 @@ void rpi2_firq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #else
 	exception_info = RPI2_EXC_FIQ;
 	rpi2_trap_handler();
@@ -1419,6 +1449,10 @@ void rpi2_firq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 void rpi2_firq_handler()
 {
 	// store processor context
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	write_context();
 
 	asm volatile (
@@ -1444,6 +1478,7 @@ void rpi2_firq_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
 	// restore processor context
@@ -1473,7 +1508,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r14 -= 4; // LR
+	rpi2_reg_context.reg.r15 -= 4; // PC
 
 #if 0
 	// check debug state
@@ -1517,7 +1552,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, ifsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context();
+	rpi2_dump_context(&rpi2_reg_context);
 #endif
 
 #if 0
@@ -1590,6 +1625,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			{
 				exception_extra = RPI2_TRAP_INITIAL;
 			}
+			rpi2_reg_context.reg.r15 += 4; // skip 'bkpt'
 		}
 	}
 	else
@@ -1606,6 +1642,10 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 
 void rpi2_pabt_handler()
 {
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_reg_context\n\t"
+	);
 	// store processor context
 	write_context();
 
@@ -1632,6 +1672,7 @@ void rpi2_pabt_handler()
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
+			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
 	// restore processor context
