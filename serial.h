@@ -41,6 +41,7 @@ int serial_rx_used();
 void enable_uart0_ints();
 void disable_uart0_ints();
 unsigned int serial_get_rx_dropped();
+unsigned int serial_get_rx_ovr();
 
 // waits until transmit fifo is empty and writes the string
 // directly in the tx fifo and returns the number of chars

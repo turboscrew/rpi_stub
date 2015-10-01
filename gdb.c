@@ -289,11 +289,12 @@ void gdb_reset()
 	gdb_step_bkpt.trap_address = (void *)0xffffffff;
 	gdb_step_bkpt.valid = 0;
 	gdb_single_stepping = 0;
+
 	// reset debuggee info
-	gdb_debuggee.start = (void *)0xffffffff;
+	gdb_debuggee.start_addr = (void *)0x00008000; // default
 	gdb_debuggee.size = 0;
-	gdb_debuggee.entry = (void *)0xffffffff;
-	gdb_debuggee.curr_addr = (void *)0xffffffff;
+	gdb_debuggee.entry = (void *)0x00008000; // default
+	gdb_debuggee.curr_addr = (void *)0x00008000; // default
 	gdb_debuggee.status = 0;
 	return;
 }
@@ -516,12 +517,7 @@ int receive_packet(char *dst)
 	while ((ch = gdb_iodev->get_char()) != (int)'#')
 	{
 		if (ch == -1) continue; // wait for char
-		// break-character received
-		if (ch == 3)
-		{
-			len = -3;
-			break;
-		}
+
 		// calculate checksum
 		checksum += ch;
 		checksum %= 256;
@@ -544,10 +540,7 @@ int receive_packet(char *dst)
 		// get first checksum hex digit and check for BRK
 		// the '#' gets dropped
 		while ((ch = gdb_iodev->get_char()) == -1);
-		if (ch == 3)
-		{
-			return -3; // BRK
-		}
+
 		// upper checksum hex digit to binary
 		chksum = util_hex_to_nib((char) ch);
 		if (chksum < 0)
@@ -557,10 +550,6 @@ int receive_packet(char *dst)
 
 		// get second checksum hex digit and check for BRK
 		while ((ch = gdb_iodev->get_char()) == -1);
-		if (ch == 3)
-		{
-			return -3; // BRK
-		}
 
 		// lower checksum hex digit to binary
 		tmp = util_hex_to_nib((char) ch);
@@ -656,15 +645,6 @@ void gdb_resp_target_halted(int reason)
 
 	gdb_monitor_running = 1; // by default
 
-#ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running(1) = ";
-	gdb_iodev->put_string(msg, util_str_len(msg)+1);
-	util_word_to_hex(scratchpad, gdb_monitor_running);
-	scratchpad[8]='\0'; // end-nul
-	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
-	gdb_iodev->put_string("\r\n", 3);
-#endif
-
 	if (reason == 0)
 	{
 		// No debuggee yet
@@ -723,6 +703,7 @@ void gdb_resp_target_halted(int reason)
 		//len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
 		// application terminated with status 0
+		rpi2_reg_context.reg.r15 = 0x8000; // default
 		len = util_str_copy(resp_buff, "S05", resp_buff_len);
 		break;
 	case FINISHED: // program has finished
@@ -741,24 +722,8 @@ void gdb_resp_target_halted(int reason)
 		return; // don't send anything more
 		break;
 	}
-#ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running(2) = ";
-	gdb_iodev->put_string(msg, util_str_len(msg)+1);
-	util_word_to_hex(scratchpad, gdb_monitor_running);
-	scratchpad[8]='\0'; // end-nul
-	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
-	gdb_iodev->put_string("\r\n", 3);
-#endif
 	// send response
 	gdb_send_packet(resp_buff, len);
-#ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running(3) = ";
-	gdb_iodev->put_string(msg, util_str_len(msg)+1);
-	util_word_to_hex(scratchpad, gdb_monitor_running);
-	scratchpad[8]='\0'; // end-nul
-	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
-	gdb_iodev->put_string("\r\n", 3);
-#endif
 }
 
 // c [addr]
@@ -784,14 +749,47 @@ void gdb_cmd_cont(char *src, int len)
 // g
 void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	int len;
-	const int resp_buff_len = 128; // should be enough to hold 'g' response
+	int len, i;
+	const int resp_buff_len = 512; // should be enough to hold 'g' response
 	char resp_buff[resp_buff_len]; // response buff
+	const int tmp_buff_len = 256; // should be enough to hold 'g' response
+	char tmp_buff[tmp_buff_len]; // response buff
+#if 0
+	char *p1, *p2;
+#else
+	uint32_t *p1, *p2;
+#endif
 	if (packet_len == 1)
 	{
-		// response for 'g'
-		len = gdb_write_hex_data((char *)&(rpi2_reg_context.storage),
-				sizeof(rpi2_reg_context), resp_buff, resp_buff_len);
+		// response for 'g' - regs r0 - r15 + cpsr
+#if 0
+		p1 = (char *)&(rpi2_reg_context.storage);
+		p2 = tmp_buff;
+		// regs reported
+		for (i=0; i<16; i++) // r0 - r15
+		{
+			util_swap_bytes(p1, p2);
+			p1 += 4;
+			p2 += 4;
+		}
+#else
+		p1 = (uint32_t *)&(rpi2_reg_context.storage);
+		p2 = (uint32_t *)tmp_buff;
+		for (i=0; i<16; i++) // r0 - r15
+		{
+			*(p2++) = *(p1++);
+		}
+
+#endif
+		//for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
+		for (i=0; i<9; i++) // 8 x fp + fps (all dummy)
+		{
+			*(p2++) = 0;
+		}
+		// p1 = (char *)&(rpi2_reg_context.reg.cpsr);
+		// util_swap_bytes(p1, p2);
+		*p2 = rpi2_reg_context.reg.cpsr;
+		len = gdb_write_hex_data(tmp_buff, 4*26, resp_buff, resp_buff_len);
 		gdb_send_packet(resp_buff, len);
 	}
 }
@@ -799,14 +797,40 @@ void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 // G
 void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	int len;
+	int len, i;
 	char *resp_str = "OK";
-	const int resp_buff_len = 128; // should be enough to hold 'g' response
+	const int resp_buff_len = 512; // should be enough to hold 'g' response
 	char resp_buff[resp_buff_len]; // response buff
+	const int tmp_buff_len = 256; // should be enough to hold 'g' response
+	char tmp_buff[tmp_buff_len]; // response buff
+	//char *p1, *p2;
+	uint32_t *p1, *p2;
+
 	if (packet_len > 1)
 	{
 		gdb_read_hex_data((char *)gdb_in_packet, packet_len - 1,
-				(char *)&(rpi2_reg_context.storage), sizeof(rpi2_reg_context));
+				tmp_buff, tmp_buff_len);
+		p2 = tmp_buff;
+		p1 = (char *)&(rpi2_reg_context.storage);
+		// 17 regs
+		for (i=0; i<16; i++) // r0 - r15
+		{
+/*
+			util_swap_bytes(p2, p1);
+			p1 += 4;
+			p2 += 4;
+
+*/
+			*(p1++) = *(p2++);
+		}
+		// for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
+		for (i=0; i<9; i++) // 8 x fp + fps (all dummy)
+		{
+			p2++;
+		}
+		*p2 = rpi2_reg_context.reg.cpsr;
+		// p2 = (char *)&(rpi2_reg_context.reg.cpsr);
+		// util_swap_bytes(p1, p2);
 		// send response
 		gdb_send_packet(resp_str, util_str_len(resp_str));
 	}
@@ -864,9 +888,10 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 // p n
 void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	uint32_t value;
+	uint32_t value, tmp;
 	uint8_t reg;
 	uint32_t *p;
+	char *cp;
 	char *err = "E00";
 	int len;
 	const int scratch_len = 16;
@@ -874,12 +899,31 @@ void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	if (packet_len > 1)
 	{
 		reg = util_hex_to_byte((char *)gdb_in_packet);
-		if (reg < 17)
+		if (reg < 16)
 		{
-			p = (uint32_t *) &(rpi2_reg_context.storage);
-			value = p[reg];
+			//p = (uint32_t *) &(rpi2_reg_context.storage);
+			//value = p[reg];
+			tmp = rpi2_reg_context.storage[reg];
+			util_swap_bytes((unsigned char *)(&tmp), (unsigned char *)(&value));
 			util_word_to_hex(scratchpad, value);
-			gdb_send_packet(scratchpad, 4);
+			util_strip_zeros(scratchpad, &cp);
+			gdb_send_packet(cp, util_str_len(cp));
+		}
+		else if ((reg > 15) && (reg < 25)) // dummy fp-register
+		{
+			util_word_to_hex(scratchpad, 0);
+			util_strip_zeros(scratchpad, &cp);
+			gdb_send_packet(cp, util_str_len(cp));
+		}
+		else if (reg == 25) // cpsr
+		{
+			//p = (uint32_t *) &(rpi2_reg_context.storage);
+			//value = p[reg];
+			tmp = rpi2_reg_context.reg.cpsr;
+			util_swap_bytes((unsigned char *)(&tmp), (unsigned char *)(&value));
+			util_word_to_hex(scratchpad, value);
+			util_strip_zeros(scratchpad, &cp);
+			gdb_send_packet(cp, util_str_len(cp));
 		}
 		else
 		{
@@ -895,7 +939,7 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	char *resp_str = "OK";
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
-	uint32_t value;
+	uint32_t value, tmp;
 	uint8_t reg;
 	uint32_t *p;
 	char *err = "E00";
@@ -903,25 +947,50 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	{
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, '=', scratch_len);
 		reg = util_hex_to_byte(scratchpad);
-		if (reg < 17)
+		if ((reg > 15) && (reg < 25))
 		{
-			gdb_in_packet += len; // skip reg number
-			value = util_hex_to_word((char *)gdb_in_packet + 1); // skip '='
-			p = (uint32_t *) &(rpi2_reg_context.storage);
-			p[reg] = value;
+			// gdb_send_packet("OK", 2); // dummy fp-register
+		}
+		else if (reg < 16)
+		{
+			gdb_in_packet += (len + 1);  // skip register number and '='
+			value = util_hex_to_word((char *)gdb_in_packet);
+			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			// p = (uint32_t *) &(rpi2_reg_context.storage);
+			// p[reg] = value;
+			rpi2_reg_context.storage[reg] = tmp;
+		}
+		else if (reg == 25) // cpsr
+		{
+			gdb_in_packet += (len + 1);  // skip register number and '='
+			value = util_hex_to_word((char *)gdb_in_packet);
+			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			// p = (uint32_t *) &(rpi2_reg_context.storage);
+			// p[reg] = value;
+			rpi2_reg_context.reg.cpsr = tmp;
 		}
 		else
 		{
 			gdb_send_packet(err, util_str_len(err));
 			return;
 		}
+		gdb_send_packet(resp_str, util_str_len(resp_str));
 	}
-	gdb_send_packet(resp_str, util_str_len(resp_str));
+	else
+	{
+		gdb_send_packet(err, util_str_len(err));
+	}
+}
+
+void gdb_cmd_detach(volatile uint8_t *gdb_packet, int packet_len)
+{
+	gdb_send_packet("OK", 2); // for now
 }
 
 void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
 {
 	int len;
+	int num;
 	char *msg;
 	char *packet;
 	const int scratch_len = 32;
@@ -933,45 +1002,65 @@ void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
 	resp_buff[0] = '\0';
 	if (packet_len > 1)
 	{
-		len = util_cpy_substr(scratchpad, packet, ':', scratch_len);
+
+		if (*packet == 'H')
+		{
 #ifdef DEBUG_GDB
-		gdb_iodev->put_string("cmd: ", 6);
-		gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
-		gdb_iodev->put_string("\r\n", 3);
+			gdb_iodev->put_string("\r\nH-cmd: ", 10);
+			gdb_iodev->put_string(packet, util_str_len(packet)+1);
+			gdb_iodev->put_string("\r\n", 3);
 #endif
-		packet += len+1; // skip the read and delimiter
-		if (util_str_cmp(scratchpad, "Hg0") == 0)
-		{
-			len = util_str_copy(resp_buff, "OK", resp_buff_len);
-			gdb_send_packet(resp_buff, len);
-		}
-		else if (util_str_cmp(scratchpad, "Hg-1") == 0)
-		{
-#if 0
-			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
-			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
-#else
-			// next step/cont involves all threads
-			len = util_str_copy(resp_buff, "OK", resp_buff_len);
-#endif
-			gdb_send_packet(resp_buff, len);
-		}
-		else if (util_str_cmp(scratchpad, "Hc-1") == 0)
-		{
-#if 0
-			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
-			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
-#else
-			// next step/cont involves all threads
-			len = util_str_copy(resp_buff, "OK", resp_buff_len);
-#endif
-			gdb_send_packet(resp_buff, len);
+			packet++; // skip the read and delimiter
+			if (--packet_len == 0)
+			{
+				gdb_send_packet("E01", 3);
+				return;
+			}
+			if ((*packet == 'g') || (*packet == 'c'))
+			{
+				packet++;
+				if (--packet_len == 0)
+				{
+					gdb_send_packet("E02", 3);
+					return;
+				}
+				// get thread ID
+				len = util_read_dec(packet, &num);
+				if (len == 0)
+				{
+					gdb_send_packet("E03", 3);
+					return;
+				}
+				if ((packet_len -= len) > 0)
+				{
+					gdb_response_not_supported();
+					return;
+				}
+
+				// thread ID -1 and 0 are OK
+				// -1 = all, 0 = arbitrary
+				if ((num == -1) || (num == 0))
+				{
+					gdb_send_packet("OK", 2);
+				}
+				else
+				{
+					gdb_response_not_supported();
+				}
+			}
+			else
+			{
+				gdb_response_not_supported(); // for now
+			}
 		}
 		else
 		{
-			gdb_response_not_supported(); // for now
+			gdb_send_packet("E04", 3);
 		}
-
+	}
+	else
+	{
+		gdb_send_packet("E05", 3);
 	}
 }
 
@@ -1001,6 +1090,10 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 		gdb_iodev->put_string("\r\n", 3);
 #endif
 		packet += len+1; // skip the read and delimiter
+		// len = util_cmp_substr(packet, "qSupported:");
+		// if (len == util_str_len("qSupported:"))
+		// {
+		// 		packet += len;
 		if (util_str_cmp(scratchpad, "qSupported") == 0)
 		{
 #if 0
@@ -1069,7 +1162,7 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 		{
 			// reply: '1' - Attached to existing process
 			// reply: '0' - new process created
-			len = util_str_copy(resp_buff, "1", resp_buff_len);
+			len = util_str_copy(resp_buff, "0", resp_buff_len);
 			gdb_send_packet(resp_buff, len);
 		}
 		else if (util_str_cmp(scratchpad, "qSymbol") == 0)
@@ -1197,7 +1290,7 @@ void gdb_cmd_write_mem_bin(volatile uint8_t *gdb_in_packet, int packet_len)
 	int len;
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
-	// M addr,length:XX XX ...
+	// X addr,length:XX XX ...
 	if (packet_len > 1)
 	{
 		// get hex for address
@@ -1411,14 +1504,6 @@ void gdb_handle_pending_state(int reason)
 	// stop responses - responses to commands 'c', 's', and the like
 	gdb_resp_target_halted(reason);
 	// go to monitor
-#ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running(4) = ";
-	gdb_iodev->put_string(msg, util_str_len(msg)+1);
-	util_word_to_hex(scratchpad, gdb_monitor_running);
-	scratchpad[8]='\0'; // end-nul
-	gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
-	gdb_iodev->put_string("\r\n", 3);
-#endif
 }
 
 /* The main debugger loop */
@@ -1433,7 +1518,7 @@ void gdb_monitor(int reason)
 #endif
 
 #ifdef DEBUG_GDB
-	msg = "\r\nEntering GDB-monitor\r\nreason = ";
+	msg = "\r\n\r\nEntering GDB-monitor\r\nreason = ";
 	gdb_iodev->put_string(msg, util_str_len(msg)+1);
 	util_word_to_hex(scratchpad, reason);
 	scratchpad[8]='\0'; // end-nul
@@ -1443,7 +1528,7 @@ void gdb_monitor(int reason)
 	gdb_handle_pending_state(reason);
 
 #ifdef DEBUG_GDB
-	msg = "\r\ngdb_monitor_running(5) = ";
+	msg = "\r\ngdb_monitor_running = ";
 	gdb_iodev->put_string(msg, util_str_len(msg)+1);
 	util_word_to_hex(scratchpad, gdb_monitor_running);
 	scratchpad[8]='\0'; // end-nul
@@ -1451,9 +1536,31 @@ void gdb_monitor(int reason)
 	gdb_iodev->put_string("\r\n", 3);
 #endif
 
+	// don't let CTRL-C interfere with binary data transfer
+	if (gdb_monitor_running)
+	{
+		gdb_iodev->set_ctrlc((void *)0);
+	}
+
 	while(gdb_monitor_running)
 	{
+		packet_len = (int)serial_get_rx_dropped();
+		if (packet_len)
+		{
+			util_str_copy(scratchpad, "Odrop:", 16);
+			util_word_to_hex(scratchpad+6, packet_len);
+			gdb_send_packet(scratchpad, util_str_len(scratchpad));
+		}
+		packet_len = (int)serial_get_rx_ovr();
+		if (packet_len)
+		{
+			util_str_copy(scratchpad, "Oovr:", 16);
+			util_word_to_hex(scratchpad+6, packet_len);
+			gdb_send_packet(scratchpad, util_str_len(scratchpad));
+		}
+
 		packet_len = receive_packet(inpkg);
+
 #ifdef DEBUG_GDB
 		if (packet_len < 0)
 		{
@@ -1478,28 +1585,15 @@ void gdb_monitor(int reason)
 #endif
 		if (packet_len < 0)
 		{
-			// BRK?
-			if (packet_len == -3)
-			{
-				// send ACK
-				//gdb_packet_ack(); comes in as sideband data
-				// clear BRK
-				gdb_iodev->get_ctrl_c();
-				// flush input - read until ctrl-c
-				while (gdb_iodev->get_char() != 3);
-				continue;
-			}
-			else // corrupted packet
-			{
-				// send NACK
-				gdb_packet_nack();
-				// flush, re-read
-				packet_len = 0;
+			// send NACK
+			gdb_packet_nack();
+			// flush, re-read
+			packet_len = 0;
 #ifdef DEBUG_GDB
 			gdb_iodev->put_string("\r\nsent nack\r\n", 16);
 #endif
-				continue;
-			}
+			continue;
+
 		}
 		else
 		{
@@ -1556,7 +1650,7 @@ void gdb_monitor(int reason)
 				gdb_cmd_cont(++inpkg, packet_len);
 				break;
 			case 'D':	// detach
-				gdb_response_not_supported(); // for now
+				gdb_cmd_detach(++inpkg, packet_len);
 				break;
 			case 'F':	// file I/O - for gdb console
 				gdb_response_not_supported(); // for now
@@ -1637,5 +1731,7 @@ void gdb_monitor(int reason)
 			}
 		}
 	}
+	// enable CTRL-C
+	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
 	return;
 }

@@ -1625,7 +1625,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			{
 				exception_extra = RPI2_TRAP_INITIAL;
 			}
-			rpi2_reg_context.reg.r15 += 4; // skip 'bkpt'
+			//rpi2_reg_context.reg.r15 += 4; // skip 'bkpt'
 		}
 	}
 	else

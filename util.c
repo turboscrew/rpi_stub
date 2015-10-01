@@ -184,6 +184,19 @@ int util_str_cmp(char *str1, char *str2)
 	return 1; // not equal
 }
 
+// compare strings - returns the number of same characters
+int util_cmp_substr(char *str1, char *str2)
+{
+	int i = 0;
+	while (*(str1) == *(str2))
+	{
+		i++;
+		if (*(str1++) == '\0') return i;
+		if (*(str2++) == '\0') return i;
+	}
+	return i; // not equal
+}
+
 // copy string, max_count = maximum number of characters to copy
 // returns number of chars copied
 int util_str_copy(char *dest, char *src, int max_count)
@@ -243,5 +256,80 @@ int util_cpy_substr(char *dst, char *src, char delim, int max)
 	return i;
 }
 
+// skip leading zeros from a number string
+// returns pointer to new location and the length of the
+// resulted string
+int util_strip_zeros(char *src, char **dst)
+{
+	int i = 0;
 
+	if (*src == '\0')
+	{
+		*dst = src;
+		return 0;
+	}
+	// skip leading zeroes, but in case of number being
+	// zero, leave the last '0'
+	while ((*(src+1) != '\0') && (*src == '0'))
+	{
+		src++;
+	}
+	*dst = src;
+	// count the length of the result
+	while (*(src++) != '\0')
+	{
+		i++;
+	}
+	return i;
+}
 
+// reads a signed decimal number from a string
+// returns a signed integer and the number of characters read
+int util_read_dec(char *str, int *result)
+{
+	int neg = 0; // flag - if the number is negative
+	int tmp, i=0;
+	long long tmp2;
+
+	*result = 0;
+
+	if (*str == '-')
+	{
+		neg = 1;
+		str++;
+		i++;
+	}
+	tmp2 = 0LL;
+	while (*str != '\0')
+	{
+		tmp = (int)(*str) - (int)'0';
+		if ((tmp < 0) || (tmp > 9))
+		{
+			break; // not a decimal digit
+		}
+		else
+		{
+			tmp2 *= 10;
+			tmp2 += (long long)tmp;
+			if (tmp2 > 0x7fffffff) break; // integer overflow
+			str++;
+			i++;
+			*result = (int)tmp2;
+		}
+	}
+	if (neg)
+	{
+		if (i == 1) return 0; // only sign - no number
+		*result = -(*result);
+	}
+	return i;
+}
+
+// converts a word endianness (swaps bytes)
+void util_swap_bytes(unsigned char *src, unsigned char *dst)
+{
+	*(dst++) = *(src+3);
+	*(dst++) = *(src+2);
+	*(dst++) = *(src+1);
+	*dst = *src;
+}

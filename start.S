@@ -62,18 +62,18 @@ loop$:
 #if 0
 	@ actlr
 	@ bit 6 = enable coherent reqs
-	MRC p15, 0, r1, c1, c0, 0 ; Read SCTLR into Rt
+	MRC p15, 0, r1, c1, c0, 1 @ Read ACTLR into Rt
 	movw r0, #0x1804 @ bin 0000000001000000
 	@ movt r0, #0x00 redundant
 	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 0 ; Write Rt to SCTLR
+	MCR p15, 0, r1, c1, c0, 1 @ Write Rt to ACTLR
 	@ sctlr
 	@ bit 12 = I-cache, bit 11 = branch pred, bit 2 = D-cache
-	MRC p15, 0, r1, c1, c0, 0 ; Read SCTLR into Rt
+	MRC p15, 0, r1, c1, c0, 0 @ Read SCTLR into Rt
 	movw r0, #0x1804 @ bin 0001100000000100
 	@ movt r0, #0x00 redundant
 	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 0 ; Write Rt to SCTLR
+	MCR p15, 0, r1, c1, c0, 0 @ Write Rt to SCTLR
 #endif
 	// Set up initial stacks
 	// ARM stack is conventionally 'Decrement Before'-type

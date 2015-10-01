@@ -217,8 +217,7 @@ void loader_main()
 		/* reset debugger */
 		gdb_reset();
 		/* enter gdb monitor */
-		gdb_trap();
-		
+		gdb_trap();	
 	}
 #endif
 }

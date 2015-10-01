@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // program
 typedef struct {
-	void *start;
+	void *start_addr;
 	uint32_t size; // load size
 	void *entry;
 	void *curr_addr;

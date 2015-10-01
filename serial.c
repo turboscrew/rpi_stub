@@ -36,6 +36,7 @@ volatile int ser_tx_tail;
 volatile char ser_tx_buff[SER_TX_BUFF_SIZE];
 
 volatile uint32_t ser_rx_dropped_count;
+volatile uint32_t ser_rx_ovr_count;
 
 volatile int ser_handle_ctrlc = 0;
 void (*ser_ctrlc_handler)();
@@ -82,6 +83,18 @@ unsigned int serial_get_rx_dropped()
 	restore_ints(cpsr_store);
 
 	return retval;
+}
+
+unsigned int serial_get_rx_ovr()
+{
+	uint32_t retval;
+	uint32_t cpsr_store;
+
+	cpsr_store = disable_save_ints();
+	retval = ser_rx_ovr_count;
+	ser_rx_ovr_count = 0;
+	restore_ints(cpsr_store);
+	return (unsigned int)retval;
 }
 
 int serial_get_ctrl_c()
@@ -140,6 +153,7 @@ void serial_init(io_device *device)
 	ser_tx_head = 0;
 	ser_tx_tail = 0;
 	ser_rx_dropped_count = 0;
+	ser_rx_ovr_count = 0;
 
 	// init ctrl-C handling
 #ifndef DEBUG_CTRLC
@@ -186,7 +200,8 @@ void serial_init(io_device *device)
 	*((volatile uint32_t *)UART0_LCRH) = (1 << 4) | (1 << 5) | (1 << 6);
 
 	// FIFO-interrupt levels: rx 1/2, tx 1/2
-	*((volatile uint32_t *)UART0_IFLS) = (0x2 << 3) | (0x2) ;
+	//*((volatile uint32_t *)UART0_IFLS) = (0x2 << 3) | (0x2) ;
+	*((volatile uint32_t *)UART0_IFLS) = (0x3 << 3) | (0x1) ;
 
 	// Enable UART0, receive & transfer part of UART
 	*((volatile uint32_t *)UART0_CR) = (1 << 0) | (1 << 8) | (1 << 9);
@@ -236,7 +251,6 @@ int serial_raw_puts(char *str)
 	{
 		if (*str == '\0')
 		{
-			*((volatile uint32_t *)UART0_DR) = (uint32_t)(*(str));
 			break;
 		}
 
@@ -484,7 +498,7 @@ void serial_rx()
 			ser_rx_dropped_count++;
 			// Clear receive interrupt
 			*((volatile uint32_t *)UART0_ICR) = (1<<4);
-
+			if (ch & 0x800) ser_rx_ovr_count++;
 			/* if BRK character (CTRL-C) */
 			/* It can't be handled if it doesn't fit into HW FIFO */
 			if ((ch & 0xff) == 3)
@@ -505,7 +519,7 @@ void serial_rx()
 				// Read char in ch
 				ch = *((volatile uint32_t *)UART0_DR);
 				ser_rx_dropped_count++;
-
+				if (ch & 0x800) ser_rx_ovr_count++;
 				/* if BRK character (CTRL-C) */
 				/* It can't be handled if it doesn't fit into HW FIFO */
 				if ((ch & 0xff) == 3)
@@ -534,6 +548,7 @@ void serial_rx()
 		{
 			// Read char in ch
 			ch = *((volatile uint32_t *)UART0_DR);
+			if (ch & 0x800) ser_rx_ovr_count++;
 			/* if BRK character (CTRL-C) */
 			/* It can't be handled if it doesn't fit into HW FIFO */
 			if ((ch & 0xff) == 3)
