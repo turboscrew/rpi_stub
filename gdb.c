@@ -97,6 +97,9 @@ void gdb_monitor(int reason);
 // resume needs this
 void gdb_do_single_step();
 
+// packet sending
+int gdb_send_packet(char *src, int count);
+
 // ckeck if cause of exception was a breakpoint
 // return breakpoint number, or -1 if none
 int gdb_check_breakpoint()
@@ -304,6 +307,8 @@ void gdb_reset()
 int dgb_set_trap(void *address, int kind)
 {
 	int i;
+	// char dbg_help[32];
+	// char scratchpad[10];
 	uint32_t *p = (uint32_t *) address;
 	if (gdb_num_bkpts == GDB_MAX_BREAKPOINTS)
 	{
@@ -319,6 +324,15 @@ int dgb_set_trap(void *address, int kind)
 			gdb_usr_breakpoint[i].valid = 1;
 			gdb_num_bkpts++;
 			rpi2_set_trap(address, kind);
+			/*
+			util_str_copy(dbg_help, "Oset trap: i =", 25);
+			util_word_to_hex(scratchpad, i);
+			scratchpad[8]='\0'; // end-nul
+			util_append_str(dbg_help, scratchpad, 32);
+			util_append_str(dbg_help, "\r\n", 32);
+			//gdb_iodev->put_string(dbg_help, util_str_len(dbg_help)+1);
+			gdb_send_packet(dbg_help, util_str_len(dbg_help));
+			*/
 			return 0; // success
 		}
 	}
@@ -328,6 +342,8 @@ int dgb_set_trap(void *address, int kind)
 int dgb_unset_trap(void *address, int kind)
 {
 	int i;
+	// char dbg_help[32];
+	// char scratchpad[10];
 	uint32_t *p = (uint32_t *) address;
 	if (gdb_num_bkpts == 0)
 	{
@@ -345,6 +361,15 @@ int dgb_unset_trap(void *address, int kind)
 					gdb_usr_breakpoint[i].valid = 0;
 					gdb_num_bkpts--;
 					*p = gdb_usr_breakpoint[i].instruction.arm;
+					/*
+					util_str_copy(dbg_help,"Ounset trap: i =", 25);
+					util_word_to_hex(scratchpad, i);
+					scratchpad[8]='\0'; // end-nul
+					util_append_str(dbg_help, scratchpad, 32);
+					util_append_str(dbg_help, "\r\n", 32);
+					//gdb_iodev->put_string(dbg_help, util_str_len(dbg_help)+1);
+					gdb_send_packet(dbg_help, util_str_len(dbg_help));
+					*/
 					return 0; // success
 				}
 				else
@@ -663,28 +688,28 @@ void gdb_resp_target_halted(int reason)
 		// T05 - breakpoint response
 		len = util_str_copy(resp_buff, "T05", resp_buff_len);
 		// PC value given
-		len = util_append_str(resp_buff, "0F", resp_buff_len);
+		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
-		util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
-		len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_ILL: // undef
 		// T04 - undef response
 		len = util_str_copy(resp_buff, "T04", resp_buff_len);
 		// PC value given
-		len = util_append_str(resp_buff, "0F", resp_buff_len);
+		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
-		util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
-		len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_BUS: // pabt/dabt
 		// T07 - pabt/dabt response
 		len = util_str_copy(resp_buff, "T07", resp_buff_len);
 		// PC value given
-		len = util_append_str(resp_buff, "0F", resp_buff_len);
+		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
-		util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
-		len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_USR1: // unhandled HW interrupt - no defined response
 		// send 'OUnhandled HW interrupt'
@@ -810,8 +835,8 @@ void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 	{
 		gdb_read_hex_data((char *)gdb_in_packet, packet_len - 1,
 				tmp_buff, tmp_buff_len);
-		p2 = tmp_buff;
-		p1 = (char *)&(rpi2_reg_context.storage);
+		p2 = (uint32_t *)tmp_buff;
+		p1 = (uint32_t *)&(rpi2_reg_context.storage);
 		// 17 regs
 		for (i=0; i<16; i++) // r0 - r15
 		{
@@ -1351,7 +1376,7 @@ void gdb_cmd_add_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	if (*gdb_in_packet == ',') gdb_in_packet++; // skip ','
 	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 	gdb_in_packet += len+1; // skip address and delimiter
-	addr = util_hex_to_byte(scratchpad);
+	addr = util_hex_to_word(scratchpad);
 	kind = util_hex_to_word((char *)gdb_in_packet); // does this work?
 	if (kind == 2) // 16-bit THUMB
 	{
@@ -1389,7 +1414,7 @@ void gdb_cmd_delete_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	// get addr
 	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 	gdb_in_packet += len+1; // skip address and delimiter
-	addr = util_hex_to_byte(scratchpad);
+	addr = util_hex_to_word(scratchpad);
 	kind = util_hex_to_word((char *)gdb_in_packet); // does this work?
 
 	if (kind == 2) // 16-bit THUMB
@@ -1484,7 +1509,7 @@ void gdb_handle_pending_state(int reason)
 				gdb_restore_breakpoint(&(gdb_usr_breakpoint[i]));
 			}
 			*/
-			gdb_restore_breakpoint(&(gdb_usr_breakpoint[gdb_trap_num]));
+			//gdb_restore_breakpoint(&(gdb_usr_breakpoint[gdb_trap_num]));
 		}
 		// response generated later
 	}

@@ -43,10 +43,10 @@ extern void loader_main();
 // moved to rpi2.h
 //#define DEBUG_CTRLC
 
-#define DEBUG_UNDEF
+//#define DEBUG_UNDEF
 //#define DEBUG_SVC
 //#define DEBUG_AUX
-#define DEBUG_DABT
+//#define DEBUG_DABT
 //#define DEBUG_IRQ
 //#define DEBUG_FIQ
 //#define DEBUG_PABT
