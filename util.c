@@ -98,7 +98,7 @@ unsigned int util_hex_to_word(char *p)
 		retval |= (val & 0x0f);
 		p++;
 	}
-	return val;
+	return retval;
 }
 
 // byte to hex

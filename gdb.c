@@ -172,12 +172,13 @@ void gdb_trap_handler()
 	gdb_iodev->put_string("\r\n", 3);
 #endif
 
-	if (serial_get_ctrl_c() == 1)
+	if (rpi2_get_sigint_flag() == 1)
 	{
+		rpi2_set_sigint_flag(0); // handled
 		// ctrl-C pressed
 		reason = SIG_INT;
 		// flush input - read until ctrl-c
-		while (gdb_iodev->get_char() != 3);
+		//while (gdb_iodev->get_char() != 3);
 	}
 	else if (exception_extra > 0xff00) // internal error
 	{
@@ -406,7 +407,7 @@ void gdb_resume()
 			}
 			*/
 			// single step old instruction
-			gdb_do_single_step();
+			//gdb_do_single_step();
 		}
 	}
 }
@@ -728,7 +729,6 @@ void gdb_resp_target_halted(int reason)
 		//len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
 		// application terminated with status 0
-		rpi2_reg_context.reg.r15 = 0x8000; // default
 		len = util_str_copy(resp_buff, "S05", resp_buff_len);
 		break;
 	case FINISHED: // program has finished
@@ -763,6 +763,7 @@ void gdb_cmd_cont(char *src, int len)
 	}
 	// breakpoint?
 	bkptnum = gdb_check_breakpoint();
+
 	if (bkptnum > 0)
 	{
 		gdb_resuming = bkptnum;
@@ -776,15 +777,27 @@ void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 {
 	int len, i;
 	const int resp_buff_len = 512; // should be enough to hold 'g' response
-	char resp_buff[resp_buff_len]; // response buff
+	static char resp_buff[512]; // response buff
 	const int tmp_buff_len = 256; // should be enough to hold 'g' response
-	char tmp_buff[tmp_buff_len]; // response buff
+	static char tmp_buff[256]; // response buff
+#if 0
+	char scratchpad[16]; // scratchpad
+#endif
 #if 0
 	char *p1, *p2;
 #else
 	uint32_t *p1, *p2;
 #endif
-	if (packet_len == 1)
+#if 0
+	util_word_to_hex(scratchpad, packet_len);
+	gdb_iodev->put_string("\r\ng_cmd: ", 10);
+	gdb_iodev->put_string(scratchpad, 9);
+	gdb_iodev->put_string(" =len: ", 10);
+	gdb_iodev->put_string((char *)gdb_in_packet, packet_len);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
+
+	if (packet_len >= 0)
 	{
 		// response for 'g' - regs r0 - r15 + cpsr
 #if 0
@@ -807,14 +820,22 @@ void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 
 #endif
 		//for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
-		for (i=0; i<9; i++) // 8 x fp + fps (all dummy)
+		for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
 		{
-			*(p2++) = 0;
+			*(p2++) = 0x90000009;
 		}
 		// p1 = (char *)&(rpi2_reg_context.reg.cpsr);
 		// util_swap_bytes(p1, p2);
 		*p2 = rpi2_reg_context.reg.cpsr;
 		len = gdb_write_hex_data(tmp_buff, 4*26, resp_buff, resp_buff_len);
+#if 0
+		util_word_to_hex(scratchpad, len);
+		gdb_iodev->put_string("\r\ng_cmd2: ", 10);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string(" =len: ", 10);
+		gdb_iodev->put_string(resp_buff, 26*4);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 		gdb_send_packet(resp_buff, len);
 	}
 }
@@ -825,18 +846,29 @@ void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 	int len, i;
 	char *resp_str = "OK";
 	const int resp_buff_len = 512; // should be enough to hold 'g' response
-	char resp_buff[resp_buff_len]; // response buff
+	static char resp_buff[512]; // response buff
 	const int tmp_buff_len = 256; // should be enough to hold 'g' response
-	char tmp_buff[tmp_buff_len]; // response buff
+	static char tmp_buff[256]; // response buff
+#if 0
+	char scratchpad[16]; // scratchpad
+#endif
 	//char *p1, *p2;
 	uint32_t *p1, *p2;
 
-	if (packet_len > 1)
+	if (packet_len > 0)
 	{
-		gdb_read_hex_data((char *)gdb_in_packet, packet_len - 1,
+		gdb_read_hex_data((char *)gdb_in_packet, packet_len,
 				tmp_buff, tmp_buff_len);
 		p2 = (uint32_t *)tmp_buff;
 		p1 = (uint32_t *)&(rpi2_reg_context.storage);
+#if 0
+		util_word_to_hex(scratchpad, packet_len);
+		gdb_iodev->put_string("\r\nG_cmd: ", 10);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string(" =len: ", 10);
+		gdb_iodev->put_string((char *)gdb_in_packet, 26*4);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 		// 17 regs
 		for (i=0; i<16; i++) // r0 - r15
 		{
@@ -849,15 +881,16 @@ void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 			*(p1++) = *(p2++);
 		}
 		// for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
-		for (i=0; i<9; i++) // 8 x fp + fps (all dummy)
+		for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
 		{
 			p2++;
 		}
-		*p2 = rpi2_reg_context.reg.cpsr;
+		*p2 = (uint32_t)(rpi2_reg_context.reg.cpsr);
 		// p2 = (char *)&(rpi2_reg_context.reg.cpsr);
 		// util_swap_bytes(p1, p2);
 		// send response
 		gdb_send_packet(resp_str, util_str_len(resp_str));
+
 	}
 }
 
@@ -869,7 +902,7 @@ void gdb_cmd_read_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 	int len;
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
-	if (packet_len > 1)
+	if (packet_len > 0)
 	{
 		// get hex for address
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
@@ -893,7 +926,7 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 	char *resp_str = "OK";
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
-	if (packet_len > 1)
+	if (packet_len > 0)
 	{
 		// get hex for address
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
@@ -914,7 +947,7 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 {
 	uint32_t value, tmp;
-	uint8_t reg;
+	uint32_t reg;
 	uint32_t *p;
 	char *cp;
 	char *err = "E00";
@@ -923,37 +956,46 @@ void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	char scratchpad[scratch_len]; // scratchpad
 	if (packet_len > 1)
 	{
-		reg = util_hex_to_byte((char *)gdb_in_packet);
+		reg = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
 		if (reg < 16)
 		{
 			//p = (uint32_t *) &(rpi2_reg_context.storage);
 			//value = p[reg];
-			tmp = rpi2_reg_context.storage[reg];
-			util_swap_bytes((unsigned char *)(&tmp), (unsigned char *)(&value));
-			util_word_to_hex(scratchpad, value);
-			util_strip_zeros(scratchpad, &cp);
-			gdb_send_packet(cp, util_str_len(cp));
+			value = rpi2_reg_context.storage[reg];
+			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_word_to_hex(scratchpad, tmp);
+			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
 		else if ((reg > 15) && (reg < 25)) // dummy fp-register
 		{
-			util_word_to_hex(scratchpad, 0);
-			util_strip_zeros(scratchpad, &cp);
-			gdb_send_packet(cp, util_str_len(cp));
+			util_word_to_hex(scratchpad, 0x90000009);
+			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_word_to_hex(scratchpad, tmp);
+			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
 		else if (reg == 25) // cpsr
 		{
 			//p = (uint32_t *) &(rpi2_reg_context.storage);
 			//value = p[reg];
-			tmp = rpi2_reg_context.reg.cpsr;
-			util_swap_bytes((unsigned char *)(&tmp), (unsigned char *)(&value));
+			value = rpi2_reg_context.reg.cpsr;
 			util_word_to_hex(scratchpad, value);
-			util_strip_zeros(scratchpad, &cp);
-			gdb_send_packet(cp, util_str_len(cp));
+			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_word_to_hex(scratchpad, tmp);
+			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
 		else
 		{
 			gdb_send_packet(err, util_str_len(err));
 		}
+#if 0
+		gdb_iodev->put_string("\r\np_cmd: ", 10);
+		util_word_to_hex(scratchpad, reg);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string(" : ", 4);
+		util_word_to_hex(scratchpad, value);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 	}
 }
 
@@ -965,34 +1007,50 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
 	uint32_t value, tmp;
-	uint8_t reg;
+	uint32_t reg;
 	uint32_t *p;
 	char *err = "E00";
 	if (packet_len > 1)
 	{
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, '=', scratch_len);
-		reg = util_hex_to_byte(scratchpad);
+		reg = (uint32_t)util_hex_to_word(scratchpad);
+		gdb_in_packet += (len + 1);  // skip register number and '='
+		packet_len -= (len + 1);
+		tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
+		util_swap_bytes((unsigned char *)&tmp, (unsigned char *)&value);
+#if 0
+		gdb_iodev->put_string((char *)gdb_in_packet, packet_len);
+		gdb_iodev->put_string("\r\nP_cmd: ", 10);
+		util_word_to_hex(scratchpad, reg);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string(" plen: ", 10);
+		util_word_to_hex(scratchpad, packet_len);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string(" tmp: ", 10);
+		util_word_to_hex(scratchpad, tmp);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string(" val: ", 10);
+		util_word_to_hex(scratchpad, value);
+		gdb_iodev->put_string(scratchpad, 10);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 		if ((reg > 15) && (reg < 25))
 		{
 			// gdb_send_packet("OK", 2); // dummy fp-register
 		}
 		else if (reg < 16)
 		{
-			gdb_in_packet += (len + 1);  // skip register number and '='
-			value = util_hex_to_word((char *)gdb_in_packet);
-			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			//util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
 			// p = (uint32_t *) &(rpi2_reg_context.storage);
 			// p[reg] = value;
-			rpi2_reg_context.storage[reg] = tmp;
+			rpi2_reg_context.storage[reg] = value;
 		}
 		else if (reg == 25) // cpsr
 		{
-			gdb_in_packet += (len + 1);  // skip register number and '='
-			value = util_hex_to_word((char *)gdb_in_packet);
-			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			//util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
 			// p = (uint32_t *) &(rpi2_reg_context.storage);
 			// p[reg] = value;
-			rpi2_reg_context.reg.cpsr = tmp;
+			rpi2_reg_context.reg.cpsr = value;
 		}
 		else
 		{
@@ -1672,19 +1730,19 @@ void gdb_monitor(int reason)
 				gdb_response_not_supported(); // for now
 				break;
 			case 'c':	// continue +
-				gdb_cmd_cont(++inpkg, packet_len);
+				gdb_cmd_cont(++inpkg, --packet_len);
 				break;
 			case 'D':	// detach
-				gdb_cmd_detach(++inpkg, packet_len);
+				gdb_cmd_detach(++inpkg, --packet_len);
 				break;
 			case 'F':	// file I/O - for gdb console
 				gdb_response_not_supported(); // for now
 				break;
 			case 'g':	// get regs +
-				gdb_cmd_get_regs(++inpkg, packet_len);
+				gdb_cmd_get_regs(++inpkg, --packet_len);
 				break;
 			case 'G':	// set regs +
-				gdb_cmd_set_regs(++inpkg, packet_len);
+				gdb_cmd_set_regs(++inpkg, --packet_len);
 				break;
 			case 'H':	// set thread - dummy
 				gdb_cmd_set_thread(inpkg, packet_len);
@@ -1693,16 +1751,16 @@ void gdb_monitor(int reason)
 				gdb_response_not_supported(); // for now
 				break;
 			case 'm':	// read mem hex +
-				gdb_cmd_read_mem_hex(++inpkg, packet_len);
+				gdb_cmd_read_mem_hex(++inpkg, --packet_len);
 				break;
 			case 'M':	// write mem hex +
-				gdb_cmd_write_mem_hex(++inpkg, packet_len);
+				gdb_cmd_write_mem_hex(++inpkg, --packet_len);
 				break;
 			case 'p':	// read reg +
-				gdb_cmd_read_reg(++inpkg, packet_len);
+				gdb_cmd_read_reg(++inpkg, --packet_len);
 				break;
 			case 'P':	// write reg +
-				gdb_cmd_write_reg(++inpkg, packet_len);
+				gdb_cmd_write_reg(++inpkg, --packet_len);
 				break;
 			case 'q':	// query + (support)
 				gdb_cmd_common_query(inpkg, packet_len);
@@ -1714,7 +1772,7 @@ void gdb_monitor(int reason)
 				gdb_cmd_restart_program(inpkg, packet_len);
 				break;
 			case 's':	// single step +
-				gdb_cmd_single_step(++inpkg, packet_len);
+				gdb_cmd_single_step(++inpkg, --packet_len);
 				break;
 			case 'T':	// thread alive?
 				gdb_response_not_supported(); // for now
@@ -1723,16 +1781,16 @@ void gdb_monitor(int reason)
 				gdb_response_not_supported(); // for now
 				break;
 			case 'X':	// write mem binary +
-				gdb_cmd_write_mem_bin(++inpkg, packet_len);
+				gdb_cmd_write_mem_bin(++inpkg, --packet_len);
 				break;
 			case 'x':	// read mem binary +
-				gdb_cmd_read_mem_bin(++inpkg, packet_len);
+				gdb_cmd_read_mem_bin(++inpkg, --packet_len);
 				break;
 			case 'Z':	// add Z0-breakpoint +
 				// Z1 - Z4 = HW breakpoints/watchpoints
 				if (*(++inpkg) == '0') // if Z0
 				{
-					gdb_cmd_add_breakpoint(++inpkg, packet_len);
+					gdb_cmd_add_breakpoint(++inpkg, --packet_len);
 				}
 				else // Z1 - Z4 not supported
 				{
@@ -1743,7 +1801,7 @@ void gdb_monitor(int reason)
 				// z1 - z4 = HW breakpoints/watchpoints
 				if (*(++inpkg) == '0') // if z0
 				{
-					gdb_cmd_delete_breakpoint(++inpkg, packet_len);
+					gdb_cmd_delete_breakpoint(++inpkg, --packet_len);
 				}
 				else // z1 - z4 not supported
 				{

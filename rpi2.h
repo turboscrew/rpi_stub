@@ -161,6 +161,9 @@ void rpi2_trap();
 void rpi2_init();
 void rpi2_set_trap(void *address, int kind);
 void rpi2_pend_trap();
+// access functions
+void rpi2_set_sigint_flag(unsigned int val);
+unsigned int rpi2_get_sigint_flag();
 
 /* for debugging */
 // ACT-led: gpio 47, active high

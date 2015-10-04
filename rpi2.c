@@ -62,8 +62,9 @@ extern void gdb_trap_handler(); // TODO: make callback
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
 volatile uint32_t rpi2_ctrl_c_flag;
+volatile uint32_t rpi2_sigint_flag;
 volatile rpi2_reg_context_t rpi2_irq_context;
-
+volatile uint32_t rpi2_lr_store1, rpi2_lr_store2, rpi2_lr_store3;
 // repeated SVC - for debugging
 // #define DEBUG_SVC_VOODOO
 #ifdef DEBUG_SVC_VOODOO
@@ -95,6 +96,7 @@ void rpi2_dabt_handler() __attribute__ ((naked));
 void rpi2_irq_handler() __attribute__ ((naked));
 void rpi2_firq_handler() __attribute__ ((naked));
 void rpi2_pabt_handler() __attribute__ ((naked));
+void rpi2_ctrlc_trap() __attribute__ ((naked));
 
 /* delay() borrowed from OSDev.org */
 static inline void delay(int32_t count)
@@ -563,18 +565,18 @@ static inline void write_context()
 			"mov r2, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r1, r2\n\t"
 
-			"@ our own mode"
+			"@ our own mode?\n\t"
 			"mrs r3, cpsr\n\t"
 			"and r3, r2\n\t"
 			"cmp r1, r3\n\t"
-			"bne 10f\n\t"
+			"bne 10f @ not our own mode\n\t"
+
 			"mov r1, sp\n\t"
 			"mov r2, lr\n\t"
 			"mrs r3, spsr\n\t"
-
 			"b 9f\n\t"
 
-			"10:"
+			"10:\n\t"
 			"cmp r1, #0x00 @ USR\n\t"
 			"cmpne r1, #0x0f @ SYS\n\t"
 			"bne 1f\n\t"
@@ -657,21 +659,23 @@ static inline void read_context()
 	asm volatile(
 			"@ldr r0, =rpi2_reg_context\n\t"
 			"@ mode specifics\n\t"
+
 			"ldr r1, [r0, #4*16] @ cpsr\n\t"
 			"msr spsr_fsxc, r1\n\t"
+			"@ mode to return to\n\t"
 			"mov r2, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r1, r2\n\t"
 
-			"@ our own mode"
+			"@ our own mode\n\t"
 			"mrs r3, cpsr\n\t"
 			"and r3, r2\n\t"
 			"cmp r1, r3\n\t"
-			"bne 10f\n\t"
+			"bne 10f @ not same mode as ours\n\t"
 			"ldr sp, [r0, #4*13] @ sp\n\t"
 			"ldr lr, [r0, #4*14] @ lr\n\t"
 			"b 9f\n\t"
 
-			"10:"
+			"10:\n\t"
 			"ldr r2, [r0, #4*13] @ sp\n\t"
 			"ldr r3, [r0, #4*14] @ lr\n\t"
 			"ldr r4, [r0, #4*17] @ spsr\n\t"
@@ -751,14 +755,11 @@ static inline void read_context()
 			// can be turned off for processor context
 			// save/restore debugging
 			"@ return from exception\n\t"
-			"ldm sp!, {r0, lr}\n\t"
+			"@ldm sp!, {r0, lr}\n\t"
 			"@ldm sp! {r0, pc}\n\t"
+			"pop {r0, lr}\n\t"
 			"dsb\n\t"
 			"isb\n\t"
-#ifndef DEBUG_REG_CONTEXT
-			"subs pc, lr, #0\n\t"
-#endif
-			".ltorg @ literal pool\n\t"
 	);
 }
 
@@ -786,6 +787,7 @@ void rpi2_trap_handler()
 void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
+	static char scratchpad[16]; // scratchpad
 #ifdef DEBUG_UNDEF
 	static char scratchpad[16]; // scratchpad
 	char *p;
@@ -803,6 +805,14 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
 	rpi2_reg_context.reg.r15 -= 4; // PC
 
+	serial_raw_puts("\r\nUND 1 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store1);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	serial_raw_puts("\r\nUND 2 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store2);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
 #ifdef DEBUG_UNDEF
 	p = "\r\nUNDEFINED EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
@@ -837,6 +847,8 @@ void rpi2_undef_handler()
 	// store processor context
 	asm volatile (
 			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_lr_store1\n\t"
+			"str lr,[r12]\n\t"
 			"ldr r12, =rpi2_reg_context\n\t"
 	);
 	write_context();
@@ -866,9 +878,21 @@ void rpi2_undef_handler()
 			"mov sp, r0\n\t"
 			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 );
-
+#define DEBUG_REG_CONTEXT
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr,[r0]\n\t"
+			"push {r0}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
+#undef DEBUG_REG_CONTEXT
+
 }
 
 void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
@@ -956,7 +980,7 @@ void rpi2_svc_handler()
 			"and r1, r0, #7\n\t"
 			"sub r0, r1\n\t"
 			"mov sp, r0\n\t"
-			"push {r0,r1} @ stack correction\n\t\n\t"
+			"push {r0,r1} @ stack correction\n\t"
 
 	);
 
@@ -971,7 +995,7 @@ void rpi2_svc_handler()
 
 
 	asm volatile (
-			"@ restore stack correction\n\t\n\t"
+			"@ restore stack correction\n\t"
 			"pop {r0, r1}\n\t"
 			"add r0, r1\n\t"
 			"mov sp, r0\n\t"
@@ -981,10 +1005,10 @@ void rpi2_svc_handler()
 //#define DEBUG_REG_CONTEXT
 	read_context();
 
-#ifdef DEBUG_REG_CONTEXT
 	// can be turned on for processor context
 	// save/restore debugging
 	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
 
 			"ldr r4, =rpi2_tmp1\n\t"
 			"str sp, [r4]\n\t"
@@ -1046,8 +1070,12 @@ void rpi2_svc_handler()
 */
 			"subs pc, lr, #0\n\t"
 			".ltorg @ literal pool\n\t"
-	);
+#else
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
 #endif
+	);
+
 #undef DEBUG_REG_CONTEXT
 }
 
@@ -1131,11 +1159,22 @@ void rpi2_aux_handler()
 
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr,[r0]\n\t"
+			"push {r0}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
 }
 
 void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
+	static char scratchpad[16]; // scratchpad
 #ifdef DEBUG_DABT
 	uint32_t tmp;
 	int i;
@@ -1153,7 +1192,17 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
 	rpi2_reg_context.reg.r15 -= 8; // PC
+	rpi2_reg_context.reg.r0 = 0xa5a50001; // debug
+	rpi2_reg_context.reg.r1 = exc_addr; // debug
 
+	serial_raw_puts("\r\nDABT 1 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store1);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	serial_raw_puts("\r\nDABT 2 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store2);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
 #ifdef DEBUG_DABT
 	p = "\r\nDABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
@@ -1188,6 +1237,8 @@ void rpi2_dabt_handler()
 	// store processor context
 	asm volatile (
 			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_lr_store1\n\t"
+			"str lr,[r12]\n\t"
 			"ldr r12, =rpi2_reg_context\n\t"
 	);
 	write_context();
@@ -1218,8 +1269,28 @@ void rpi2_dabt_handler()
 			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
+#define DEBUG_REG_CONTEXT
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr,[r0]\n\t"
+			"push {r0}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
+#undef DEBUG_REG_CONTEXT
+}
+
+// trapping from IRQ-mode to pabt
+void rpi2_ctrlc_trap()
+{
+	asm volatile (
+			"bkpt #0xe\n\t"
+	);
 }
 
 void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
@@ -1310,7 +1381,9 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// if crtl-C, dump exception info (for now)
 	if (rpi2_ctrl_c_flag)
 	{
+		// swap flags to stop further interrupts on one ctrl-C
 		rpi2_ctrl_c_flag = 0;
+		rpi2_sigint_flag = 1;
 		serial_raw_puts("\r\nCTRL-C\r\n");
 		serial_raw_puts("exc_addr: ");
 		util_word_to_hex(scratchpad, exc_addr);
@@ -1404,6 +1477,27 @@ void rpi2_irq_handler()
 
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr,[r0]\n\t"
+			"push {r0}\n\t"
+#endif
+			"push {r0, r1}\n\t"
+			"ldr r0, =rpi2_sigint_flag\n\t"
+			"ldr r1, [r0]\n\t"
+			"cmp r1, #0\n\t"
+			"bne 1f\n\t"
+			"pop {r0, r1}\n\t"
+			"subs pc, lr, #0\n\t"
+			"1:\n\t"
+			"ldr r0, =rpi2_ctrlc_trap\n\t"
+			"mov lr, r0\n\t"
+			"pop {r0, r1}\n\t"
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
 }
 #endif
 
@@ -1483,15 +1577,26 @@ void rpi2_firq_handler()
 
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr,[r0]\n\t"
+			"push {r0}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
 }
 
 void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	int i;
-	uint32_t *p;
+	uint32_t *p, *p2;
 	uint32_t exc_cpsr;
 	uint32_t dbg_state;
 	uint32_t ifsr;
+	static char scratchpad[16]; // scratchpad
 
 #ifdef DEBUG_PABT
 	uint32_t tmp;
@@ -1504,11 +1609,26 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r15 -= 4; // PC
+	// if crtl-C trap
+	if (rpi2_sigint_flag)
+	{
+		// leave the flag for gdb_trap_handler()
+		p = (uint32_t *)(&rpi2_irq_context);
+		p2 = (uint32_t *)(&rpi2_reg_context);
+		for (i=0; i<(sizeof(rpi2_reg_context_t)/4); i++)
+		{
+			*(p2++) = *(p++);
+		}
+		serial_raw_puts("\r\nIRQ_PABT\r\n");
+	}
+	else
+	{
+		// fix for the exception return address
+		// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
+		// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
+		// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
+		rpi2_reg_context.reg.r15 -= 4; // PC
+	}
 
 #if 0
 	// check debug state
@@ -1531,8 +1651,14 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			:[var_reg] "=r" (ifsr) ::
 	);
 
-	//copy_from_stackframe(stack_frame_addr);
-	//store_banked_regs();
+	serial_raw_puts("\r\nPABT 1 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store1);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	serial_raw_puts("\r\nPABT 2 ");
+	util_word_to_hex(scratchpad, rpi2_lr_store2);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
 
 #ifdef DEBUG_PABT
 	// raw puts, because we are here with interrupts disabled
@@ -1630,6 +1756,8 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	}
 	else
 	{
+		//rpi2_reg_context.reg.r0 = 0xa5a50002; // debug
+		//rpi2_reg_context.reg.r1 = exc_addr; // debug
 		exception_extra = RPI2_TRAP_PABT; // prefetch abort
 #ifdef DEBUG_PABT
 		pp = "\r\nPrefetch Abort\r\n";
@@ -1637,13 +1765,35 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 #endif
 	}
 	rpi2_trap_handler();
+	// serial_raw_puts("\r\nPABT ret\r\n");
+	// rpi2_dump_context(&rpi2_reg_context);
 	// TODO: check if the exception causing instruction needs to be skipped
 }
 
+void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
+{
+	static char scratchpad[16];
+
+	serial_raw_puts("\r\npabt_ret");
+	serial_raw_puts("\r\nlr: ");
+	util_word_to_hex(scratchpad, xlr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\ncpsr: ");
+	util_word_to_hex(scratchpad, xcpsr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\nspsr: ");
+	util_word_to_hex(scratchpad, xspsr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+}
 void rpi2_pabt_handler()
 {
 	asm volatile (
+			"dsb\n\t"
+			"isb\n\t"
 			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_lr_store1\n\t"
+			"str lr,[r12]\n\t"
 			"ldr r12, =rpi2_reg_context\n\t"
 	);
 	// store processor context
@@ -1663,7 +1813,15 @@ void rpi2_pabt_handler()
 			"mov r0, sp\n\t"
 			"mov r1, lr\n\t"
 			"push {r0 - r3}\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"bl rpi2_pabt_handler2\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"ldr r0, =rpi2_lr_store3\n\t"
+			"ldr r1, =rpi2_reg_context\n\t"
+			"ldr r1, [r1, #4*15]\n\t"
+			"str r1, [r0]\n\t"
 			"pop {r0 - r3}\n\t"
 	);
 
@@ -1675,8 +1833,26 @@ void rpi2_pabt_handler()
 			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
 	);
 
+#define DEBUG_REG_CONTEXT
 	// restore processor context
 	read_context();
+	asm volatile (
+#ifdef DEBUG_REG_CONTEXT
+			"push {r0, r1, r2, lr}\n\t"
+			"ldr r0, =rpi2_lr_store2\n\t"
+			"str lr, [r0]\n\t"
+			"mov r0, lr\n\t"
+			"mrs r1, cpsr\n\t"
+			"mrs r2, spsr\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"bl rpi2_print_dbg\n\t"
+			"pop {r0, r1, r2, lr}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
+#undef DEBUG_REG_CONTEXT
 }
 
 void rpi2_set_vector(int excnum, void *handler)
@@ -1719,6 +1895,16 @@ void rpi2_pend_trap()
 	/* set pending flag for Prefetch Abort exception */
 	// TODO: pend Prefetch Abort
 	rpi2_ctrl_c_flag = 1; // for now
+}
+
+unsigned int rpi2_get_sigint_flag()
+{
+	return (unsigned int) rpi2_sigint_flag;
+}
+
+void rpi2_set_sigint_flag(unsigned int val)
+{
+	rpi2_sigint_flag = (uint32_t)val;
 }
 
 // for dumping info about debug HW
@@ -1811,6 +1997,7 @@ void rpi2_init()
 	uint32_t *tmp3;
 	exception_info = RPI2_EXC_NONE;
 	exception_extra = 0;
+	rpi2_sigint_flag = 0;
 #ifdef DEBUG_CTRLC
 	rpi2_ctrl_c_flag = 0;
 	serial_set_ctrlc((void *)rpi2_pend_trap);
