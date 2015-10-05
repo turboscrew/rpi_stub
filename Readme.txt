@@ -6,7 +6,7 @@ for Raspberry Pi 2B
 
 
 
-WORK IN PROGRESS - DOESN'T WORK YET.
+WORK IN PROGRESS - NOT FULLY TESTED.
 
 This is my very first RPi(2) project ever, and first ever project that
 I have to deal with ARM core (and assembly).

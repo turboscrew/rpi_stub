@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef INSTR_COMM_H_
 #define INSTR_COMM_H_
 
+// marker: instruction is UNDEF
 #define INSTR_ADDR_UNDEF 0
 // marker: instruction is UNPREDICTABLE
 #define INSTR_ADDR_UNPRED (1 << 4)
@@ -28,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define INSTR_ADDR_ARM 2
 // marker: THUMB instruction is defined
 #define INSTR_ADDR_THUMB 3
-// marker: instruction is UNDEF
 
 // processor modes
 #define INSTR_PMODE_USR 0x10

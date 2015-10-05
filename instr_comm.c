@@ -108,17 +108,6 @@ void exec_instr(unsigned int instr, unsigned int r0, unsigned int r1,
 		);
 }
 
-// TODO: Maybe add running a function in MON-mode
-/*
-void smc_call_func()
-{
-	// set vector to here
-	// SMC
-	// call function
-	// return from SMC
-}
-*/
-
 // The next function needs this
 unsigned int instr_comm_regret = 0;
 // reads banked register of another mode
