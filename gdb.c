@@ -1098,6 +1098,8 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 void gdb_cmd_detach(volatile uint8_t *gdb_packet, int packet_len)
 {
 	gdb_send_packet("OK", 2); // for now
+	// TODO: clear all breakpoints
+	gdb_cmd_cont("", 0);
 }
 
 void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
