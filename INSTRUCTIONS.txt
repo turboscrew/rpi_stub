@@ -59,11 +59,17 @@ https://github.com/raspberrypi/tools/tree/master/arm-bcm2708
 and the eclipse:
 https://eclipse.org/downloads/packages/release/Kepler/SR2
 
-Using image:
-Download the image and write it onto the SD card. put the card into
-the Raspberry Pi and turn the power on.
-The writing is done just like with Raspberry. Instructions can be found:
-https://www.raspberrypi.org/documentation/installation/installing-images/
+Using image file:
+- Format an SD card as FAT32
+- Download the files bootcode.bin, cmdline.txt, config.txt and start.elf
+  from https://github.com/raspberrypi/firmware/tree/master/boot .
+- Copy the downloaded files onto the SD card.
+- Copy the file 'kernel7.img' from the 'Debug' folder onto the SD card.
+- Insert the SD card into Rspberry Pi 2B.
+- Turn the power on.
+- To update the program, copy a new version of kernel7.img file
+  (from the Debug directory, if you have compiled it, or from the Debug
+  directory in the github) on top of the kernel7.img file on the SD card.
 
 The typical way to use the stub:
 - Connect a serial cable between the Raspberry Pi 2B and your
