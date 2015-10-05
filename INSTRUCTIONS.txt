@@ -1,0 +1,93 @@
+/*
+INSTRUCTIONS.txt
+
+Copyright (C) 2015 Juha Aaltonen
+
+This file is part of standalone gdb stub for Raspberry Pi 2B.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+In the text I'll use the word 'stub' for this program and the word
+'debuggee' for a program being debugged.
+
+This program is a bare metal standalone gdb stub for Raspberry Pi 2B.
+That is, the idea is that stub is installed onto the SD card as
+'kernel7.img' to be booted. The gdb is then used for the debugging
+and loading debuggees onto the Raspberry Pi.
+
+This way there is no need to constant insert/removal of the SD card
+to/from Raspberry Pi.
+
+Limitations:
+- Only single core is supported.
+- No single stepping (yet).
+- No hardware breakpoints nor watchpoints of any kind.
+- No conditional breakpoints.
+- Exceptions are not (yet) directly supported.
+- The stub reserves the ABT-mode to itself.
+- The stub reserves the UART0 to itself for communicating
+  with gdb.
+- The stub runs in addresses 0x1f000000 upwards leaving the
+  lower memory for the debuggee.
+- Floating point and vector registers are not supported (yet).
+
+The stub supports:
+- Both hex and binary data transfer.
+- Software interrupts.
+- Software breakpoints
+- Control-C handling
+
+INSTALLATION:
+
+From sources:
+For now, the stub is being developed using the "official" Raspberry
+Pi / Raspbian tool chain (gcc-linaro-arm-linux-gnueabihf-raspbian)
+and Eclipse (Kepler SR2) with CDT.
+The tool chain can be found:
+https://github.com/raspberrypi/tools/tree/master/arm-bcm2708
+and the eclipse:
+https://eclipse.org/downloads/packages/release/Kepler/SR2
+
+Using image:
+Download the image and write it onto the SD card. put the card into
+the Raspberry Pi and turn the power on.
+The writing is done just like with Raspberry. Instructions can be found:
+https://www.raspberrypi.org/documentation/installation/installing-images/
+
+The typical way to use the stub:
+- Connect a serial cable between the Raspberry Pi 2B and your
+  development computer. Raspberry Pi GPIO-pins 13, 14 and 15 are
+  used for the serial adapter.
+  NOTE: 3.3V adapter must be used.
+  (https://www.raspberrypi.org/documentation/usage/gpio/README.md)
+- Boot the Raspberry Pi with the SD card containing the image.
+- Start the gdb
+- In gdb, give the commands:
+	set serial baud 115200
+	target remote /dev/ttyUSB0 # or which ever serial device you use
+	load my_program/Debug/my_program.elf # load your program
+	break main # set breakpoint to the function 'main' in your program
+	cont # start your program
+	# when the breakpoint is hit
+	info register # look at the registers
+	cont # continue running
+	# Control-C to stop the program
+	info register # look at the registers
+	detach # to stop debugging
+	quit # to quit gdb
+
+
+	
+
+
