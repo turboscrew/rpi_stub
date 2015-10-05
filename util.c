@@ -77,10 +77,10 @@ unsigned char util_hex_to_byte(char *p)
 	val = util_hex_to_nib(*p);
 	if (val < 0) return 0; // no digits
 	retval = (unsigned char) val;
-	val |= util_hex_to_nib(*(++p));
+	val = util_hex_to_nib(*(++p));
 	if (val < 0) return retval; // 1 digit
 	retval <<= 4;
-	retval |= (val & 0x0f);
+	retval |= (unsigned char)(val & 0x0f);
 	return retval;
 }
 
@@ -130,18 +130,18 @@ void util_word_to_hex(char *dst, unsigned int w)
 }
 
 // bin (escaped binary) to byte
-unsigned char util_bin_to_byte(unsigned char *p)
+int util_bin_to_byte(unsigned char *src, unsigned char *dst)
 {
-	unsigned char retval;
-	if (*p == 0x7d) // escape
+	if (*src == 0x7d) // escape
 	{
-		retval = (*(++p)) ^ 0x20;
+		*dst = (*(++src)) ^ 0x20;
+		return 2;
 	}
 	else
 	{
-		retval = *p;
+		*dst = *src;
+		return 1;
 	}
-	return retval;
 }
 
 // byte to bin (escaped binary)

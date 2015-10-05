@@ -47,21 +47,24 @@ void loader_main()
 	static char scratchpad[16]; // scratchpad
 	static char dbg_buff[512]; // message buffer
 	static char scratch2[16];
+	
 	/* initialize rpi2 */
 	rpi2_init();
 
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
-	
+
+#ifdef SERIAL_TEST	
 	// debug-line
-	msg = "Finally! Got into main()\r\n";
+	msg = "Got into main()\r\n";
 	i=0;
-	//do {i = serial_raw_puts(msg); msg += i;} while (i) ;
+	do {i = serial_raw_puts(msg); msg += i;} while (i) ;
 
 	// rpi2_check_debug();
 	
 	rpi2_led_blink(1000, 1000, 3);
 	rpi2_delay_loop(3000);
+#endif
 
 #if 0		
 	//  dump vectors (debug)

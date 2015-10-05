@@ -269,6 +269,7 @@ void gdb_init(io_device *device)
 	/* install trap handler */
 	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
+	rpi2_set_sigint_flag(0);
 	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
 #ifdef DEBUG_GDB
 	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
@@ -426,7 +427,7 @@ int gdb_write_hex_data(uint8_t *indata, int count, char *hexdata, int max)
 	uint8_t hex;
 	unsigned char *src = (unsigned char *)indata;
 	unsigned char *dst = (unsigned char *)hexdata;
-	while (i < count)
+	while (i < count) // 1 byte = 2 chars
 	{
 		if (j + 2 > max) break; // both output characters wouldn't fit
 		byte = *(src++);
@@ -451,9 +452,9 @@ int gdb_write_bin_data(uint8_t *indata, int count, uint8_t *bindata, int max)
 	while (i < count)
 	{
 		// if escaped, both output bytes would not fit
-		if (j + 2 > max) break; // out of while
+		if (j + 2 > max) break;
 		len = util_byte_to_bin(dst, *(src++));
-		bindata += len;
+		dst += len;
 		j += len;
 		i++;
 	}
@@ -469,15 +470,18 @@ int gdb_read_hex_data(uint8_t *hexdata, int count, uint8_t *outdata, int max)
 	uint8_t inbyte;
 	unsigned char *src = (unsigned char *)hexdata;
 	unsigned char *dst = (unsigned char *)outdata;
+
 	while (j < max)
 	{
 		// check that there are at least two digits left
-		if (i + 2 > count) break;
+		// 1 byte = 2 chars
+		if (i + 2 > count*2) break;
 		*(dst++) = util_hex_to_byte(src);
 		src += 2;
 		j++;
 		i += 2;
 	}
+
 	return i;
 }
 
@@ -487,21 +491,25 @@ int gdb_read_bin_data(uint8_t *bindata, int count, uint8_t *outdata, int max)
 {
 	int i = 0; // bindata counter
 	int j = 0; // outdata counter
-	uint8_t inbyte;
+	//uint8_t inbyte;
+	int cnt;
 	unsigned char *src = (unsigned char *)bindata;
 	unsigned char *dst = (unsigned char *)outdata;
-	while (j < max)
+	while (j < count)
 	{
-		if (i + 2 > count) break;
-		inbyte = *(src++);
-		if (inbyte == 0x7d) // escaped
-		{
-			i++; // escape char
-			inbyte = *(src++) ^ 0x20; // escaped char
-		}
-		*(dst++) = inbyte;
+		if (i + 2 > max) break;
+		cnt = util_bin_to_byte(src, dst);
+//		inbyte = *(src++);
+//		if (inbyte == 0x7d) // escaped
+//		{
+//			i++; // escape char
+//			inbyte = *(src++) ^ 0x20; // escaped char
+//		}
+//		*(dst++) = inbyte;
+		src += cnt;
+		dst++;
+		i+= cnt;
 		j++;
-		i++;
 	}
 	return i;
 }
@@ -909,6 +917,15 @@ void gdb_cmd_read_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 		gdb_in_packet += len+1; // skip address and delimiter
 		addr = util_hex_to_word(scratchpad); // address to binary
 		bytes = util_hex_to_word((char *)gdb_in_packet); // read nuber of bytes
+#if 0
+		gdb_iodev->put_string("\r\nm_cmd: addr= ", 16);
+		util_word_to_hex(scratchpad, addr);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string(" len= ", 10);
+		util_word_to_hex(scratchpad, bytea);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 		// dump memory as hex into temp buffer
 		len = gdb_write_hex_data((uint8_t *)addr, (int)bytes, (char *)gdb_tmp_packet,
 				 GDB_MAX_MSG_LEN - 5); // -5 to allow message overhead
@@ -931,10 +948,23 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 		// get hex for address
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 		gdb_in_packet += len+1; // skip address and delimiter
+		packet_len -= (len+1);
 		addr = util_hex_to_word(scratchpad); // address to binary
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ':', scratch_len);
 		gdb_in_packet += len+1; // skip bytecount and delimiter
+		packet_len -= (len+1);
 		bytes = util_hex_to_word(scratchpad); // address to binary
+#if 0
+		gdb_iodev->put_string("\r\nM_cmd: addr= ", 16);
+		util_word_to_hex(scratchpad, addr);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string(" len= ", 10);
+		util_word_to_hex(scratchpad, bytea);
+		gdb_iodev->put_string(scratchpad, 9);
+		gdb_iodev->put_string("\r\ndata:", 10);
+		gdb_iodev->put_string((char *)gdb_in_packet, packet_len);
+		gdb_iodev->put_string("\r\n", 3);
+#endif
 		// write to memory
 		gdb_read_hex_data((char *)gdb_in_packet, (int)bytes, (uint8_t *) addr,
 				GDB_MAX_MSG_LEN); // can't be more than message size
@@ -1379,10 +1409,13 @@ void gdb_cmd_write_mem_bin(volatile uint8_t *gdb_in_packet, int packet_len)
 		// get hex for address
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 		gdb_in_packet += len+1; // skip address and delimiter
+		packet_len -= (len + 1);
 		addr = util_hex_to_word(scratchpad); // address to binary
 		len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ':', scratch_len);
 		gdb_in_packet += len+1; // skip bytecount and delimiter
+		packet_len -= (len + 1);
 		bytes = util_hex_to_word(scratchpad); // address to binary
+
 		// write to memory
 		gdb_read_bin_data((char *)gdb_in_packet, (int)bytes, (uint8_t *) addr,
 				GDB_MAX_MSG_LEN); // can't be more than message size
@@ -1780,10 +1813,10 @@ void gdb_monitor(int reason)
 			case 'v':	// v-command
 				gdb_response_not_supported(); // for now
 				break;
-			case 'X':	// write mem binary +
+			case 'X':	// write mem binary
 				gdb_cmd_write_mem_bin(++inpkg, --packet_len);
 				break;
-			case 'x':	// read mem binary +
+			case 'x':	// read mem binary
 				gdb_cmd_read_mem_bin(++inpkg, --packet_len);
 				break;
 			case 'Z':	// add Z0-breakpoint +

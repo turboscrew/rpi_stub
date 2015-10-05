@@ -44,10 +44,10 @@ void util_byte_to_hex(char *dst, unsigned char b);
 // convert unsigned int to 8 hex digits
 void util_word_to_hex(char *dst, unsigned int w);
 
-// convert unsigned char to "escaped" string used in gdb serial protocol
-unsigned char util_bin_to_byte(unsigned char *p);
-
 // convert"escaped" string used in gdb serial protocol to unsigned char
+int util_bin_to_byte(unsigned char *src, unsigned char *dst);
+
+// convert unsigned char to "escaped" string used in gdb serial protocol
 int util_byte_to_bin(unsigned char *dst, unsigned char b);
 
 // returns the length of the string excluding the end NUL

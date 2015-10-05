@@ -355,19 +355,24 @@ int serial_get_string(char *st, int n)
 int serial_put_string(char *st, int n)
 {
 	int m = 0;
-
+	int retry = 0;
 	while (*st != '\0')
 	{
 		// check against max length
 		if (m <= n)
 		{
-			// -1 means that FIFO is full
-			if (serial_write_char(*(st++)) == -1)
+			// -1 means that tx buffer is full
+			if (serial_write_char(*st) == -1)
 			{
-				break;
+				retry++;
+				if (retry > 100) break;
+				continue;
+				// break;
 			}
 			else
 			{
+				retry = 0;
+				st++;
 				m++;
 			}
 		}
