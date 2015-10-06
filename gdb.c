@@ -134,6 +134,44 @@ int gdb_check_breakpoint()
 	return num;
 }
 
+void gdb_clear_breakpoints(int remove_traps)
+{
+	int i;
+	uint32_t *tmp;
+
+	/* clean up user breakpoints */
+	for (i=0; i<GDB_MAX_BREAKPOINTS; i++)
+	{
+		if (remove_traps)
+		{
+			// restore 'bkpts'
+			if (gdb_usr_breakpoint[i].valid)
+			{
+				tmp = (uint32_t *)gdb_usr_breakpoint[i].trap_address;
+				*tmp = gdb_usr_breakpoint[i].instruction.arm;
+			}
+		}
+		gdb_usr_breakpoint[i].trap_address = (void *)0xffffffff;
+		gdb_usr_breakpoint[i].instruction.arm = 0;
+		gdb_usr_breakpoint[i].valid = 0;
+	}
+	gdb_num_bkpts = 0;
+	// clean up single stepping breakpoints
+	if (remove_traps)
+	{
+		// restore 'bkpts'
+		if (gdb_step_bkpt.valid)
+		{
+			tmp = (uint32_t *)gdb_step_bkpt.trap_address;
+			*tmp = gdb_step_bkpt.instruction.arm;
+		}
+	}
+	gdb_step_bkpt.instruction.arm = 0;
+	gdb_step_bkpt.trap_address = (void *)0xffffffff;
+	gdb_step_bkpt.valid = 0;
+	gdb_single_stepping = 0;
+}
+
 // exception handler
 void gdb_trap_handler()
 {
@@ -280,20 +318,7 @@ void gdb_init(io_device *device)
 /* Clean-up after last session */
 void gdb_reset()
 {
-	int i;
-	/* clean up user breakpoints */
-	for (i=0; i<GDB_MAX_BREAKPOINTS; i++)
-	{
-		gdb_usr_breakpoint[i].trap_address = (void *)0xffffffff;
-		gdb_usr_breakpoint[i].instruction.arm = 0;
-		gdb_usr_breakpoint[i].valid = 0;
-	}
-	gdb_num_bkpts = 0;
-	// clean up single stepping breakpoints
-	gdb_step_bkpt.instruction.arm = 0;
-	gdb_step_bkpt.trap_address = (void *)0xffffffff;
-	gdb_step_bkpt.valid = 0;
-	gdb_single_stepping = 0;
+	gdb_clear_breakpoints(0);
 
 	// reset debuggee info
 	gdb_debuggee.start_addr = (void *)0x00008000; // default
@@ -1098,7 +1123,7 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 void gdb_cmd_detach(volatile uint8_t *gdb_packet, int packet_len)
 {
 	gdb_send_packet("OK", 2); // for now
-	// TODO: clear all breakpoints
+	gdb_clear_breakpoints(1); // bremove all breakpoints
 	gdb_cmd_cont("", 0);
 }
 
