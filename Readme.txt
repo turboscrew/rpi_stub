@@ -46,34 +46,46 @@ PROCESS loader
     set up exceptions
     set up serial
     set up gdb-stub
-    reset gdb-stub
     FOREVER
-        BKPT
-        IF program loaded THEN // loaded by gdb-stub
-            IF arguments THEN
-                CALL program with arguments (probably doesn't return)
-                notify program status (if program returns)
-                reset gdb-stub
-            ELSE
-                CALL program with NULL arguments (probably doesn't return)
-                notify program status (if program returns)
-                reset gdb-stub
-            ENDIF
-        ENDIF
+        reset gdb-stub
+        START gdb_stub
     ENDFOREVER
+ENDPROCESS
+
+PROCESS ctrl_c_trap
+    do BKPT
 ENDPROCESS
 
 PROCESS exception_handler (really kind of exception vector)
     store registers
     IF exception is reset THEN
         START reset
-    ELSIF exception is serial tx THEN
-        START serial_output
-    ELSIF exception is serial rx THEN
-        START serial_output
+    ELSIF exception is IRQ THEN
+        IF exception is serial tx THEN
+            START serial_output
+        ELSIF exception is serial rx THEN
+            START serial_output
+        ENDIF
+        IF ctrl-C flag is set THEN
+            set sig_int flag
+            clear ctrl_C flag
+            restore registers
+            set return address to ctrl_c_trap
+            return from exception
+        ENDIF
+    ELSIF exception is PABT
+        IF bkpt THEN
+            set breakpoint info
+        ELSIF sig_int flag is set
+            copy registers from IRQ context store to gdb context store
+        ENDIF
+        call gdb_stub
     ELSE
-        START gdb-stub
+        set exception info
+        CALL gdb_stub
     ENDIF
+    restore registers
+    return from exception
 ENDPROCESS
 
 PROCESS reset
@@ -93,15 +105,13 @@ PROCESS serial_input
     IF data to receive THEN
         receive data to queue
         IF ctrl-C encountered THEN
-            notify gdb_stub about ctrl-C
-            set exception pending for gdb-stub
+            set ctrl_C flag
         ENDIF
     ENDIF
-    restore registers
-    return from exception
 ENDPROCESS
 
 PROCESS gdb-stub
+    enable IRQ
     handle debug exception (all except reset, serial tx and serial rx)
     handle pending status (like remove single-stepping breakpoints)
     send pending response to gdb-client (response for s,c,...)
@@ -114,17 +124,12 @@ PROCESS gdb-stub
     return from exception
 ENDPROCESS
 
-The resuming from a breakpoint is a bit messy.
-When a breakpoint fires, the gdb_handle_pending_state is called
-and the breakpoint is written over by the saved (original) instruction.
-
 When resume takes place, a variable 'gdb_resuming' is set (to the index of
-the trapping breakpoint) for resuming from breakpoint and single stepping
-over the "breakpointed" instruction is made.
+the trapping breakpoint) for resuming from single stepping over the
+"breakpointed" instruction is made.
 
 When the single step fires, the single step handling in gdb_handle_pending_state
 puts the "missing" bkpt in the code and resumes again.
-
 
 single-stepping
 in command interpreter s-command checks the next instruction
@@ -256,14 +261,14 @@ arm_breakpoint_at (CORE_ADDR where)
 
       (*the_target->read_memory) (where, (unsigned char *) &insn, 2);
       if (insn == thumb_breakpoint)
-	return 1;
+    return 1;
 
       if (insn == thumb2_breakpoint[0])
-	{
-	  (*the_target->read_memory) (where + 2, (unsigned char *) &insn, 2);
-	  if (insn == thumb2_breakpoint[1])
-	    return 1;
-	}
+    {
+      (*the_target->read_memory) (where + 2, (unsigned char *) &insn, 2);
+      if (insn == thumb2_breakpoint[1])
+        return 1;
+    }
     }
   else
     {
@@ -272,10 +277,10 @@ arm_breakpoint_at (CORE_ADDR where)
 
       (*the_target->read_memory) (where, (unsigned char *) &insn, 4);
       if (insn == arm_breakpoint)
-	return 1;
+    return 1;
 
       if (insn == arm_eabi_breakpoint)
-	return 1;
+    return 1;
     }
 
   return 0;
