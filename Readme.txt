@@ -34,7 +34,7 @@ them anywhere in the net - not even in text format.
 Feel free to download them and play with them.
 
 missing:
-breakpoints and single-stepping
+single-stepping
 
 
 --------------------------
