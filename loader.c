@@ -50,10 +50,13 @@ void loader_main()
 	
 	/* initialize rpi2 */
 	rpi2_init();
-
+	
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
 
+	/* enable all interrupts */
+	rpi2_enable_ints();
+	
 #ifdef SERIAL_TEST	
 	// debug-line
 	msg = "Got into main()\r\n";
@@ -106,11 +109,14 @@ void loader_main()
 			"mrs %[retreg], cpsr\n\t"
 			:[retreg] "=r" (tmp1) ::
 	);
-	msg = "cpsr = ";
-	serial_io.put_string(msg, util_str_len(msg)+1);
+	msg = "\r\ncpsr = ";
+	serial_raw_puts(msg);
+	//serial_io.put_string(msg, util_str_len(msg)+1);
 	util_word_to_hex(scratchpad, tmp1);
-	serial_io.put_string(scratchpad, 9);
-	serial_io.put_string("\r\n", 3);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	//serial_io.put_string(scratchpad, 9);
+	//serial_io.put_string("\r\n", 3);
 #endif
 #if 0
 	// test PABT exception handling

@@ -91,8 +91,16 @@ SECTIONS
 		__abrt_stack = .;
     } >EXEC AT>LOAD
     __bss_end = .;
-    __load_end = LOADADDR(.bss) + SIZEOF(.bss);
 
+    /* . = ALIGN(.,0x20); */
+    .hivec ALIGN(.,0x20):
+    {
+    	/* . = ALIGN(.,0x20); */
+    	__hivec = .;
+		. = . + 64; /* 8 vectors: jump instr + address */
+    } >EXEC AT>LOAD
+	__hivec_load = LOADADDR(.hivec);
+    __load_end = LOADADDR(.hivec) + SIZEOF(.hivec);
 
 	/* gcc-generated crap */
     .note :

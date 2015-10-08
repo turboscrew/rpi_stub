@@ -55,6 +55,13 @@ C_DEPS += \
 	@echo 'Finished building: $<'
 	@echo ' '
 
+rpi2.o: ../rpi2.c
+	@echo 'Building file: $<'
+	@echo 'Invoking: Cross ARM C Compiler'
+	arm-linux-gnueabihf-gcc -mcpu=cortex-a7 -marm -O2  -g -std=gnu11 --save-temps -MMD -MP -MF"$(@:%.o=%.d)" -MT"rpi2.d" -c -o "$@" "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
 %.o: ../%.S
 	@echo 'Building file: $<'
 	@echo 'Invoking: Cross ARM GNU Assembler'

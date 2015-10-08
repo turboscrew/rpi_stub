@@ -124,6 +124,10 @@ void serial_set_ctrlc(void *handler)
 void serial_init(io_device *device)
 {
 	uint32_t tmp; // scratchpad
+	uint32_t cpsr_store;
+
+	// no messing with interrupt
+	cpsr_store = disable_save_ints();
 
 	// Disable uart interrupts
 	// Writing a 1 to a bit will clear the corresponding IRQ enable bit.
@@ -216,6 +220,8 @@ void serial_init(io_device *device)
 
 	// Enable uart0 interrupt
 	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+
+	restore_ints(cpsr_store);
 }
 
 void serial_start()

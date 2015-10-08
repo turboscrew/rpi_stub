@@ -23,6 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // needs to be here to be visible to both rpi2 and serial
 #define DEBUG_CTRLC
+//#define DEBUG_EXCEPTIONS
+
+//#define DEBUG_UNDEF
+//#define DEBUG_SVC
+//#define DEBUG_AUX
+//#define DEBUG_DABT
+//#define DEBUG_IRQ
+//#define DEBUG_FIQ
+//#define DEBUG_PABT
 
 // The peripherals base address
 #define PERIPH_BASE 0x3f000000
@@ -96,29 +105,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RPI2_EXC_TRAP	3
 #define RPI2_EXC_NONE	8
 
+#define RPI2_INTERNAL_BKPT 0xe127ff7e
+#define RPI2_INITIAL_BKPT 0xe127ff7d
+#define RPI2_USER_BKPT_ARM 0xe127ff7f
+#define RPI2_USER_BKPT_THUMB 0xbebe
+
 #define RPI2_TRAP_ARM 1
 #define RPI2_TRAP_THUMB 2
 #define RPI2_TRAP_PABT 3
+#define RPI2_TRAP_BKPT 4
 #define RPI2_TRAP_INITIAL 15
 
-// for reading and writing registers
-// also guarantee 32-bit reads and writes
-/*
-#define PUT32(address, data) \
-    asm volatile (\
-    "str %[src], [%[dst]] \n\t"\
-    :[src] "=r" (data)\
-    :[dst] "r" (address):\
-    )
-
-#define GET32(address, data) \
-    asm volatile (\
-    "ldr %[dst], [%[src]] \n\t"\
-    :[dst] "=r" (data)\
-    :[src] "r" (address):\
-    )
-*/
-// interrupt disable/enable
+// for special traps to gdb
+#define RPI2_REASON_SIGINT 2
+#define RPI2_REASON_HW_EXC 10
+#define RPI2_REASON_SW_EXC 12
 
 #define SYNC asm volatile ("dsb\n\tisb\n\t")
 
@@ -156,14 +157,23 @@ typedef union reg_ctx {
 
 extern volatile rpi2_reg_context_t rpi2_reg_context;
 
+unsigned int rpi2_disable_save_ints();
+void rpi2_restore_ints(unsigned int status);
+void rpi2_disable_ints();
+void rpi2_enable_ints();
+void set_gdb_enabled(unsigned int state);
+
 void rpi2_set_vector(int excnum, void *handler);
 void rpi2_trap();
+void rpi2_gdb_trap();
 void rpi2_init();
 void rpi2_set_trap(void *address, int kind);
 void rpi2_pend_trap();
 // access functions
-void rpi2_set_sigint_flag(unsigned int val);
-unsigned int rpi2_get_sigint_flag();
+unsigned int rpi2_get_irq_flag();
+void rpi2_set_irq_flag(unsigned int val);
+unsigned int rpi2_get_exc_reason();
+void rpi2_set_exc_reason(unsigned int val);
 
 /* for debugging */
 // ACT-led: gpio 47, active high

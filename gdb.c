@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // => 'O'-packet?
 
 // 'reasons' for target halt
-#define SIG_INT  2
+#define SIG_INT  RPI2_REASON_SIGINT
 #define SIG_TRAP 5
 #define SIG_ILL  4
 #define SIG_BUS  7
-#define SIG_USR1 10
-#define SIG_USR2 12
+#define SIG_USR1 RPI2_REASON_HW_EXC
+#define SIG_USR2 RPI2_REASON_SW_EXC
 #define ALOHA 32
 #define FINISHED 33
 #define PANIC 34
@@ -210,13 +210,11 @@ void gdb_trap_handler()
 	gdb_iodev->put_string("\r\n", 3);
 #endif
 
-	if (rpi2_get_sigint_flag() == 1)
+	if (rpi2_get_irq_flag() == 1)
 	{
-		rpi2_set_sigint_flag(0); // handled
+		rpi2_set_irq_flag(0); // handled
 		// ctrl-C pressed
-		reason = SIG_INT;
-		// flush input - read until ctrl-c
-		//while (gdb_iodev->get_char() != 3);
+		reason = rpi2_get_exc_reason();
 	}
 	else if (exception_extra > 0xff00) // internal error
 	{
@@ -248,6 +246,11 @@ void gdb_trap_handler()
 					// one of ours
 					reason = SIG_TRAP;
 				}
+			}
+			else if (exception_extra == RPI2_TRAP_BKPT)
+			{
+				// not one of our breakpoints
+				reason = SIG_USR2;
 			}
 			else if (exception_extra == RPI2_TRAP_INITIAL)
 			{
@@ -287,7 +290,7 @@ void gdb_trap_handler()
 /* cause trap - enter gdb stub */
 void gdb_trap()
 {
-	rpi2_trap();
+	rpi2_gdb_trap();
 }
 
 /* initialize this gdb stub */
@@ -307,11 +310,12 @@ void gdb_init(io_device *device)
 	/* install trap handler */
 	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
-	rpi2_set_sigint_flag(0);
+	rpi2_set_irq_flag(0);
 	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
 #ifdef DEBUG_GDB
 	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
 #endif
+	set_gdb_enabled(1); // enable gdb calls
 	return;
 }
 
@@ -747,15 +751,15 @@ void gdb_resp_target_halted(int reason)
 		break;
 	case SIG_USR1: // unhandled HW interrupt - no defined response
 		// send 'OUnhandled HW interrupt'
-		len = util_str_copy(resp_buff, "OUnhandled HW interrupt", resp_buff_len);
+		len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, err, resp_buff_len);
+		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		break;
 	case SIG_USR2: // unhandled SW interrupt - no defined response
 		// send 'OUnhandled SW interrupt'
 		len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, err, resp_buff_len);
+		len = util_str_copy(resp_buff, "T12", resp_buff_len);
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
 		// send 'Ogdb stub started'
@@ -774,9 +778,9 @@ void gdb_resp_target_halted(int reason)
 		break;
 	default:
 		// send 'Ounknown event'
-		len = util_str_copy(resp_buff, "OUnknown event\n", resp_buff_len);
+		len = util_str_copy(resp_buff, "OUnknown event", resp_buff_len);
 		gdb_send_packet(resp_buff, len);
-		gdb_response_not_supported();
+		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		return; // don't send anything more
 		break;
 	}
