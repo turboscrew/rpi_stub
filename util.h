@@ -82,6 +82,6 @@ int util_strip_zeros(char *src, char **dst);
 int util_read_dec(char *str, int *result);
 
 // converts a word endianness (swaps bytes)
-void util_swap_bytes(unsigned char *src, unsigned char *dst);
+void util_swap_bytes(unsigned int *src, unsigned int *dst);
 
 #endif /* UTIL_H_ */

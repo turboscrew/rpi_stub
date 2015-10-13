@@ -54,10 +54,11 @@ void loader_main()
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
 
-	/* enable all interrupts */
-	rpi2_enable_ints();
+	/* enable all exceptions */
+	rpi2_enable_excs();
 	
-#ifdef SERIAL_TEST	
+#ifdef SERIAL_TEST
+	serial_io.set_ctrlc((void *)rpi2_pend_trap);
 	// debug-line
 	msg = "Got into main()\r\n";
 	i=0;
@@ -218,11 +219,11 @@ void loader_main()
 		}
 	}
 #else
-	/* initialize debugger */
-	gdb_init(&serial_io);
 
 	while (1)
 	{
+		/* initialize debugger */
+		gdb_init(&serial_io);
 		/* reset debugger */
 		gdb_reset();
 		/* enter gdb monitor */

@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RPI2_H_
 
 // needs to be here to be visible to both rpi2 and serial
-#define DEBUG_CTRLC
 //#define DEBUG_EXCEPTIONS
 
 //#define DEBUG_UNDEF
@@ -92,7 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define UART0_ITOP   (UART0_BASE + 0x88)
 #define UART0_TDR    (UART0_BASE + 0x8C)
 
-/* exception numbers - these had to be hardcoded in the
+
+/* exception_info values
+   exception numbers - these had to be hardcoded in the
    exception handlers' assembly code in rpi2.c */
 #define RPI2_EXC_RESET	0
 #define RPI2_EXC_UNDEF	1
@@ -110,10 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RPI2_USER_BKPT_ARM 0xe127ff7f
 #define RPI2_USER_BKPT_THUMB 0xbebe
 
+// exception_extra values used in PABT
+// our ARM-breakpoint
 #define RPI2_TRAP_ARM 1
+// our THUMB-breakpoint
 #define RPI2_TRAP_THUMB 2
+// our internal breakpoint
 #define RPI2_TRAP_PABT 3
+// user bkpt
 #define RPI2_TRAP_BKPT 4
+// prefetch abort
+#define RPI2_TRAP_BUS 5
+// our initial breakpoint
 #define RPI2_TRAP_INITIAL 15
 
 // for special traps to gdb
@@ -159,11 +168,13 @@ extern volatile rpi2_reg_context_t rpi2_reg_context;
 
 unsigned int rpi2_disable_save_ints();
 void rpi2_restore_ints(unsigned int status);
+void rpi2_disable_excs();
+void rpi2_enable_excs();
 void rpi2_disable_ints();
 void rpi2_enable_ints();
 void set_gdb_enabled(unsigned int state);
 
-void rpi2_set_vector(int excnum, void *handler);
+void rpi2_set_vectors();
 void rpi2_trap();
 void rpi2_gdb_trap();
 void rpi2_init();

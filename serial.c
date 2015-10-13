@@ -160,10 +160,9 @@ void serial_init(io_device *device)
 	ser_rx_ovr_count = 0;
 
 	// init ctrl-C handling
-#ifndef DEBUG_CTRLC
 	ser_handle_ctrlc = 0;
 	ser_ctrl_c = 0;
-#endif
+
 	// Setup the GPIO pin 14 & 15.
 
 	// Change pull up/down to pull-down & delay for 150 cycles
@@ -239,7 +238,6 @@ void disable_uart0_ints()
 {
 	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
 }
-
 // waits until transmit fifo is empty and writes the string
 // directly in the tx fifo and returns the number of chars
 // actually sent
@@ -422,7 +420,6 @@ int serial_read(char *buf, int n)
 int serial_write(char *buf, int n)
 {
 	int m = n; // count
-
 	// write one by one to let more space to emerge
 	while (m > 0)
 	{

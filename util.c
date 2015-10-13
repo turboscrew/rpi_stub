@@ -326,10 +326,13 @@ int util_read_dec(char *str, int *result)
 }
 
 // converts a word endianness (swaps bytes)
-void util_swap_bytes(unsigned char *src, unsigned char *dst)
+void util_swap_bytes(unsigned int *src, unsigned int *dst)
 {
-	*(dst++) = *(src+3);
-	*(dst++) = *(src+2);
-	*(dst++) = *(src+1);
-	*dst = *src;
+	unsigned char *p1, *p2;
+	p1 = (unsigned char *)src;
+	p2 = (unsigned char *)dst;
+	*(p2++) = *(p1+3);
+	*(p2++) = *(p1+2);
+	*(p2++) = *(p1+1);
+	*p2 = *p1;
 }

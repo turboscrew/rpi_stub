@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define GDB_MAX_BREAKPOINTS 64
 #define GDB_MAX_MSG_LEN 1024
 
+extern void loader_main();
+
 // breakpoint
 typedef struct {
 	void *trap_address;
@@ -177,6 +179,8 @@ void gdb_trap_handler()
 {
 	int break_char = 0;
 	int reason = 0;
+	static char scratchpad[16];
+
 #ifdef DEBUG_GDB
 	char *msg;
 	static char scratchpad[16];
@@ -310,27 +314,28 @@ void gdb_init(io_device *device)
 	/* install trap handler */
 	//rpi2_set_vector(RPI2_EXC_TRAP, &gdb_trap_handler);
 	/* install ctrl-c handling */
-	rpi2_set_irq_flag(0);
-	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
 #ifdef DEBUG_GDB
 	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
 #endif
-	set_gdb_enabled(1); // enable gdb calls
 	return;
 }
 
 /* Clean-up after last session */
 void gdb_reset()
 {
+	rpi2_disable_excs();
+	rpi2_set_vectors();
+	gdb_iodev->set_ctrlc((void *)rpi2_pend_trap);
+	rpi2_set_irq_flag(0);
+	set_gdb_enabled(1); // enable gdb calls
+	rpi2_enable_excs();
 	gdb_clear_breakpoints(0);
-
 	// reset debuggee info
 	gdb_debuggee.start_addr = (void *)0x00008000; // default
 	gdb_debuggee.size = 0;
 	gdb_debuggee.entry = (void *)0x00008000; // default
 	gdb_debuggee.curr_addr = (void *)0x00008000; // default
 	gdb_debuggee.status = 0;
-	return;
 }
 
 /* set a breakpoint to given address */
@@ -702,12 +707,13 @@ void gdb_resp_target_halted(int reason)
 	const int resp_buff_len = 128; // should be enough to hold any response
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
+	unsigned int tmp;
 #ifdef DEBUG_GDB
 	char *msg;
 #endif
 
 	gdb_monitor_running = 1; // by default
-
+/*
 	if (reason == 0)
 	{
 		// No debuggee yet
@@ -716,6 +722,7 @@ void gdb_resp_target_halted(int reason)
 			reason = ALOHA;
 		}
 	}
+*/
 	switch(reason)
 	{
 	case SIG_INT: // ctrl-C
@@ -728,7 +735,8 @@ void gdb_resp_target_halted(int reason)
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
-		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		//util_swap_bytes((unsigned int *)&(rpi2_reg_context.reg.r15), &tmp);
+		//util_word_to_hex(scratchpad, tmp);
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_ILL: // undef
@@ -751,14 +759,14 @@ void gdb_resp_target_halted(int reason)
 		break;
 	case SIG_USR1: // unhandled HW interrupt - no defined response
 		// send 'OUnhandled HW interrupt'
-		len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
-		gdb_send_packet(resp_buff, len);
+		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
+		//gdb_send_packet(resp_buff, len);
 		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		break;
 	case SIG_USR2: // unhandled SW interrupt - no defined response
 		// send 'OUnhandled SW interrupt'
-		len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
-		gdb_send_packet(resp_buff, len);
+		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
+		//gdb_send_packet(resp_buff, len);
 		len = util_str_copy(resp_buff, "T12", resp_buff_len);
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
@@ -778,8 +786,8 @@ void gdb_resp_target_halted(int reason)
 		break;
 	default:
 		// send 'Ounknown event'
-		len = util_str_copy(resp_buff, "OUnknown event", resp_buff_len);
-		gdb_send_packet(resp_buff, len);
+		//len = util_str_copy(resp_buff, "OUnknown event", resp_buff_len);
+		//gdb_send_packet(resp_buff, len);
 		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		return; // don't send anything more
 		break;
@@ -793,7 +801,7 @@ void gdb_cmd_cont(char *src, int len)
 {
 	uint32_t address;
 	int bkptnum;
-	if (len > 1)
+	if (len > 0)
 	{
 		address = util_hex_to_word(src);
 		rpi2_reg_context.reg.r15 = address;
@@ -805,6 +813,10 @@ void gdb_cmd_cont(char *src, int len)
 	{
 		gdb_resuming = bkptnum;
 		gdb_resume();
+	}
+	if (exception_info == RPI2_EXC_RESET)
+	{
+		rpi2_reg_context.reg.r15 = (unsigned int)(&loader_main);
 	}
 	gdb_monitor_running = 0; // return
 }
@@ -1005,7 +1017,7 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 // p n
 void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	uint32_t value, tmp;
+	unsigned int value, tmp;
 	uint32_t reg;
 	uint32_t *p;
 	char *cp;
@@ -1021,14 +1033,14 @@ void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 			//p = (uint32_t *) &(rpi2_reg_context.storage);
 			//value = p[reg];
 			value = rpi2_reg_context.storage[reg];
-			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_swap_bytes(&value, &tmp);
 			util_word_to_hex(scratchpad, tmp);
 			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
 		else if ((reg > 15) && (reg < 25)) // dummy fp-register
 		{
 			util_word_to_hex(scratchpad, 0x90000009);
-			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_swap_bytes(&value, &tmp);
 			util_word_to_hex(scratchpad, tmp);
 			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
@@ -1038,7 +1050,7 @@ void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 			//value = p[reg];
 			value = rpi2_reg_context.reg.cpsr;
 			util_word_to_hex(scratchpad, value);
-			util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
+			util_swap_bytes(&value, &tmp);
 			util_word_to_hex(scratchpad, tmp);
 			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
@@ -1065,7 +1077,7 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	char *resp_str = "OK";
 	const int scratch_len = 16;
 	char scratchpad[scratch_len]; // scratchpad
-	uint32_t value, tmp;
+	unsigned int value, tmp;
 	uint32_t reg;
 	uint32_t *p;
 	char *err = "E00";
@@ -1076,7 +1088,7 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 		gdb_in_packet += (len + 1);  // skip register number and '='
 		packet_len -= (len + 1);
 		tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
-		util_swap_bytes((unsigned char *)&tmp, (unsigned char *)&value);
+		util_swap_bytes(&tmp, &value);
 #if 0
 		gdb_iodev->put_string((char *)gdb_in_packet, packet_len);
 		gdb_iodev->put_string("\r\nP_cmd: ", 10);
@@ -1124,6 +1136,11 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 	}
 }
 
+void gdb_cmd_kill(volatile uint8_t *gdb_packet, int packet_len)
+{
+	// kill doesn't have responses
+	gdb_reset();
+}
 void gdb_cmd_detach(volatile uint8_t *gdb_packet, int packet_len)
 {
 	gdb_send_packet("OK", 2); // for now
@@ -1446,7 +1463,6 @@ void gdb_cmd_write_mem_bin(volatile uint8_t *gdb_in_packet, int packet_len)
 		gdb_in_packet += len+1; // skip bytecount and delimiter
 		packet_len -= (len + 1);
 		bytes = util_hex_to_word(scratchpad); // address to binary
-
 		// write to memory
 		gdb_read_bin_data((char *)gdb_in_packet, (int)bytes, (uint8_t *) addr,
 				GDB_MAX_MSG_LEN); // can't be more than message size
@@ -1618,7 +1634,7 @@ void gdb_handle_pending_state(int reason)
 				rpi2_set_trap(gdb_usr_breakpoint[gdb_resuming].trap_address,
 						gdb_usr_breakpoint[gdb_resuming].trap_kind);
 				gdb_resuming = -1; // done
-				gdb_monitor_running = 0; // resume kind of continues
+				//gdb_monitor_running = 0; // resume kind of continues
 				return;
 			}
 		}
@@ -1812,7 +1828,7 @@ void gdb_monitor(int reason)
 				gdb_cmd_set_thread(inpkg, packet_len);
 				break;
 			case 'k':	// kill
-				gdb_response_not_supported(); // for now
+				gdb_cmd_kill(++inpkg, --packet_len);
 				break;
 			case 'm':	// read mem hex +
 				gdb_cmd_read_mem_hex(++inpkg, --packet_len);

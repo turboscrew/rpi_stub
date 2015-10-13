@@ -134,7 +134,7 @@
 					</folderInfo>
 					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.512205672.693974124" name="rpi2.c" rcbsApplicability="disable" resourcePath="rpi2.c" toolsToInvoke="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761.350709155">
 						<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761.350709155" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761">
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.savetemps.1369079122" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.savetemps" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.savetemps.1369079122" name="Save temporary files (--save-temps Use with caution!)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.savetemps" value="false" valueType="boolean"/>
 							<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1839954931" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
 						</tool>
 					</fileInfo>
