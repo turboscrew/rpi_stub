@@ -6,7 +6,32 @@ for Raspberry Pi 2B
 
 
 
-WORK IN PROGRESS - NOT FULLY TESTED.
+WORK IN PROGRESS!
+
+The rpi_stub is a bare metal standalone gdb server/stub to aid in remote debugging
+of bare metal programs using gdb via serial cable. It boots from the SD-card and
+runs there without any additional programs.
+
+The bare metal program to be debugged is loaded on Raspberry Pi 2B using
+gdb's 'load'-command (see the INSTRUCTIONS.txt), and then run with gdb's
+'cont'-command. You can break a runaway program with ctrl-C.
+
+
+At the moment the main restrictions are:
+- Only ARM instruction set is supported
+- Floating point and vector HW are not supported
+- No single stepping (yet).
+- Only single core supported
+- UART0 (the full UART) is reserved exclusively for the rpi_stub.
+- The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
+  reserved exclusively for the stub.
+- The double vectoring adds exception latency, especially for IRQ.
+
+I could list the gdb serial protocol commands that rpi_stub supports,
+but it wouldn't be of much help for a gdb user - the gdb-commands and gdb
+serial protocol commands do not map one-to-one.
+
+
 
 This is my very first RPi(2) project ever, and first ever project that
 I have to deal with ARM core (and assembly).
@@ -14,10 +39,6 @@ This project started in the first days of april 2015.
 
 This will hopefully become a standalone gdb-stub for RPi2 using serial line
 for communicating with a gdb client.
-
-The idea is that this loader/debugger boots, and it could be used for uploading
-and then debugging bare metal progams on RPi2. The only 'external' h-file used
-is stdint.h.
 
 I don't take any responsibility of anything that happens, if someone dares to
 try this. You can use this but totally on your own risk.
@@ -33,12 +54,9 @@ ARM and Thumb instructions to help figuring out the decoding. I couldn't find
 them anywhere in the net - not even in text format.
 Feel free to download them and play with them.
 
-missing:
-single-stepping
-
 
 --------------------------
-Some kind of description
+Some kind of description (obsolete - I'll make a new one)
 
 This is a rough 'conceptual' pseudocode of the program
 Here asynchronous/independent code sequences are called processes

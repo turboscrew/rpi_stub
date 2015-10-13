@@ -728,7 +728,7 @@ void rpi2_reroute_reset()
 #endif
 
 	asm volatile(
-			"mov pc, #0 @ jump tp low vector\n\t"
+			"mov pc, #0 @ jump to low vector\n\t"
 	);
 }
 
@@ -739,7 +739,7 @@ void rpi2_reroute_exc_und()
 #endif
 
 	asm volatile(
-			"mov pc, #4 @ jump tp low vector\n\t"
+			"mov pc, #4 @ jump to low vector\n\t"
 	);
 }
 
@@ -749,7 +749,7 @@ void rpi2_reroute_exc_svc()
 	naked_debug();
 #endif
 	asm volatile(
-			"mov pc, #8 @ jump tp low vector\n\t"
+			"mov pc, #8 @ jump to low vector\n\t"
 	);
 }
 
@@ -759,7 +759,7 @@ void rpi2_reroute_exc_dabt()
 	naked_debug();
 #endif
 	asm volatile(
-			"mov pc, #16 @ jump tp low vector\n\t"
+			"mov pc, #16 @ jump to low vector\n\t"
 	);
 }
 
@@ -769,7 +769,7 @@ void rpi2_reroute_exc_aux()
 	naked_debug();
 #endif
 	asm volatile(
-			"mov pc, #20 @ jump tp low vector\n\t"
+			"mov pc, #20 @ jump to low vector\n\t"
 	);
 }
 
@@ -779,7 +779,7 @@ void rpi2_reroute_exc_fiq()
 	naked_debug();
 #endif
 	asm volatile(
-			"mov pc, #28 @ jump tp low vector\n\t"
+			"mov pc, #28 @ jump to low vector\n\t"
 	);
 }
 
@@ -794,7 +794,8 @@ void rpi2_reroute_exc_fiq()
 // and we'd return with unbalanced stack.
 // Naked functions shouldn't have any C-code in them.
 //
-// The secondary does the actual work
+// The secondary handlers are mainly used for debugging, except for PABT
+// where the secondary handler does things for entering the debugger.
 
 void rpi2_reset_handler()
 {
@@ -824,7 +825,7 @@ void rpi2_reset_handler()
 			"bne 1f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, svc_sp_store\n\t"
+			"ldr r0, rst_sp_store\n\t"
 			"ldr r1, =rpi2_svc_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
@@ -856,7 +857,7 @@ void rpi2_reset_handler()
 void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
-	static char scratchpad[16]; // scratchpad
+	static char scratchpad[16];
 	char *p;
 	int i;
 	asm volatile
@@ -881,7 +882,7 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
+	rpi2_dump_context(&rpi2_svc_context);
 }
 #endif
 
@@ -915,7 +916,7 @@ void rpi2_undef_handler()
 
 			"@ our mode\n\t"
 			"ldr r0, und_sp_store\n\t"
-			"ldr r1, =rpi2_reg_context\n\t"
+			"ldr r1, =rpi2_svc_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
 			"1: @ context stored\n\t"
@@ -952,11 +953,9 @@ void rpi2_undef_handler()
 void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
-
 	int i;
-	uint32_t tmp;
 	char *p;
-	static char scratchpad[16]; // scratchpad
+	static char scratchpad[16];
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -982,7 +981,7 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
+	rpi2_dump_context(&rpi2_svc_context);
 }
 #endif
 
@@ -1016,7 +1015,7 @@ void rpi2_svc_handler()
 
 			"@ our mode\n\t"
 			"ldr r0, svc_sp_store\n\t"
-			"ldr r1, =rpi2_reg_context\n\t"
+			"ldr r1, =rpi2_svc_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
 			"1: @ context stored\n\t"
@@ -1057,9 +1056,8 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
 	int i;
-	uint32_t tmp;
 	char *p;
-	static char scratchpad[16]; // scratchpad
+	static char scratchpad[16];
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -1085,7 +1083,7 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
+	rpi2_dump_context(&rpi2_svc_context);
 }
 #endif
 
@@ -1119,7 +1117,7 @@ void rpi2_aux_handler()
 
 			"@ our mode\n\t"
 			"ldr r0, aux_sp_store\n\t"
-			"ldr r1, =rpi2_reg_context\n\t"
+			"ldr r1, =rpi2_svc_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
 			"1: @ context stored\n\t"
@@ -1159,11 +1157,9 @@ void rpi2_aux_handler()
 void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
-	static char scratchpad[16]; // scratchpad
-	uint32_t tmp;
+	static char scratchpad[16];
 	int i;
 	char *p;
-	static char scratchpad[16]; // scratchpad
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -1175,7 +1171,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
 	// rpi2_reg_context.reg.r15 -= 8; // PC
-	rpi2_reg_context.reg.r15 -= 4; // skip bad instruction
+	//rpi2_reg_context.reg.r15 -= 4; // skip bad instruction
 
 	p = "\r\nDABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
@@ -1187,7 +1183,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
+	rpi2_dump_context(&rpi2_dabt_context);
 }
 #endif
 
@@ -1203,6 +1199,7 @@ void rpi2_dabt_handler()
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"push {r12} @ popped in write_context\n\t"
+			"sub lr, #4 @ fix return address\n\t"
 			"ldr r12, =rpi2_dabt_context\n\t"
 	);
 	write_context();
@@ -1257,6 +1254,13 @@ void rpi2_dabt_handler()
 }
 
 #ifdef DEBUG_IRQ
+#define IRQ_DEBUG
+#endif
+#ifdef DEBUG_CTRLC
+#define IRQ_DEBUG
+#endif
+
+#ifdef IRQ_DEBUG
 void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
@@ -1352,7 +1356,9 @@ void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	util_word_to_hex(scratchpad, tmp);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	//rpi2_dump_context(&rpi2_irq_context);
+#ifdef DEBUG_CTRLC
+	rpi2_dump_context(&rpi2_irq_context);
+#endif
 #endif
 
 #if 0
@@ -1521,6 +1527,11 @@ write_context();
 			"str r0, [r1, #13*4]\n\t"
 
 			"2: @ context stored, handle SIGINT\n\t"
+#ifdef DEBUG_CTRLC
+			"mov r0, sp\n\t"
+			"mov r1, lr\n\t"
+			"bl rpi2_irq_handler2\n\t"
+#endif
 			"mov r1, #0\n\t"
 			"ldr r0, =rpi2_ctrl_c_flag\n\t"
 			"str r1, [r0]\n\t"
