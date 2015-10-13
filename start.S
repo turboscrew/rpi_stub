@@ -35,20 +35,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 .globl _start
 .globl debug_blink
 .globl debug_wait
+
 .sect .init
 
 _start:
 
-	// Entry point for the kernel.
-	// r15 -> should begin execution at 0x8000.
-	// r0 -> 0x00000000
-	// r1 -> 0x00000C42
-	// r2 -> 0x00000100 - start of ATAGS
-	// preserve these registers as argument for kernel_main
-
-	// cpsid aif @ disable interrupts
-
+	/*
+	This is due to change (Oct 2, 2015) in the firmware
+	( https://github.com/raspberrypi/firmware/tree/master/boot )
+	to leave the core in HYP mode.
+	(Issue #369 opened on Feb 18 by yann-morin-1998)
+	*/
+	mrs r0, cpsr
+	and r1, r0, #0x1f
+	cmp r1, #0x1a @ HYP-mode?
+	bne codecopy
+	movw r0, #0x1d3 @ aif-masks set, SVC-mode, other bits zeroed
+#if 1
+	msr cpsr_fsxc, r0
+#else
+	@ if the rough write in cpsr doesn't work
+	adr r1, codecopy
+	msr ELR_hyp, r1
+	msr SPSR_hyp, r0
+	eret
+#endif
 	// copy loader/stub into upper memory
+codecopy:
+	cpsid aif
 	ldr r4, =__load_start
 	ldr	r5, =__load_end
 	ldr	r6, =__code_begin
@@ -60,20 +74,18 @@ loop$:
 
 	/* Enable caches & branch prediction */
 #if 0
-	@ actlr
+
 	@ bit 6 = enable coherent reqs
-	MRC p15, 0, r1, c1, c0, 1 @ Read ACTLR into Rt
+	MRC p15, 0, r1, c1, c0, 1 @ read ACTLR
 	movw r0, #0x1804 @ bin 0000000001000000
-	@ movt r0, #0x00 redundant
 	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 1 @ Write Rt to ACTLR
-	@ sctlr
+	MCR p15, 0, r1, c1, c0, 1 @ write to ACTLR
+
 	@ bit 12 = I-cache, bit 11 = branch pred, bit 2 = D-cache
-	MRC p15, 0, r1, c1, c0, 0 @ Read SCTLR into Rt
+	MRC p15, 0, r1, c1, c0, 0 @ read SCTLR
 	movw r0, #0x1804 @ bin 0001100000000100
-	@ movt r0, #0x00 redundant
 	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 0 @ Write Rt to SCTLR
+	MCR p15, 0, r1, c1, c0, 0 @ write to SCTLR
 #endif
 	// Set up initial stacks
 	// ARM stack is conventionally 'Decrement Before'-type
