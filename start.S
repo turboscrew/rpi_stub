@@ -51,15 +51,14 @@ _start:
 	cmp r1, #0x1a @ HYP-mode?
 	bne codecopy
 	movw r0, #0x1d3 @ aif-masks set, SVC-mode, other bits zeroed
-#if 1
-	msr cpsr_fsxc, r0
-#else
-	@ if the rough write in cpsr doesn't work
+	@ rough write in cpsr doesn't work - see pseudo code in
+	@ architecture reference manual:
+	@"Pseudocode support for the Banked register transfer instructions"
 	adr r1, codecopy
 	msr ELR_hyp, r1
 	msr SPSR_hyp, r0
 	eret
-#endif
+
 	// copy loader/stub into upper memory
 codecopy:
 	cpsid aif
