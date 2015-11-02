@@ -488,6 +488,7 @@ int serial_get_string(char *st, char delim, int n)
 			// a character less to read
 			m--;
 			if (*(st++) == delim) break;
+			serial_poll();
 		}
 	}
 	SYNC;
