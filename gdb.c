@@ -660,8 +660,10 @@ int receive_packet(char *dst)
 		gdb_iodev->put_string(msg, util_str_len(msg)+1);
 #endif
 
+		i = 0;
 		do // read the payload
 		{
+#if 0
 			do // try to get at least one character
 			{
 				// try to read the payload at once
@@ -680,6 +682,31 @@ int receive_packet(char *dst)
 				checksum += (int)*(curr++);
 				checksum %= 256;
 			}
+#else
+			got = gdb_iodev->get_string(dst, '#', GDB_MAX_MSG_LEN - 1 - len);
+			if (got == 0)
+			{
+				if (i < len)
+				{
+					// calculate checksum
+					checksum += (int)*(curr++);
+					checksum %= 256;
+					i++;
+				}
+			}
+			dst += got;
+			len += got;
+			if (*(dst - 1) == '#') // if the whole payload is read
+			{
+				// finish the check
+				while (*curr != '#')
+				{
+					checksum += (int)*(curr++);
+					checksum %= 256;
+				}
+			}
+
+#endif
 
 #ifdef GDB_DEBUG_RX
 			msg = "read: len = ";
@@ -1464,7 +1491,7 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 #else
 
 			len = util_str_copy(resp_buff, "swbreak+;PacketSize=", resp_buff_len);
-			util_word_to_hex(scratchpad, GDB_MAX_MSG_LEN);
+			util_word_to_hex(scratchpad, 256); // GDB_MAX_MSG_LEN / 4
 			len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 #endif
 			gdb_send_packet(resp_buff, len);
@@ -1472,7 +1499,7 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 		else if (util_str_cmp(scratchpad, "qOffsets") == 0)
 		{
 			// reply: 'Text=xxxx;Data=xxxx;Bss=xxxx'
-			len = util_str_copy(resp_buff, "Text=8000;Data=8000;Bss=8000", resp_buff_len);
+			len = util_str_copy(resp_buff, "Text=0;Data=0;Bss=0", resp_buff_len);
 			gdb_send_packet(resp_buff, len);
 		}
 		else if (util_str_cmp(scratchpad, "qC") == 0)
@@ -2187,6 +2214,8 @@ void gdb_monitor(int reason)
 	}
 	// enable CTRL-C
 	gdb_iodev->enable_ctrlc(); // enable
+	if (rpi2_keep_ctrlc) enable_uart0_ints();
+
 #ifdef DEBUG_GDB
 	msg = "\r\ngdb_monitor returns\r\n";
 	gdb_iodev->put_string(msg, util_str_len(msg)+1);

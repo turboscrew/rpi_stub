@@ -305,6 +305,12 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 						rpi2_uart0_excmode = RPI2_UART0_POLL;
 					}
 				}
+				else if (util_cmp_substr("keep_ctrlc", cmdline + i) >= util_str_len("keep_ctrlc"))
+				{
+					// rpi_stub_keep_ctrlc
+					i += util_str_len("keep_ctrlc");
+					rpi2_keep_ctrlc = 1;
+				}
 #if 0
 				else if (util_cmp_substr("baud=", cmdline + i) >= util_str_len("baud="))
 				{

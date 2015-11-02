@@ -318,13 +318,31 @@ void serial_start()
 
 void enable_uart0_ints()
 {
-	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+	// Enable uart0 interrupt
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		*((volatile uint32_t *)IRC_FIQCTRL) = ((1 << 7) | 57);
+		asm volatile ("cpsie f\n\t");
+	}
+	else
+	{
+		*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+		asm volatile ("cpsie i\n\t");
+	}
 	SYNC;
 }
 
 void disable_uart0_ints()
 {
-	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+	// Enable uart0 interrupt
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		*((volatile uint32_t *)IRC_FIQCTRL) &= ~(1 << 7);
+	}
+	else
+	{
+		*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+	}
 	SYNC;
 }
 // waits until transmit fifo is empty and writes the string
@@ -413,6 +431,7 @@ int serial_get_char()
 		// get character from ring buffer
 		ch = ser_rx_buff[ser_rx_head++];
 		ser_rx_head %= SER_RX_BUFF_SIZE;
+		serial_poll();
 	}
 	SYNC;
 	return (int) ch;
@@ -456,32 +475,27 @@ int serial_put_char(char c)
 int serial_get_string(char *st, char delim, int n)
 {
 	int m = n; // count
+	int tries;
 
+	tries = 5;
 	// Read one by one to let more characters to accumulate
 	// This also takes care of negative n
 	while (m > 0)
 	{
 		SYNC;
 
-		if (ser_rx_tail == ser_rx_head)
-		{
-			serial_poll();
-		}
-		SYNC;
-
 		// if rx buffer is empty
 		if (ser_rx_tail == ser_rx_head)
 		{
-#if 1
-			// quit reading
-			break;
-#else
+			if (tries-- == 0) break;
+
+			serial_poll();
 			// wait
 			continue;
-#endif
 		}
 		else
 		{
+			tries = 10;
 			// get character from ring buffer
 			*st = ser_rx_buff[ser_rx_head++];
 			ser_rx_head %= SER_RX_BUFF_SIZE;
@@ -620,7 +634,7 @@ void serial_poll()
 			serial_irq();
 			status = *((volatile uint32_t *)UART0_MIS);
 		}
-		while (ser_tx_tail != ser_tx_head)
+		if (ser_tx_tail != ser_tx_head)
 		{
 			serial_irq();
 		}
@@ -630,7 +644,6 @@ void serial_poll()
 void serial_irq()
 {
 	uint32_t status;
-
 
 	status = *((volatile uint32_t *)UART0_MIS);
 #if 0
@@ -668,9 +681,6 @@ void serial_irq()
 		// Clear rx timeout interrupt
 		//*((volatile uint32_t *)UART0_ICR) = (1<<6);
 	}
-#if 0
-	serial_rx();
-#endif
 }
 
 // Note: rx only reads rx_head, and only rx writes rx_tail

@@ -16,7 +16,7 @@ The bare metal program to be debugged is loaded on Raspberry Pi 2B using
 gdb's 'load'-command (see the INSTRUCTIONS.txt), and then run with gdb's
 'cont'-command. You can break a runaway program with ctrl-C.
 
-There are also two command line parameters.
+There are also three command line parameters.
 'rpi_stub_mmu' causes rpi_stub to use MMU and caches. Default is no mmu or caches.
 'rpi_stub_interrupt=<int>' makes rpi_stub to handle UART0 interrupts
 in a different way:
@@ -25,6 +25,8 @@ If <int> is 'fiq' rpi_stub uses fiq exception also withing the debugger.
 if <int> is 'poll' rpi_stub uses irq when the debuggee runs, but the debugger
 is run with interrupts masked, and the UART0 is handled by polling.
 The default (and recommended) option is 'poll'.
+'rpi_stub_keep_ctrlc' makes rpi_stub to re-enable UART0 interrupts each time
+the execution is returned to the debuggee.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported

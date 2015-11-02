@@ -2892,7 +2892,7 @@ void rpi2_init()
 	rpi2_debuggee_running = 0;
 	gdb_dyn_debug = 0;
 	rpi2_arm_ramsize = rpi2_get_arm_ram(&rpi2_arm_ramstart);
-
+	rpi2_keep_ctrlc = 0;
 	// TODO: add set-up for UART0 handling by FIQ
 
 #if 0

@@ -194,6 +194,8 @@ extern unsigned int rpi2_use_mmu;
 extern unsigned int rpi2_arm_ramsize; // ARM ram in megs
 extern unsigned int rpi2_arm_ramstart; // ARM ram start address
 
+extern unsigned int rpi2_keep_ctrlc; // ARM ram start address
+
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of
 // ARMv7-A/R ARM issue C (ARM DDI 0406C.c)
