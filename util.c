@@ -336,3 +336,11 @@ void util_swap_bytes(unsigned int *src, unsigned int *dst)
 	*(p2++) = *(p1+1);
 	*p2 = *p1;
 }
+
+// number of bits needed to represent a value
+int util_num_bits(unsigned int val)
+{
+	int i;
+	while (val >>= 1) i++;
+	return i;
+}

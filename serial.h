@@ -25,15 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 void serial_init(io_device *device);
 void serial_start();
-void serial_set_ctrlc(void *handler);
-int serial_get_ctrl_c();
 int serial_get_char();
 int serial_put_char(char c);
-int serial_get_string(char *st, int n);
+int serial_get_string(char *st, char delim, int n);
 int serial_put_string(char *st, int n);
 int serial_read(char *buf, int n);
 int serial_write(char *buf, int n);
-
+//void serial_enable_ctrlc(int enable);
 int serial_tx_free();
 int serial_rx_used();
 

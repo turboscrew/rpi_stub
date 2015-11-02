@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern void serial_irq(); // this shouldn't be public, so it's not in serial.h
 extern int serial_raw_puts(char *str); // used for debugging - may be removed
-extern void serial_set_ctrlc(void *handler); // used for debugging
+extern void serial_enable_ctrlc(); // used for debugging
+extern volatile uint32_t gdb_dyn_debug;
 extern char __hivec;
-
+extern int gdb_send_packet(char *src, int count); // for debugging ('O'-packets)
 // Another naughty trick - allocates
 // exception_info, exception_extra and rpi2_reg_context
 // This way definitions and extern-declarations don't clash
@@ -33,7 +34,7 @@ extern char __hivec;
 #include "rpi2.h"
 #undef extern
 
-#define RPI_DOUBLE_VECTORS
+#define DEBUG_REG_CONTEXT
 
 #define LOW_VECTOR_ADDRESS_RST 0
 #define LOW_VECTOR_ADDRESS_UND 4
@@ -47,15 +48,68 @@ extern char __hivec;
 #define TRAP_INSTR_T 0xbe00
 #define TRAP_INSTR_A 0xe1200070
 
-extern void gdb_trap_handler(); // TODO: make callback
+// for mailbox
+#define MBOX_BUFF_SIZE (1024 + 16)
+volatile __attribute__ ((aligned (16))) uint8_t rpi2_mbox_buff[MBOX_BUFF_SIZE];
+
+// MMU-stuff
+
+/* this is for reference only - actually using bit fields would be dangerous here
+typedef struct
+{
+	uint32_t base_address:12;
+	uint32_t ns:1;
+	uint32_t sect_type:1;
+	uint32_t ng:1;
+	uint32_t s:1;
+	uint32_t apx:1;
+	uint32_t tex:3;
+	uint32_t ap:2;
+	uint32_t p:1;
+	uint32_t domain:4;
+	uint32_t xn:1;
+	uint32_t c:1;
+	uint32_t b:1;
+	uint32_t entry_type:1;
+	uint32_t xn:1;
+} xlat1_entry_sect;
+*/
+
+// for now
+#define MMU_SECT_ATTR_NORMAL 0x00090c0a
+#define MMU_SECT_ATTR_DEV 0x00090c06
+
+// TTBCR_N:
+// if N = 0, TTBR0 maps all addresses and the table size is 16 kB
+// the table (16 kB) can be addressed with 14 bits (0 - 0x3fff)
+// then the rest (upper part) of the address is put into the TTBR0
+// as the upper part of the table entry address, and the table needs to be
+// 16 kB aligned. If N=1, TTBR0 maps half of the addresses, table size is
+// 8 kB, table offset is 13 bits and the rest is put in TTBR0. The table
+// has to be 8 kB aligned, and so on.
+// one entry maps 1 MB block, so mapping 4GB memory takes 4096 (4k) entries
+// 4 bytes each -> 16 kB
+// these definitions are made for possibly splitting the mappings between
+// TTBR0 and TTBR1 in the future
+#define TTBCR_N 0
+#define TBL_OFFSET_BITS (14 - TTBCR_N)
+#define TBL_ALIGNMENT (1 << TBL_OFFSET_BITS)
+#define TBL_WORD_SIZE (TBL_ALIGNMENT >>2 )
+#define MMU_VAL_TTBR0(addr, attr) ((addr & ((~0)<< TBL_OFFSET_BITS)) | attr)
+#define MMU_SECT_ENTRY(addr_meg, attr) ((addr_meg << 20) | attr)
+volatile __attribute__ ((aligned (TBL_ALIGNMENT))) uint32_t master_xlat_tbl[TBL_WORD_SIZE];
+extern void gdb_trap_handler(); // TODO: make callback?
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
-uint32_t rpi2_dgb_enabled; // flag to pabt that this is IRQ-case
+volatile uint32_t rpi2_dgb_enabled; // flag to pabt that this is IRQ-case
+volatile uint32_t rpi2_debuggee_running;
 volatile uint32_t rpi2_ctrl_c_flag;
 volatile uint32_t rpi2_irq_status;
-volatile uint32_t rpi2_irq_flag; // flag to pabt that this is IRQ-case
+volatile uint32_t rpi2_sigint_flag; // flag: this is SIGINT-case
 volatile uint32_t rpi2_exc_reason;
 uint32_t rpi2_upper_vec_address;
+volatile uint32_t rpi2_pabt_reroute;
+
 // exception handling stuff
 // at the moment, SVC-stuff are used for all sychronous exceptions:
 // reset, und, svc, aux
@@ -87,17 +141,19 @@ void rpi2_svc_handler() __attribute__ ((naked));
 void rpi2_aux_handler() __attribute__ ((naked));
 void rpi2_dabt_handler() __attribute__ ((naked));
 void rpi2_irq_handler() __attribute__ ((naked));
-void rpi2_firq_handler() __attribute__ ((naked));
+void rpi2_fiq_handler() __attribute__ ((naked));
 void rpi2_pabt_handler() __attribute__ ((naked));
 
 // exception re-routing
 void rpi2_unhandled_irq() __attribute__ ((naked));
+void rpi2_unhandled_fiq() __attribute__ ((naked));
 void rpi2_unhandled_pabt() __attribute__ ((naked));
 void rpi2_reroute_reset() __attribute__ ((naked));
 void rpi2_reroute_exc_und() __attribute__ ((naked));
 void rpi2_reroute_exc_svc() __attribute__ ((naked));
 void rpi2_reroute_exc_dabt() __attribute__ ((naked));
 void rpi2_reroute_exc_aux() __attribute__ ((naked));
+void rpi2_reroute_exc_irq() __attribute__ ((naked));
 void rpi2_reroute_exc_fiq() __attribute__ ((naked));
 
 /* delay() borrowed from OSDev.org */
@@ -110,6 +166,7 @@ static inline void delay(int32_t count)
 void set_gdb_enabled(unsigned int state)
 {
 	rpi2_dgb_enabled = state;
+	rpi2_flush_address((unsigned int) &rpi2_dgb_enabled);
 }
 
 unsigned int rpi2_disable_save_ints()
@@ -117,6 +174,8 @@ unsigned int rpi2_disable_save_ints()
 	uint32_t status;
 	asm volatile (
 			"mrs %[var_reg], cpsr\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"cpsid aif\n\t"
 			"dsb\n\t"
 			"isb\n\t"
@@ -181,7 +240,7 @@ void rpi2_enable_ints()
  * IRQ exception is checked whether it's a serial interrupt. If it is,
  * it's handled like a normal interrupt, otherwise the mode is set to the
  * debugger's and a jump to debugger is made.
- * Other exceptions are handled line non-serial interrupt.
+ * Other exceptions are handled like non-serial interrupt.
  * On return, the exception handler loads the processor context and returns from
  * the exception. No offset is added to the return address, so the return address
  * needs to be fixed at the entry.
@@ -223,7 +282,7 @@ void rpi2_set_lower_vectable()
 			".word rpi2_dabt_handler\n\t"
 			".word rpi2_aux_handler @ used in some cases\n\t "
 			".word rpi2_unhandled_irq\n\t"
-			".word rpi2_firq_handler\n\t"
+			".word rpi2_unhandled_fiq\n\t"
 	);
 	asm volatile (
 			"irqset_low:\n\t"
@@ -240,11 +299,17 @@ void rpi2_set_lower_vectable()
 			".ltorg @ literal pool\n\t"
 			"2:\n\t"
 			"pop {r0, r1, r2, r3}\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 	);
 }
 
 void rpi2_set_upper_vectable()
 {
+	// TODO: add:
+	// if rpi2_uart0_excmode == RPI2_UART0_FIQ
+	// rpi2_irq_handler => rpi2_reroute_exc_irq
+	// rpi2_reroute_exc_fiq => rpi2_fiq_handler
 	asm volatile (
 			"@.globl jumptbl\n\t"
 			"push {r0, r1, r2, r3}\n\t"
@@ -282,6 +347,8 @@ void rpi2_set_upper_vectable()
 			".ltorg @ literal pool\n\t"
 			"2:\n\t"
 			"pop {r0, r1, r2, r3}\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 	);
 }
 
@@ -436,6 +503,7 @@ static inline void write_context()
 			"str r12, [r0, #4*12]\n\t"
 
 			"mrs r1, spsr\n\t"
+			"dsb\n\t"
 			"str r1, [r0, #4*16]\n\t"
 			"str lr, [r0, #4*15]\n\t"
 
@@ -445,6 +513,7 @@ static inline void write_context()
 
 			"@ our own mode?\n\t"
 			"mrs r3, cpsr\n\t"
+			"dsb\n\t"
 			"and r3, r2\n\t"
 			"cmp r1, r3\n\t"
 			"bne 10f @ not our own mode\n\t"
@@ -452,6 +521,7 @@ static inline void write_context()
 			"mov r1, sp\n\t"
 			"mov r2, lr\n\t"
 			"mrs r3, spsr\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 
 			"10:\n\t"
@@ -461,6 +531,7 @@ static inline void write_context()
 			"@ USR/SYS\n\t"
 			"mrs r1, SP_usr\n\t"
 			"mrs r2, LR_usr\n\t"
+			"dsb\n\t"
 			"eor r3, r3 @ usr/sys has no spsr\n\t"
 			"b 9f\n\t"
 			"1: cmp r1,  #0x01 @ FIQ\n\t"
@@ -471,11 +542,13 @@ static inline void write_context()
 			"mrs r4, r10_fiq\n\t"
 			"mrs r5, r11_fiq\n\t"
 			"mrs r6, r12_fiq\n\t"
+			"dsb\n\t"
 			"add r1, r0, #4*8\n\t"
 			"stmia r1, {r2 - r6} @ overwrite r8 - 12 with banked regs\n\t"
 			"mrs r1, SP_fiq\n\t"
 			"mrs r2, LR_fiq\n\t"
 			"mrs r3, SPSR_fiq\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"2: cmp r1, #0x02 @ IRQ\n\t"
 			"bne 3f\n\t"
@@ -483,6 +556,7 @@ static inline void write_context()
 			"mrs r1, SP_irq\n\t"
 			"mrs r2, LR_irq\n\t"
 			"mrs r3, SPSR_irq\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"3: cmp r1, #0x03 @ SVC\n\t"
 			"bne 4f\n\t"
@@ -490,6 +564,7 @@ static inline void write_context()
 			"mrs r1, SP_svc\n\t"
 			"mrs r2, LR_svc\n\t"
 			"mrs r3, SPSR_svc\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"4: cmp r1, #0x06 @ MON\n\t"
 			"bne 5f\n\t"
@@ -497,6 +572,7 @@ static inline void write_context()
 			"mrs r1, SP_mon\n\t"
 			"mrs r2, LR_mon\n\t"
 			"mrs r3, SPSR_mon\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"5: cmp r1, #0x07 @ ABT\n\t"
 			"bne 6f\n\t"
@@ -504,6 +580,7 @@ static inline void write_context()
 			"mrs r1, SP_abt\n\t"
 			"mrs r2, LR_abt\n\t"
 			"mrs r3, SPSR_abt\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"6: cmp r1, #0x0a @ HYP\n\t"
 			"bne 7f\n\t"
@@ -511,6 +588,7 @@ static inline void write_context()
 			"mrs r1, SP_hyp\n\t"
 			"mrs r2, ELR_hyp\n\t"
 			"mrs r3, SPSR_hyp\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"7: cmp r1, #0x0b @ UND\n\t"
 			"bne 8f\n\t"
@@ -518,11 +596,13 @@ static inline void write_context()
 			"mrs r1, SP_und\n\t"
 			"mrs r2, LR_und\n\t"
 			"mrs r3, SPSR_und\n\t"
+			"dsb\n\t"
 			"b 9f\n\t"
 			"8: @ ILLEGAL MODE\n\t"
 			"udf\n\t"
 			"9: \n\t"
 
+			"dsb\n\t"
 			"str r1, [r0, #4*13]\n\t"
 			"str r2, [r0, #4*14]\n\t"
 			"str r3, [r0, #4*17]\n\t"
@@ -540,12 +620,15 @@ static inline void read_context()
 
 			"ldr r1, [r0, #4*16] @ cpsr\n\t"
 			"msr spsr_fsxc, r1\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"@ mode to return to\n\t"
 			"mov r2, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r1, r2\n\t"
 
 			"@ our own mode\n\t"
 			"mrs r3, cpsr\n\t"
+			"dsb\n\t"
 			"and r3, r2\n\t"
 			"cmp r1, r3\n\t"
 			"bne 10f @ not same mode as ours\n\t"
@@ -563,6 +646,8 @@ static inline void read_context()
 			"@ USR/SYS\n\t"
 			"msr SP_usr, r2\n\t"
 			"msr LR_usr, r3\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"1: cmp r1,  #0x01 @ FIQ\n\t"
 			"bne 2f\n\t"
@@ -570,6 +655,8 @@ static inline void read_context()
 			"msr SP_fiq, r2\n\t"
 			"msr LR_fiq, r3\n\t"
 			"msr SPSR_fiq, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"add r1, r0, #4*8\n\t"
 			"ldmia r1, {r2 - r6} @ banked regs\n\t"
 			"msr r8_fiq, r2\n\t"
@@ -577,6 +664,8 @@ static inline void read_context()
 			"msr r10_fiq, r4\n\t"
 			"msr r11_fiq, r5\n\t"
 			"msr r12_fiq, r6\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"2: cmp r1, #0x02 @ IRQ\n\t"
 			"bne 3f\n\t"
@@ -584,6 +673,8 @@ static inline void read_context()
 			"msr SP_irq, r2\n\t"
 			"msr LR_irq, r3\n\t"
 			"msr SPSR_irq, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"3: cmp r1, #0x03 @ SVC\n\t"
 			"bne 4f\n\t"
@@ -591,6 +682,8 @@ static inline void read_context()
 			"msr SP_svc, r2\n\t"
 			"msr LR_svc, r3\n\t"
 			"msr SPSR_svc, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"4: cmp r1, #0x06 @ MON\n\t"
 			"bne 5f\n\t"
@@ -598,6 +691,8 @@ static inline void read_context()
 			"msr SP_mon, r2\n\t"
 			"msr LR_mon, r3\n\t"
 			"msr SPSR_mon, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"5: cmp r1, #0x07 @ ABT\n\t"
 			"bne 6f\n\t"
@@ -605,6 +700,8 @@ static inline void read_context()
 			"msr SP_abt, r2\n\t"
 			"msr LR_abt, r3\n\t"
 			"msr SPSR_abt, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"6: cmp r1, #0x0a @ HYP\n\t"
 			"bne 7f\n\t"
@@ -612,6 +709,8 @@ static inline void read_context()
 			"msr SP_hyp, r2\n\t"
 			"msr ELR_hyp, r3\n\t"
 			"msr SPSR_hyp, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"7: cmp r1, #0x0b @ UND\n\t"
 			"bne 8f\n\t"
@@ -619,38 +718,130 @@ static inline void read_context()
 			"msr SP_und, r2\n\t"
 			"msr LR_und, r3\n\t"
 			"msr SPSR_und, r4\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			"b 9f\n\t"
 			"8: @ ILLEGAL MODE\n\t"
 			"udf\n\t"
 			"9: \n\t"
 
+			"dsb\n\t"
+			"isb\n\t"
 			"ldr r2, [r0, #4*15] @ return address\n\t"
 			"ldr r1, [r0] @ r0-value\n\t"
 			"push {r1, r2} @ prepare for return\n\t"
 			"ldmia r0, {r0 - r12}\n\t"
 			"pop {r0, lr}\n\t"
-			"dsb\n\t"
-			"isb\n\t"
 	);
 }
+
+#ifdef RPI2_DEBUG_TIMER
+
+void rpi2_timer_init()
+{
+	*((volatile uint32_t *)ARM_TIMER_CTL) = 0x003E0000; // stop
+	*((volatile uint32_t *)ARM_TIMER_LOAD) = 1000000-1; // load-value
+	*((volatile uint32_t *)ARM_TIMER_RELOAD) = 1000000-1; // reload-value
+	*((volatile uint32_t *)ARM_TIMER_DIV) = 0x000000F9; // pre-divisor
+	*((volatile uint32_t *)ARM_TIMER_CLI) = 0; // clear interrupts
+	*((volatile uint32_t *)IRC_ENB) = 1; // enable at interrupt controller
+}
+
+void rpi2_timer_start()
+{
+	*((volatile uint32_t *)ARM_TIMER_LOAD) = 1000000-1; // load-value
+	*((volatile uint32_t *)ARM_TIMER_CLI) = 0; // clear interrupts
+	// start timer, enable int, prescaler = 256, 23-bit counter
+	*((volatile uint32_t *)ARM_TIMER_CTL) = 0x003E00AA;
+}
+
+void rpi2_timer_stop()
+{
+	*((volatile uint32_t *)ARM_TIMER_CTL) = 0x003E0000; // stop
+}
+
+void rpi2_timer_kick()
+{
+	*((volatile uint32_t *)ARM_TIMER_LOAD) = 1000000-1; // load-value
+}
+
+
+void rpi2_timer_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
+{
+	uint32_t exc_cpsr;
+	static char scratchpad[16];
+	char *p;
+	int i;
+	asm volatile
+	(
+			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
+			:[var_reg] "=r" (exc_cpsr) ::
+	);
+
+	// for fix for the exception return address
+	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
+	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
+	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
+	//rpi2_reg_context.reg.r15 -= 4; // PC (already done in assembly)
+
+	p = "\r\nTIMER EXCEPTION\r\n";
+	do {i = serial_raw_puts(p); p += i;} while (i);
+
+	serial_raw_puts("exc_addr: ");
+	util_word_to_hex(scratchpad, exc_addr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\nSPSR: ");
+	util_word_to_hex(scratchpad, exc_cpsr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	rpi2_dump_context(&rpi2_svc_context);
+
+	while (1); // hang
+}
+
+#endif
 
 // exception handlers
 
 // debug print for naked exception functions
 void naked_debug_2(uint32_t src, uint32_t link, uint32_t stack)
 {
+	int len;
 	char tmp[16];
-	serial_raw_puts("\r\nnak_dbg");
-	serial_raw_puts("\r\nPC: ");
-	util_word_to_hex(tmp, src);
-	serial_raw_puts(tmp);
-	serial_raw_puts(" LR: ");
-	util_word_to_hex(tmp, link);
-	serial_raw_puts(tmp);
-	serial_raw_puts(" SP: ");
-	util_word_to_hex(tmp, stack);
-	serial_raw_puts(tmp);
-	serial_raw_puts("\r\n");
+
+	if (rpi2_debuggee_running)
+	{
+#if 0
+		serial_raw_puts("\r\nnak_dbg");
+		serial_raw_puts("\r\nPC: ");
+		util_word_to_hex(tmp, src);
+		serial_raw_puts(tmp);
+		serial_raw_puts(" LR: ");
+		util_word_to_hex(tmp, link);
+		serial_raw_puts(tmp);
+		serial_raw_puts(" SP: ");
+		util_word_to_hex(tmp, stack);
+		serial_raw_puts(tmp);
+		serial_raw_puts("\r\n");
+#else
+		// \175\055\175\052 is \r\n escaped
+		util_str_copy(dbg_msg_buff, "O", DBG_MSG_SZ);
+		len = util_append_str(dbg_msg_buff, "\175\055\175\052nak_dbg", DBG_MSG_SZ);
+		len = util_append_str(dbg_msg_buff, "\175\055\175\052PC: ", DBG_MSG_SZ);
+		util_word_to_hex(tmp, src);
+		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
+		len = util_append_str(dbg_msg_buff, " LR: ", DBG_MSG_SZ);
+		util_word_to_hex(tmp, link);
+		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
+		len = util_append_str(dbg_msg_buff, " SP: ", DBG_MSG_SZ);
+		util_word_to_hex(tmp, stack);
+		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
+		len = util_append_str(dbg_msg_buff, "\175\055\175\052", DBG_MSG_SZ);
+
+		gdb_send_packet(dbg_msg_buff, len);
+#endif
+	}
 }
 
 // this protects the processor state
@@ -682,6 +873,7 @@ static inline void check_irq_stack()
 			"mov r2, sp\n\t"
 			"push {r0 - r12}\n\t"
 			"mrs r0, cpsr\n\t"
+			"dsb\n\t"
 			"push {r0, lr}\n\t"
 
 			"ldr r0, =__irq_stack\n\t"
@@ -707,14 +899,12 @@ static inline void check_irq_stack()
 // common trap handler outside exception handlers
 void rpi2_trap_handler()
 {
-#ifdef DEBUG_EXCEPTIONS
+#ifdef DEBUG_GDB_EXC
 	serial_raw_puts("\r\ntrap_hndlr\r\n");
 #endif
 
-	// IRQs need to be enabled for serial I/O
 	if (rpi2_dgb_enabled)
 	{
-		rpi2_enable_ints();
 		gdb_trap_handler();
 	}
 }
@@ -773,6 +963,17 @@ void rpi2_reroute_exc_aux()
 	);
 }
 
+// in case uart0 is handled by firq instead
+void rpi2_reroute_exc_irq()
+{
+#ifdef DEBUG_EXCEPTIONS
+	naked_debug();
+#endif
+	asm volatile(
+			"mov pc, #24 @ jump to low vector\n\t"
+	);
+}
+
 void rpi2_reroute_exc_fiq()
 {
 #ifdef DEBUG_EXCEPTIONS
@@ -797,6 +998,161 @@ void rpi2_reroute_exc_fiq()
 // The secondary handlers are mainly used for debugging, except for PABT
 // where the secondary handler does things for entering the debugger.
 
+// upper level handler for gdb entry
+void gdb_exception_handler()
+{
+	volatile rpi2_reg_context_t *ctx;
+	int i;
+#ifdef DEBUG_GDB_EXC
+	uint32_t exc_cpsr;
+	uint32_t tmp;
+	char *pp;
+	static char scratchpad[16]; // scratchpad
+#endif
+
+	switch (exception_info)
+	{
+	case RPI2_EXC_RESET:
+		ctx = &rpi2_svc_context;
+		break;
+	case RPI2_EXC_UNDEF:
+		ctx = &rpi2_svc_context;
+		break;
+	case RPI2_EXC_SVC:
+		ctx = &rpi2_svc_context;
+		break;
+	case RPI2_EXC_PABT:
+		ctx = &rpi2_pabt_context;
+		break;
+	case RPI2_EXC_DABT:
+		ctx = &rpi2_dabt_context;
+		break;
+	case RPI2_EXC_AUX:
+		ctx = &rpi2_svc_context;
+		break;
+	case RPI2_EXC_IRQ:
+		ctx = &rpi2_irq_context;
+		break;
+	case RPI2_EXC_FIQ:
+		ctx = &rpi2_fiq_context;
+		break;
+	default:
+		ctx = &rpi2_svc_context;
+		break;
+	}
+	// copy irq context to reg context for returning
+	// to original program that was interrupted by CTRL-C
+	for (i=0; i<18; i++)
+	{
+		rpi2_reg_context.storage[i] = ctx->storage[i];
+	}
+
+	if (rpi2_sigint_flag) rpi2_ctrl_c_flag = 0;
+
+	// interrupts need to be enabled for serial I/O?
+	// asm volatile ("cpsid aif\n\t");
+	asm volatile ("cpsid if\n\t");
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		asm volatile ("cpsie f\n\t");
+	}
+	else if (rpi2_uart0_excmode == RPI2_UART0_IRQ)
+	{
+		asm volatile ("cpsie i\n\t");
+	}
+	// else keep all exceptions masked
+
+#ifdef DEBUG_GDB_EXC
+#if 0
+	asm volatile
+	(
+			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
+			:[var_reg] "=r" (exc_cpsr) ::
+	);
+#endif
+	// raw puts, because we are here with interrupts disabled
+	pp = "\r\nGDB EXCEPTION";
+	do {i = serial_raw_puts(pp); pp += i;} while (i);
+#if 0
+	serial_raw_puts("\r\nexc_addr: ");
+	util_word_to_hex(scratchpad, exc_addr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" SPSR: ");
+	util_word_to_hex(scratchpad, exc_cpsr);
+	serial_raw_puts(scratchpad);
+#endif
+	serial_raw_puts("\r\nctx: ");
+	util_word_to_hex(scratchpad, (unsigned int)ctx);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" info: ");
+	util_word_to_hex(scratchpad, (unsigned int)exception_info);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" extra: ");
+	util_word_to_hex(scratchpad, (unsigned int)exception_extra);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" sigint: ");
+	util_word_to_hex(scratchpad, (unsigned int)rpi2_sigint_flag);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\n");
+	rpi2_dump_context(&rpi2_reg_context);
+#endif
+
+	rpi2_trap_handler();
+}
+
+void show_go(uint32_t retaddr)
+{
+	uint32_t xspsr;
+	asm volatile
+	(
+			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
+			:[var_reg] "=r" (xspsr) ::
+	);
+
+	serial_raw_puts("\n\t going to: ");
+	util_word_to_hex(dbg_msg_buff, (unsigned int)retaddr);
+	serial_raw_puts(dbg_msg_buff);
+	serial_raw_puts(" spsr: ");
+	util_word_to_hex(dbg_msg_buff, (unsigned int)xspsr);
+	serial_raw_puts(dbg_msg_buff);
+	serial_raw_puts("\r\n");
+}
+
+// the gdb "entry"
+void rpi2_gdb_exception()
+{
+	// switch to PABT
+	asm volatile (
+			"mrs r0, cpsr\n\t"
+			"and r0, #0x1f\n\t"
+			"cmp r0, #0x17\n\t"
+			"beq 1f\n\t"
+			"mov r0, #0x17 @ abt-mode\n\t"
+			"msr cpsr_c, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"1:\n\t"
+			"movw sp, #:lower16:__gdb_stack\n\t"
+			"movt sp, #:upper16:__gdb_stack\n\t"
+			"bl gdb_exception_handler\n\t"
+			"ldr r0, =rpi2_reg_context\n\t"
+	);
+
+	read_context();
+
+	asm volatile (
+#ifdef DEBUG_GDB_EXC
+			"push {r0 - r4, lr}\n\t"
+			"mov r0, lr\n\t"
+			"bl show_go\n\t"
+			"pop {r0 - r4, lr}\n\t"
+#endif
+			"subs pc, lr, #0\n\t"
+	);
+}
+
 void rpi2_reset_handler()
 {
 #ifdef DEBUG_EXCEPTIONS
@@ -808,6 +1164,7 @@ void rpi2_reset_handler()
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
@@ -816,9 +1173,10 @@ void rpi2_reset_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
@@ -836,16 +1194,11 @@ void rpi2_reset_handler()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #0 @ RPI2_EXC_RESET\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #0 @ nothing\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
 			"rst_sp_store: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
@@ -863,6 +1216,7 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
@@ -897,6 +1251,7 @@ void rpi2_undef_handler()
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__und_stack\n\t"
 			"movt sp, #:upper16:__und_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 			"sub lr, #4 @ on return, skip the instruction\n\t"
@@ -906,9 +1261,10 @@ void rpi2_undef_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
@@ -932,16 +1288,11 @@ void rpi2_undef_handler()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #1 @ RPI2_EXC_UNDEF\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #0 @ nothing\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
 			"und_sp_store: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
@@ -959,6 +1310,7 @@ void rpi2_svc_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
@@ -997,6 +1349,7 @@ void rpi2_svc_handler()
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
@@ -1005,9 +1358,10 @@ void rpi2_svc_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
-			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
-			"and r0, r1\n\t"
 			"mrs r2, cpsr @ our mode\n\t"
+			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
+			"dsb\n\t"
+			"and r0, r1\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
@@ -1034,16 +1388,11 @@ void rpi2_svc_handler()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #2 @ RPI2_EXC_SVC\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #0 @ nothing\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
 			"svc_sp_store: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
@@ -1061,6 +1410,7 @@ void rpi2_aux_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
@@ -1099,6 +1449,7 @@ void rpi2_aux_handler()
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
@@ -1107,9 +1458,10 @@ void rpi2_aux_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
@@ -1136,16 +1488,11 @@ void rpi2_aux_handler()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #5 @ RPI2_EXC_AUX\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #0 @ nothing\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
 			"aux_sp_store: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
@@ -1157,12 +1504,14 @@ void rpi2_aux_handler()
 void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
+	uint32_t dfsr, dfar;
 	static char scratchpad[16];
 	int i;
 	char *p;
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
@@ -1170,17 +1519,28 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
 	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
 	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	// rpi2_reg_context.reg.r15 -= 8; // PC
-	//rpi2_reg_context.reg.r15 -= 4; // skip bad instruction
+	// rpi2_reg_context.reg.r15 -= 8; // done in the primary handler
 
+	// TODO: add DFSR.FS, DFAR
+	// MRC p15, 0, <Rt>, c5, c0, 0 ; Read DFSR into Rt
+	// MRC p15, 0, <Rt>, c6, c0, 0 ; Read DFAR into Rt
+	// LR = faulting instruction address
+	asm volatile ("mrc p15, 0, %0, c5, c0, 0\n\t" : "=r" (dfsr) ::);
+	asm volatile ("mrc p15, 0, %0, c6, c0, 0\n\t" : "=r" (dfar) ::);
 	p = "\r\nDABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
 
 	serial_raw_puts("exc_addr: ");
 	util_word_to_hex(scratchpad, exc_addr);
 	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nSPSR: ");
+	serial_raw_puts(" SPSR: ");
 	util_word_to_hex(scratchpad, exc_cpsr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\nDFSR: ");
+	util_word_to_hex(scratchpad, dfsr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" DFAR: ");
+	util_word_to_hex(scratchpad, dfar);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context(&rpi2_dabt_context);
@@ -1198,8 +1558,9 @@ void rpi2_dabt_handler()
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
-			"sub lr, #4 @ fix return address\n\t"
+			"sub lr, #4 @ fix return address - skip bad instruction\n\t"
 			"ldr r12, =rpi2_dabt_context\n\t"
 	);
 	write_context();
@@ -1207,9 +1568,10 @@ void rpi2_dabt_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
@@ -1236,16 +1598,11 @@ void rpi2_dabt_handler()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #4 @ RPI2_EXC_DABT\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
 			"dabt_sp_store: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
@@ -1254,138 +1611,108 @@ void rpi2_dabt_handler()
 }
 
 #ifdef DEBUG_IRQ
-#define IRQ_DEBUG
+#define SER_DEBUG
 #endif
 #ifdef DEBUG_CTRLC
-#define IRQ_DEBUG
+#define SER_DEBUG
 #endif
+extern volatile int ser_handle_ctrlc;
 
-#ifdef IRQ_DEBUG
-void rpi2_irq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
+// returns code for what to do after return
+uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
 {
+	uint32_t irq_status;
+	uint32_t retval;
 	uint32_t exc_cpsr;
 	uint32_t tmp;
 	int i;
 	char *p;
 	static char scratchpad[16]; // scratchpad
 
+	retval = 0; // default: goto low vector
+
+	irq_status =  *((volatile uint32_t *)IRC_PENDB);
+	if (irq_status & (1 << 19)) // bit 19 = UART0
+	{
+		irq_status &= ~(1 << 19); // clear bit 9
+		serial_irq();
+	}
+
+	if (!rpi2_sigint_flag)
+	{
+		if (rpi2_ctrl_c_flag)
+		{
+			// CTRL-C
+			// swap flags to prevent multiple handling of the same ctrl-c
+			rpi2_ctrl_c_flag = 0;
+			rpi2_sigint_flag = 1;
+			exception_extra = RPI2_REASON_SIGINT;
+			rpi2_exc_reason = RPI2_REASON_SIGINT;
+			retval = 2; // don't return - goto gdb
+		}
+	}
+
+	if (retval == 0)
+	{
+		if (irq_status == 0)
+		{
+			retval = 1; // return to interrupted program
+		}
+		// else retval = 0
+	}
+
+#ifdef SER_DEBUG
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	// rpi2_irq_context.reg.r15 -= 4; // PC
 
-
-#if 0
-	// IRQ2 pending
-	if (*((volatile uint32_t *)IRC_PENDB) & (1<<19))
+	if (rpi2_sigint_flag)
+//	if (gdb_dyn_debug)
 	{
-		// UART IRQ
-		if (*((volatile uint32_t *)IRC_PEND2) & (1<<25))
-		{
-			//rpi2_led_blink(200, 200, 8);
-			//serial_irq();
-		}
-		else
-		{
-			// unhandled IRQ
-			p = "\r\nIRQ EXCEPTION\r\n";
-			do {i = serial_raw_puts(p); p += i;} while (i);
-
-			serial_raw_puts("exc_addr: ");
-			util_word_to_hex(scratchpad, exc_addr);
-			serial_raw_puts(scratchpad);
-			serial_raw_puts("\r\nSPSR: ");
-			util_word_to_hex(scratchpad, exc_cpsr);
-			serial_raw_puts(scratchpad);
-			serial_raw_puts("\r\nSP: ");
-			util_word_to_hex(scratchpad, stack_frame_addr);
-			serial_raw_puts(scratchpad);
-			tmp = *((volatile uint32_t *)IRC_PEND2);
-			serial_raw_puts("\r\nPEND2: ");
-			util_word_to_hex(scratchpad, tmp);
-			serial_raw_puts(scratchpad);
-			serial_raw_puts("\r\n");
-			rpi2_dump_context(&rpi2_irq_context);
-			exception_info = RPI2_EXC_IRQ;
-			rpi2_set_exc_reason(RPI2_REASON_HW_EXC);
-		}
-	}
-	else
-	{
-		// unhandled IRQ
 		p = "\r\nIRQ EXCEPTION\r\n";
 		do {i = serial_raw_puts(p); p += i;} while (i);
 
 		serial_raw_puts("exc_addr: ");
 		util_word_to_hex(scratchpad, exc_addr);
 		serial_raw_puts(scratchpad);
-		serial_raw_puts("\r\nSPSR: ");
+		serial_raw_puts(" SP: ");
+		util_word_to_hex(scratchpad, stack_pointer);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts(" SPSR: ");
 		util_word_to_hex(scratchpad, exc_cpsr);
 		serial_raw_puts(scratchpad);
 		tmp = *((volatile uint32_t *)IRC_PENDB);
 		serial_raw_puts("\r\nPENDB: ");
 		util_word_to_hex(scratchpad, tmp);
 		serial_raw_puts(scratchpad);
+		tmp = *((volatile uint32_t *)IRC_PEND1);
+		serial_raw_puts(" PEND1: ");
+		util_word_to_hex(scratchpad, tmp);
+		serial_raw_puts(scratchpad);
+		tmp = *((volatile uint32_t *)IRC_PEND2);
+		serial_raw_puts(" PEND2: ");
+		util_word_to_hex(scratchpad, tmp);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("\r\nctrlc-flag: ");
+		util_word_to_hex(scratchpad, (unsigned int) rpi2_ctrl_c_flag);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts("handle_ctrlc: ");
+		util_word_to_hex(scratchpad, (unsigned int) ser_handle_ctrlc);
+		serial_raw_puts(scratchpad);
+		serial_raw_puts(" irq-flag: ");
+		util_word_to_hex(scratchpad, (unsigned int) rpi2_sigint_flag);
+		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
-		rpi2_dump_context(&rpi2_irq_context);
-		exception_info = RPI2_EXC_IRQ;
-		rpi2_set_exc_reason(RPI2_REASON_HW_EXC);
-
-	}
-#else
-	p = "\r\nIRQ EXCEPTION\r\n";
-	do {i = serial_raw_puts(p); p += i;} while (i);
-
-	serial_raw_puts("exc_addr: ");
-	util_word_to_hex(scratchpad, exc_addr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nSP: ");
-	util_word_to_hex(scratchpad, stack_frame_addr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nSPSR: ");
-	util_word_to_hex(scratchpad, exc_cpsr);
-	serial_raw_puts(scratchpad);
-	tmp = *((volatile uint32_t *)IRC_PENDB);
-	serial_raw_puts("\r\nPENDB: ");
-	util_word_to_hex(scratchpad, tmp);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\n");
 #ifdef DEBUG_CTRLC
-	rpi2_dump_context(&rpi2_irq_context);
-#endif
-#endif
-
-#if 0
-	// if crtl-C, dump exception info (for now)
-	if (rpi2_ctrl_c_flag)
-	{
-		// swap flags to stop further interrupts on one ctrl-C
-		rpi2_ctrl_c_flag = 0;
-		rpi2_irq_flag = 1;
-		rpi2_set_exc_reason(RPI2_REASON_SIGINT);
-		exception_info = RPI2_EXC_IRQ;
-
-#ifdef DEBUG_REG_CONTEXT
-		serial_raw_puts("\r\nCTRL-C\r\n");
-		serial_raw_puts("exc_addr: ");
-		util_word_to_hex(scratchpad, exc_addr);
-		serial_raw_puts(scratchpad);
-		serial_raw_puts("\r\nSPSR: ");
-		util_word_to_hex(scratchpad, exc_cpsr);
-		serial_raw_puts(scratchpad);
-		serial_raw_puts("\r\n");
 		rpi2_dump_context(&rpi2_irq_context);
 #endif
 	}
 #endif
+	return retval;
 }
-#endif
 
 void rpi2_unhandled_irq()
 {
@@ -1393,9 +1720,10 @@ void rpi2_unhandled_irq()
 	naked_debug();
 #endif
 	asm volatile (
-			"str sp, irq_sp_store\n\t"
+			"str sp, irq_sp_store1\n\t"
 			"movw sp, #:lower16:__irq_stack\n\t"
 			"movt sp, #:upper16:__irq_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_irq_context\n\t"
 			"sub lr, #4 @ fix return address\n\t"
@@ -1406,16 +1734,17 @@ void rpi2_unhandled_irq()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
 			"bne 1f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, irq_sp_store\n\t"
+			"ldr r0, irq_sp_store1\n\t"
 			"ldr r1, =rpi2_irq_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
@@ -1423,24 +1752,13 @@ void rpi2_unhandled_irq()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #6 @ RPI2_EXC_IRQ\n\t"
 			"str r1, [r0]\n\t"
-
-			"ldr r0, =rpi2_exc_reason\n\t"
+			"ldr r0, =exception_extra\n\t"
 			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
-			"str r1, [r0]\n\t"
-
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
-
-			"irq_sp_store: @ close enough for simple pc relative\n\t"
+			"irq_sp_store1: @ close enough for simple pc relative\n\t"
 			".int 0\n\t"
 	);
 }
@@ -1448,62 +1766,55 @@ void rpi2_unhandled_irq()
 void rpi2_irq_handler()
 {
 	asm volatile (
-			"str sp, irq_sp_store\n\t"
+			"str sp, irq_sp_store2\n\t"
 			"movw sp, #:lower16:__irq_stack\n\t"
 			"movt sp, #:upper16:__irq_stack\n\t"
+			"dsb\n\t"
 			"push {r0 - r12}\n\t"
 			"mrs r0, cpsr\n\t"
 			"push {r0, r1, lr} @ r1 to keep sp double word aligned\n\t"
+			"ldr r0, =rpi2_uart0_excmode\n\t"
+			"ldr r0, [r0]\n\t"
+			"cmp r0, #1 @ RPI2_UART0_FIQ\n\t"
+			"beq 1f @ serial doesn't use irq - other irqs\n\t"
 
-			"movw r0, #0xb200 @ IRC_PENDB\n\t"
-			"movt r0, #0x3f00\n\t"
-			"ldr r1, [r0]\n\t"
-			"ands r1, #0x80000 @ bit 19 = UART0\n\t"
-			"beq rpi2_other_irqs\n\t"
-
-			"@ UART0 IRQ involved\n\t"
-			"bl serial_irq\n\t"
-#ifdef DEBUG_IRQ
-			"mov r0, sp\n\t"
+			"ldr r0, irq_sp_store2\n\t"
 			"mov r1, lr\n\t"
-			"bl rpi2_irq_handler2\n\t"
-#endif
-			"ldr r0, =rpi2_ctrl_c_flag\n\t"
-			"ldr r1, [r0]\n\t"
-			"cmp r1, #0\n\t"
-			"bne 1f @ sigint happened\n\t"
-			"@ can't do both ctrl-c and other IRQs so ctrl-c\n\t"
-			"@ is of higher priority\n\t"
+			"bl rpi2_serial_handler\n\t"
+			"cmp r0, #2\n\t"
+			"beq 2f @ ctrl-c \n\t"
+			"cmp r0, #1\n\t"
+			"bne 1f\n\t"
 
-			"@ any other pending IRQs?\n\t"
-			"movw r0, #0xb200 @ IRC_PENDB\n\t"
-			"movt r0, #0x3f00\n\t"
-			"ldr r1, [r0]\n\t"
-			"mvn r2, #0x80000 @ bit 19 = UART0\n\t"
-			"ands r1, r2\n\t"
-			"bne rpi2_other_irqs\n\t"
-
-			"@ Only UART0 IRQ\n\t"
+			"@ only serial irq\n\t"
 			"pop {r0, r1, lr}\n\t"
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
 			"pop {r0 - r12}\n\t"
-			"ldr sp, irq_sp_store\n\t"
-			"subs pc, lr, #4 @ return\n\t"
+			"ldr sp, irq_sp_store2\n\t"
+			"subs pc, lr, #4\n\t"
 
-			"1: @ SIGINT\n\t"
-	);
-#ifdef DEBUG_EXCEPTIONS
-	naked_debug();
-#endif
-	asm volatile (
+			"1: @ other irqs\n\t"
 			"pop {r0, r1, lr}\n\t"
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
-			"sub lr, #4 @ the return address fix"
 			"pop {r0 - r12}\n\t"
+			"ldr sp, irq_sp_store2\n\t"
+			"mov pc, #24 @ jump to irq low vector\n\t"
+
+			"2: @ ctrl-c \n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #6 @ RPI2_EXC_IRQ\n\t"
+			"str r1, [r0]\n\t"
+
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"sub lr, #4 @ fix return address\n\t"
 			"push {r12}\n\t"
 			"ldr r12, =rpi2_irq_context\n\t"
 	);
@@ -1513,109 +1824,44 @@ write_context();
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
-			"bne 2f @ not our own mode, no fix needed\n\t"
+			"bne 3f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, irq_sp_store\n\t"
+			"ldr r0, irq_sp_store2\n\t"
 			"ldr r1, =rpi2_irq_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
-			"2: @ context stored, handle SIGINT\n\t"
-#ifdef DEBUG_CTRLC
-			"mov r0, sp\n\t"
-			"mov r1, lr\n\t"
-			"bl rpi2_irq_handler2\n\t"
-#endif
-			"mov r1, #0\n\t"
-			"ldr r0, =rpi2_ctrl_c_flag\n\t"
-			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
-			"str r1, [r0]\n\t"
-			"ldr r0, =exception_info\n\t"
-			"mov r1, #6 @ RPI2_EXC_IRQ\n\t"
-			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_exc_reason\n\t"
-			"mov r1, #2 @ RPI2_REASON_SIGINT\n\t"
-			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"3: \n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
 
-			"rpi2_other_irqs:\n\t"
-	);
-#ifdef DEBUG_EXCEPTIONS
-	naked_debug();
-#endif
-	asm volatile (
-			"pop {r0, r1, lr}\n\t"
-			"msr cpsr_fsxc, r0\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"pop {r0 - r12}\n\t"
-			"ldr sp, irq_sp_store\n\t"
-			"mov pc, #24 @ IRQ, low vector\n\t"
-
+			"irq_sp_store2: @ close enough for simple pc relative\n\t"
+			".int 0\n\t"
 			".ltorg @ literal pool\n\t"
 	);
 }
 
-#ifdef DEBUG_FIQ
-void rpi2_firq_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
-{
-	uint32_t exc_cpsr;
-	uint32_t tmp;
-	int i;
-	char *p;
-	static char scratchpad[16]; // scratchpad
-	asm volatile
-	(
-			"mrs %[var_reg], spsr\n\t"
-			:[var_reg] "=r" (exc_cpsr) ::
-	);
-
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	rpi2_reg_context.reg.r15 -= 4; // PC
-
-	p = "\r\nFIQ EXCEPTION\r\n";
-	do {i = serial_raw_puts(p); p += i;} while (i);
-
-	serial_raw_puts("exc_addr: ");
-	util_word_to_hex(scratchpad, exc_addr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nSPSR: ");
-	util_word_to_hex(scratchpad, exc_cpsr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
-}
-#endif
-
-void rpi2_firq_handler()
+void rpi2_unhandled_fiq()
 {
 #ifdef DEBUG_EXCEPTIONS
 	naked_debug();
 #endif
 	// store processor context
 	asm volatile (
-			"str sp, fiq_sp_store\n\t"
+			"str sp, fiq_sp_store1\n\t"
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__fiq_stack\n\t"
 			"movt sp, #:upper16:__fiq_stack\n\t"
+			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
+			"sub lr, #4 @ fix return address\n\t"
 			"ldr r12, =rpi2_fiq_context\n\t"
 	);
 	write_context();
@@ -1623,49 +1869,142 @@ void rpi2_firq_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
 			"bne 1f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, fiq_sp_store\n\t"
+			"ldr r0, fiq_sp_store1\n\t"
 			"ldr r1, =rpi2_fiq_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
-			"1: @ context stored\n\t"
-	);
-
-	// rpi2_firq_handler2() // - No C in naked function
-#ifdef DEBUG_FIQ
-	asm volatile (
-			"mov r0, sp\n\t"
-			"mov r1, lr\n\t"
-			"bl rpi2_firq_handler2\n\t"
-	);
-#endif
-	asm volatile (
+			"1:\n\t"
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #7 @ RPI2_EXC_FIQ\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
-			"ldr lr, =rpi2_trap\n\t"
-			"mrs r0, spsr\n\t"
-			"orr r0, #8 @ interrupt mask\n\t"
-			"msr spsr_fsxc, r0\n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
+
+			"fiq_sp_store1:\n\t"
+			".int 0\n\t"
+	);
+}
+
+void rpi2_fiq_handler()
+{
+	asm volatile (
+			"str sp, fiq_sp_store2\n\t"
+			"movw sp, #:lower16:__fiq_stack\n\t"
+			"movt sp, #:upper16:__fiq_stack\n\t"
+			"dsb\n\t"
+			"push {r0 - r12}\n\t"
+			"mrs r0, cpsr\n\t"
+			"push {r0, r1, lr} @ r1 to keep sp double word aligned\n\t"
+			"ldr r0, =rpi2_uart0_excmode\n\t"
+			"ldr r0, [r0]\n\t"
+			"cmp r0, #1 @ RPI2_UART0_FIQ\n\t"
+			"beq 1f @ serial doesn't use fiq - other fiq\n\t"
+
+			"ldr r0, fiq_sp_store2\n\t"
+			"mov r1, lr\n\t"
+			"bl rpi2_serial_handler\n\t"
+			"cmp r0, #2\n\t"
+			"beq 2f @ ctrl-c \n\t"
+
+			"@ only serial fiq\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
-			"subs pc, lr, #0\n\t"
+			"pop {r0 - r12}\n\t"
+			"ldr sp, fiq_sp_store2\n\t"
+			"subs pc, lr, #4\n\t"
 
-			"fiq_sp_store:\n\t"
+			"1: @ other irqs\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"ldr sp, fiq_sp_store2\n\t"
+			"mov pc, #28 @ jump to fiq low vector\n\t"
+	);
+
+	asm volatile (
+			"2: @ ctrl_c\n\t"
+#ifdef DEBUG_EXCEPTIONS
+	);
+	naked_debug();
+	asm volatile (
+#endif
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #7 @ RPI2_EXC_FIQ\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"sub lr, #4 @ fix return address\n\t"
+			"push {r12}\n\t"
+			"ldr r12, =rpi2_fiq_context\n\t"
+	);
+// store processor context
+write_context();
+
+	asm volatile (
+			"@ fix sp in the context, if needed\n\t"
+			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
+			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
+			"and r0, r1\n\t"
+			"and r2, r1\n\t"
+			"@ our own mode?\n\t"
+			"cmp r0, r2\n\t"
+			"bne 3f @ not our own mode, no fix needed\n\t"
+
+			"@ our mode\n\t"
+			"ldr r0, fiq_sp_store2\n\t"
+			"ldr r1, =rpi2_fiq_context\n\t"
+			"str r0, [r1, #13*4]\n\t"
+
+			"3: \n\t"
+			"ldr r0, =rpi2_gdb_exception\n\t"
+			"mov pc, r0\n\t"
+			"fiq_sp_store2:\n\t"
 			".int 0\n\t"
 			".ltorg @ literal pool\n\t"
 	);
+}
+
+
+void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
+{
+	uint32_t xpc;
+
+	asm volatile("mov %[reg], lr\n\t" :[reg] "=r" (xpc)::);
+	serial_raw_puts("pc: ");
+	util_word_to_hex(dbg_tmp_buff, xpc);
+	serial_raw_puts(dbg_tmp_buff);
+	serial_raw_puts(" lr: ");
+	util_word_to_hex(dbg_tmp_buff, xlr);
+	serial_raw_puts(dbg_tmp_buff);
+	serial_raw_puts("\r\ncpsr: ");
+	util_word_to_hex(dbg_tmp_buff, xcpsr);
+	serial_raw_puts(dbg_tmp_buff);
+	serial_raw_puts(" spsr: ");
+	util_word_to_hex(dbg_tmp_buff, xspsr);
+	serial_raw_puts(dbg_tmp_buff);
+	serial_raw_puts("\r\n");
 }
 
 void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
@@ -1675,6 +2014,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	uint32_t exc_cpsr;
 	uint32_t dbg_state;
 	uint32_t ifsr;
+	uint32_t our_lr;
 	volatile rpi2_reg_context_t *ctx;
 #ifdef DEBUG_PABT
 	uint32_t tmp;
@@ -1688,75 +2028,17 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
-
-	if (rpi2_irq_flag) // leave the flag for gdb_trap_handler()
-	{
-		switch (exception_info)
-		{
-		case RPI2_EXC_RESET:
-			ctx = &rpi2_svc_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_UNDEF:
-			ctx = &rpi2_svc_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_SVC:
-			ctx = &rpi2_svc_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_PABT:
-			ctx = &rpi2_pabt_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_DABT:
-			ctx = &rpi2_dabt_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_AUX:
-			ctx = &rpi2_svc_context;
-			rpi2_irq_flag = 0;
-			break;
-		case RPI2_EXC_IRQ:
-			ctx = &rpi2_irq_context;
-			break;
-		case RPI2_EXC_FIQ:
-			ctx = &rpi2_fiq_context;
-			rpi2_irq_flag = 0;
-			break;
-		default:
-			ctx = &rpi2_reg_context;
-			rpi2_irq_flag = 0;
-			break;
-		}
-		// copy irq context to reg context for returning
-		// to original program that was interrupted by CTRL-C
-		for (i=0; i<18; i++)
-		{
-			rpi2_reg_context.storage[i] = ctx->storage[i];
-		}
-		//rpi2_reg_context.reg.cpsr &= ~(1<<7); // clear irq mask
-		// serial_raw_puts("\r\nIRQ_PABT\r\n");
-	}
-
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	// rpi2_reg_context.reg.r15 -= 4; // PC
-
-
-#if 0
-	// check debug state
-	// MRC p14, 0, <Rt>, c0, c1, 0 // DBGDSCRint
 	asm volatile
 	(
-			"mrc p14, 0, %[var_reg], c0, c1, 0 @ DBGDSCRint\n\t"
-			:[var_reg] "=r" (dbg_state) ::
+			"mov %[var_reg], lr\n\t"
+			"dsb\n\t"
+			:[var_reg] "=r" (our_lr) ::
 	);
-#else
+
+#if 0
 	// all bits are not reliable if read via CP14 interface
 	p = (uint32_t *)(dbg_reg_base + 0x88); // DBGDSCRext
 	dbg_state = *p;
@@ -1766,6 +2048,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	asm volatile
 	(
 			"mrc p15, 0, %[var_reg], c5, c0, 1 @ IFSR\n\t"
+			"dsb\n\t"
 			:[var_reg] "=r" (ifsr) ::
 	);
 
@@ -1773,8 +2056,10 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	// raw puts, because we are here with interrupts disabled
 	pp = "\r\nPABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(pp); pp += i;} while (i);
-
-	serial_raw_puts("exc_addr: ");
+	serial_raw_puts("our_lr: ");
+	util_word_to_hex(scratchpad, our_lr);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\nexc_addr: ");
 	util_word_to_hex(scratchpad, exc_addr);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts(" SPSR: ");
@@ -1792,8 +2077,14 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(" info: ");
 	util_word_to_hex(scratchpad, (unsigned int)exception_info);
 	serial_raw_puts(scratchpad);
+	serial_raw_puts(" extra: ");
+	util_word_to_hex(scratchpad, (unsigned int)exception_extra);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" ctrl-c: ");
+	util_word_to_hex(scratchpad, (unsigned int)rpi2_sigint_flag);
+	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
-	rpi2_dump_context(&rpi2_reg_context);
+	rpi2_dump_context(&rpi2_pabt_context);
 #endif
 
 #if 0
@@ -1825,11 +2116,12 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		serial_raw_puts(" DBGLSR2: ");
 		util_word_to_hex(scratchpad, tmp);
 		serial_raw_puts(scratchpad);
-	}
+	}93
 	*/
 
 	p = (uint32_t *)(dbg_reg_base + 0x88); // DBGDSCRext
 	dbg_state = *p;
+	SYNC;
 	/*
 	while (!(dbg_state & 0x2)) // while not 'restarted'
 	{
@@ -1839,6 +2131,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	for (i=0; i<100000; i++)
 	{
 		dbg_state = *p;
+		SYNC;
 		if (dbg_state & 0x2) break;
 	}
 
@@ -1850,82 +2143,50 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 #endif
-	//exception_info = RPI2_EXC_PABT;
 
+#ifdef DEBUG_PABT
 	if (ifsr & 0x40f) // BKPT
 	{
-#ifdef DEBUG_PABT
 		serial_raw_puts("\r\nBKPT\r\n");
 		serial_raw_puts("ret_addr: ");
-		util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		util_word_to_hex(scratchpad, rpi2_pabt_context.reg.r15);
 		serial_raw_puts(scratchpad);
 		serial_raw_puts("\r\n");
-#endif
-
-#if 0
-		if (exc_cpsr & (1<<5)) // Thumb
-		{
-			exception_extra = RPI2_TRAP_THUMB;
-		}
-		else
-		{
-
-			exception_extra = RPI2_TRAP_ARM;
-			p = (uint32_t *)(exc_addr);
-			if ((*p) == RPI2_INITIAL_BKPT) // our gdb-entering trap
-			{
-				exception_extra = RPI2_TRAP_INITIAL;
-			}
-			//rpi2_reg_context.reg.r15 += 4; // skip 'bkpt'
-		}
-#endif
 	}
 	else
 	{
-		//rpi2_reg_context.reg.r0 = 0xa5a50002; // debug
-		//rpi2_reg_context.reg.r1 = exc_addr; // debug
-		// exception_extra = RPI2_TRAP_PABT; // prefetch abort
-#ifdef DEBUG_PABT
 		pp = "\r\nPrefetch Abort\r\n";
 		do {i = serial_raw_puts(pp); pp += i;} while (i);
-#endif
 	}
-	rpi2_trap_handler();
-	// serial_raw_puts("\r\nPABT ret\r\n");
-	// rpi2_dump_context(&rpi2_reg_context);
-	// TODO: check if the exception causing instruction needs to be skipped
-}
-
-#ifdef DEBUG_REG_CONTEXT
-void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
-{
-	static char scratchpad[16];
-
-	serial_raw_puts("\r\npabt_ret");
-	serial_raw_puts("\r\nlr: ");
-	util_word_to_hex(scratchpad, xlr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\ncpsr: ");
-	util_word_to_hex(scratchpad, xcpsr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nspsr: ");
-	util_word_to_hex(scratchpad, xspsr);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\n");
-}
 #endif
 
-#ifdef RPI_DOUBLE_VECTORS
+
+#if 0
+	serial_raw_puts("\r\nBKPT\r\n");
+	util_word_to_hex(scratchpad, (unsigned int) ser_handle_ctrlc);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" =flag\r\n");
+	serial_raw_puts(" SPSR: ");
+	util_word_to_hex(scratchpad, rpi2_pabt_context.reg.cpsr);
+	serial_raw_puts(scratchpad);
+	//rpi2_reg_context.reg.cpsr &= ~(1<<8); // enable irqs (fishy)
+#endif
+	//rpi2_gdb_exception();
+}
+
+
 void rpi2_unhandled_pabt()
 {
 #ifdef DEBUG_EXCEPTIONS
 	naked_debug();
 #endif
 	asm volatile (
-			"str sp, pabt_sp_store\n\t"
+			"str sp, pabt_sp_store1\n\t"
 			"@ switch to our stack\n\t"
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
+			"dsb\n\t"
+			"@sub lr, #4 @ for now we skip the bad instruction\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
 	);
@@ -1935,16 +2196,17 @@ void rpi2_unhandled_pabt()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
 			"bne 1f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, pabt_sp_store\n\t"
+			"ldr r0, pabt_sp_store1\n\t"
 			"ldr r1, =rpi2_pabt_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
@@ -1954,14 +2216,12 @@ void rpi2_unhandled_pabt()
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #3 @ RPI2_EXC_PABT\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
-			"str r1, [r0]\n\t"
 			"mrc p15, 0, r0, c5, c0, 1 @ IFSR\n\t"
+			"dsb\n\t"
 			"and r1, r0, #0x400 @ bit 10\n\t"
 			"bne 2f\n\t"
 			"and r0, #0x0f @ bit 10\n\t"
-			"cmp r0, #0x2\n\t"
+			"cmp r0, #0x2 @ debug event\n\t"
 			"bne 2f\n\t"
 			"@ breakpoint\n\t"
 			"mov r1, #4 @ RPI2_TRAP_BKPTn\t"
@@ -1986,25 +2246,20 @@ void rpi2_unhandled_pabt()
 
 			"3:\n\t"
 	);
+#ifdef DEBUG_PABT
 	asm volatile (
-			"mov r0, sp\n\t"
+			"ldr r0, pabt_sp_store1\n\t"
 			"mov r1, lr\n\t"
 			"bl rpi2_pabt_handler2\n\t"
 	);
-
+#endif
 	asm volatile (
-			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
-	);
+			"b rpi2_gdb_exception\n\t"
 
-	// restore processor context
-	read_context();
-
-	asm volatile (
-			"subs pc, lr, #0 @ skip bad instruction\n\t"
-			".ltorg @ literal pool\n\t"
+			"pabt_sp_store1:\n\t"
+			".int 0\n\t"
 	);
 }
-#endif
 
 
 void rpi2_pabt_handler()
@@ -2013,28 +2268,27 @@ void rpi2_pabt_handler()
 	naked_debug();
 #endif
 	asm volatile (
-			"str sp, pabt_sp_store\n\t"
+			"str sp, pabt_sp_store2\n\t"
+			"dsb\n\t"
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
+			"dsb\n\t"
 			"push {r0 - r12}\n\t"
 			"mrs r0, cpsr\n\t"
-			"push {r0, lr}\n\t"
-
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"ldr r0, [r0]\n\t"
-			"cmp r0, #0\n\t"
-			"bne 3f @ irq flag set\n\t"
+			"dsb\n\t"
+			"push {r0, r1, lr} @ to keep stack 8-byte aligned\n\t"
 
 			"mrc p15, 0, r0, c5, c0, 1 @ IFSR\n\t"
+			"dsb\n\t"
 			"ands r1, r0, #0x400 @ bit 10\n\t"
 			"bne 1f\n\t"
 			"and r0, #0x0f\n\t"
-			"cmp r0, #0x2\n\t"
+			"cmp r0, #0x2 @ debug event\n\t"
 			"bne 1f\n\t"
 
 			"@ breakpoint\n\t"
 			"mov r3, #4 @ RPI2_TRAP_BKPT\n\t"
-			"sub r0, lr, #4 @ exception address\n\t"
+			"sub r0, lr, #4\n\t"
 			"ldr r1, [r0] @ get instruction\n\t"
 			"movw r0, #0xff7f @ user bkpt arm\n\t"
 			"movt r0, #0xe127\n\t"
@@ -2063,33 +2317,25 @@ void rpi2_pabt_handler()
 			"str r3, [r0]\n\t"
 
 			"1: @ not ours - re-route\n\t"
-			"pop {r0, lr}\n\t"
+			"pop {r0, r1, lr}\n\t"
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
 			"pop {r0 - r12}\n\t"
-			"ldr sp, pabt_sp_store\n\t"
+			"ldr sp, pabt_sp_store2\n\t"
 			"mov pc, #12 @ low PABT vector address\n\t"
 
 			"2: @ ours\n\t"
-			"ldr r0, =rpi2_irq_flag\n\t"
-			"mov r1, #1\n\t"
-			"str r1, [r0]\n\t"
 			"ldr r0, =exception_extra\n\t"
 			"str r3, [r0]\n\t"
 			"ldr r0, =exception_info\n\t"
 			"mov r1, #3 @ RPI2_EXC_PABT\n\t"
 			"str r1, [r0]\n\t"
-			"3: @ irqflag\n\t"
-#ifdef DEBUG_EXCEPTIONS
-	);
-	naked_debug();
-	asm volatile (
-#endif
-			"pop {r0, lr}\n\t"
+			"pop {r0, r1, lr}\n\t"
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
+			"sub lr, #4\n\t"
 			"pop {r0 - r12}\n\t"
 );
 
@@ -2103,48 +2349,35 @@ void rpi2_pabt_handler()
 	asm volatile (
 			"@ fix sp in the context, if needed\n\t"
 			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
 			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
 			"and r0, r1\n\t"
-			"mrs r2, cpsr @ our mode\n\t"
 			"and r2, r1\n\t"
 			"@ our own mode?\n\t"
 			"cmp r0, r2\n\t"
 			"bne 3f @ not our own mode, no fix needed\n\t"
 
 			"@ our mode\n\t"
-			"ldr r0, pabt_sp_store\n\t"
+			"ldr r0, pabt_sp_store2\n\t"
 			"ldr r1, =rpi2_pabt_context\n\t"
 			"str r0, [r1, #13*4]\n\t"
 
 			"3:\n\t"
 	);
-
+#ifdef DEBUG_PABT
 	// rpi2_pabt_handler2() // - No C in naked function
 	asm volatile (
-			"mov r0, sp\n\t"
+			"ldr r0, pabt_sp_store2\n\t"
 			"mov r1, lr\n\t"
 			"bl rpi2_pabt_handler2\n\t"
 	);
-
-	asm volatile (
-			"ldr r0, =rpi2_reg_context @ for read_context\n\t"
-	);
-
-	// restore processor context
-	read_context();
-	asm volatile (
-#ifdef DEBUG_REG_CONTEXT
-			"push {r0, r1, r2, lr}\n\t"
-			"mov r0, lr\n\t"
-			"mrs r1, cpsr\n\t"
-			"mrs r2, spsr\n\t"
-			"dsb\n\t"
-			"isb\n\t"
-			"bl rpi2_print_dbg\n\t"
-			"pop {r0, r1, r2, lr}\n\t"
+	// naked_debug();
 #endif
-			"subs pc, lr, #0\n\t"
-			"pabt_sp_store:\n\t"
+	asm volatile (
+			"b rpi2_gdb_exception\n\t"
+
+			"pabt_sp_store2:\n\t"
 			".int 0\n\t"
 			".ltorg @ literal pool\n\t"
 	);
@@ -2152,7 +2385,6 @@ void rpi2_pabt_handler()
 
 void rpi2_trap()
 {
-	/* Use BKPT */
 #ifdef DEBUG_EXCEPTIONS
 	serial_raw_puts("\r\nrpi2_trap\r\n");
 #endif
@@ -2162,7 +2394,7 @@ void rpi2_trap()
 void rpi2_gdb_trap()
 {
 #ifdef DEBUG_EXCEPTIONS
-	serial_raw_puts("\r\ngdb_trap\r\n");
+	serial_raw_puts("\r\ninit_trap\r\n");
 #endif
 	asm("bkpt #0x7ffd\n\t");
 }
@@ -2175,29 +2407,41 @@ void rpi2_set_trap(void *address, int kind)
 	/* poke BKPT instruction */
 	if (kind == RPI2_TRAP_THUMB)
 	{
-		*(location_t++) = RPI2_USER_BKPT_THUMB; // BKPT #be
+		*location_t = RPI2_USER_BKPT_THUMB; // BKPT #be
+		rpi2_flush_address((unsigned int) location_t);
 	}
 	else
 	{
-		*(location_a) = RPI2_USER_BKPT_ARM; // BKPT
+#ifdef DEBUG_GDB_EXC
+		serial_raw_puts("\r\nbkpt at: ");
+		util_word_to_hex(dbg_tmp_buff, (unsigned int)location_a);
+		serial_raw_puts(dbg_tmp_buff);
+		serial_raw_puts("\r\n");
+#endif
+		*location_a = RPI2_USER_BKPT_ARM; // BKPT
+		rpi2_flush_address((unsigned int) location_a);
 	}
+	SYNC;
 	return;
 }
 
 void rpi2_pend_trap()
 {
+	//serial_raw_puts("\r\nctrl-C\r\n");
+
 	/* set pending flag for SIGINT */
 	rpi2_ctrl_c_flag = 1; // for now
+	SYNC;
 }
 
-unsigned int rpi2_get_irq_flag()
+unsigned int rpi2_get_sigint_flag()
 {
-	return (unsigned int) rpi2_irq_flag;
+	return (unsigned int) rpi2_sigint_flag;
 }
 
-void rpi2_set_irq_flag(unsigned int val)
+void rpi2_set_sigint_flag(unsigned int val)
 {
-	rpi2_irq_flag = (uint32_t)val;
+	rpi2_sigint_flag = (uint32_t)val;
 }
 
 unsigned int rpi2_get_exc_reason()
@@ -2210,6 +2454,37 @@ void rpi2_set_exc_reason(unsigned int val)
 	rpi2_exc_reason = (uint32_t)val;
 }
 
+void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int range)
+{
+	//  96-111 0x180-0x1BC DBGWVRm 4 watchpoint values
+	// 112-127 0x1C0-0x1FC DBGWCRm 4 watchpoint controls
+	// for now, num is always 0, and no range
+	// if range = 2 words, BAS = 0xff
+	// if range is > 8 bytes (2**n), BAS = 0xff, MASK = n-1
+	uint32_t *pval, *pctrl;
+	uint32_t tmp;
+	pval = (uint32_t *)(dbg_reg_base + 0x180);
+	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
+	*pval = (((uint32_t)addr) & ~(3));
+	tmp = 0 << 24; // MASK
+	tmp |= (1 << 13); // HMC
+	tmp |= (0x0f << 5); // BAS: 4 bytes
+	tmp |= (2 << 3); // LSC 2=store
+	tmp |= (3 << 1); // PAC
+	tmp |= 1; // enable
+	*pctrl = tmp;
+}
+
+void rpi2_unset_watchpoint(unsigned int num)
+{
+	// only watchpoint 0 is used for now
+	uint32_t *pval, *pctrl;
+
+	//pval = (uint32_t *)(dbg_reg_base + 0x180);
+	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
+	*pctrl = 0;
+}
+
 // for dumping info about debug HW
 void rpi2_check_debug()
 {
@@ -2220,10 +2495,12 @@ void rpi2_check_debug()
 
 	asm volatile (
 			"mrc p14, 0, %[retreg], c1, c0, 0 @ get DBGDRAR\n\t"
+			"dsb\n\t"
 			: [retreg] "=r" (tmp1)::
 	);
 	asm volatile (
 			"mrc p14, 0, %[retreg], c2, c0, 0 @ get DBGDSAR\n\t"
+			"dsb\n\t"
 			: [retreg] "=r" (tmp2)::
 	);
 
@@ -2236,15 +2513,14 @@ void rpi2_check_debug()
 
 	tmp2 &= 0xfffff000;
 	tmp3 = *((uint32_t *) (tmp2 + 0xfb4)); // DBGLSR
+	SYNC;
 	serial_raw_puts(" DBGLSR: ");
 	util_word_to_hex(scratchpad, tmp3);
 	serial_raw_puts(scratchpad);
 	*((uint32_t *) (tmp2 + 0xfb0)) = 0xC5ACCE55; // DBGLAR
-	asm volatile (
-			"dsb\n\t"
-			"isb\n\t"
-	);
+	SYNC;
 	tmp3 = *((uint32_t *) (tmp2 + 0xfb4)); // DBGLSR
+	SYNC;
 	serial_raw_puts(" DBGLSR2: ");
 	util_word_to_hex(scratchpad, tmp3);
 	serial_raw_puts(scratchpad);
@@ -2254,6 +2530,7 @@ void rpi2_check_debug()
 	for (i=0; i<(0xf00/4); i++)
 	{
 		tmp2 = *(ptmp1++);
+		asm volatile("dsb\n\t");
 		// print component entry
 		serial_raw_puts("\r\ncomp: ");
 		util_word_to_hex(scratchpad, i);
@@ -2277,11 +2554,21 @@ void rpi2_check_debug()
 		util_word_to_hex(scratchpad, tmp3);
 		serial_raw_puts(scratchpad);
 
+		ptmp2 = (uint32_t *)(tmp1 + tmp2 + 0xfcc);
+		tmp3 = ((*ptmp2) & 0xff);
+		serial_raw_puts("\r\nDEVTYPE: ");
+		util_word_to_hex(scratchpad, tmp3);
+		serial_raw_puts(scratchpad);
+
 		ptmp2 = (uint32_t *)(tmp1 + tmp2 + 0xfe0);
 		tmp3 = ((*(ptmp2++)) & 0xff);
+		asm volatile("dsb\n\t");
 		tmp3 |= (((*(ptmp2++)) & 0xff) << 8);
+		asm volatile("dsb\n\t");
 		tmp3 |= (((*(ptmp2++)) & 0xff) << 16);
+		asm volatile("dsb\n\t");
 		tmp3 |= (((*(ptmp2++)) & 0xff) << 24);
+		asm volatile("dsb\n\t");
 		serial_raw_puts("\r\nPIDR: ");
 		util_word_to_hex(scratchpad, tmp3);
 		serial_raw_puts(scratchpad);
@@ -2292,14 +2579,79 @@ void rpi2_check_debug()
 
 }
 
+unsigned int rpi2_get_arm_ram(unsigned int *start)
+{
+	int i;
+	uint32_t request, response;
+	request_response_t *arm_mem_req = (request_response_t *)rpi2_mbox_buff;
+	arm_mem_req->buff_size = 8*4;
+	arm_mem_req->req_resp_code = 0;
+	arm_mem_req->tag = 0x00010005;
+	arm_mem_req->tag_buff_len = 2*4;
+	arm_mem_req->tag_msg_len = 0;
+	for (i=0; i<256; i++) arm_mem_req->tag_buff.word_buff[i] = 0;
+	arm_mem_req->end_tag = 0;
+
+	request = (uint32_t)(arm_mem_req);
+	request &= ((~0) << 4);
+	request |= 8; // channel for property tags
+
+	SYNC;
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	*((volatile uint32_t *)MBOX1_WRITE) = request;
+	do {
+		SYNC;
+		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		response = *((volatile uint32_t *)MBOX0_READ);
+	} while ((response & 0xf) != 8);
+
+	// base address = arm_mem_req->tag_buff.word_buff[0];
+	// size in bytes = arm_mem_req->tag_buff.word_buff[1];
+	//arm_mem_req = (request_response_t *)(response & ((~0) << 4));
+	*start = (arm_mem_req->tag_buff.word_buff[0]);
+	return (arm_mem_req->tag_buff.word_buff[1]);
+}
+
+void rpi2_get_cmdline(char *line)
+{
+	int i;
+	uint32_t request, response, linelen;
+	request_response_t *arm_mem_req = (request_response_t *)rpi2_mbox_buff;
+	arm_mem_req->buff_size = sizeof(rpi2_mbox_buff);
+	arm_mem_req->req_resp_code = 0;
+	arm_mem_req->tag = 0x00050001;
+	arm_mem_req->tag_buff_len = 1024;
+	arm_mem_req->tag_msg_len = 0;
+	for (i=0; i<256; i++) arm_mem_req->tag_buff.word_buff[i] = 0;
+	arm_mem_req->end_tag = 0;
+
+	request = (uint32_t)(arm_mem_req);
+	request &= ((~0) << 4);
+	request |= 8; // channel for property tags
+	SYNC;
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	*((volatile uint32_t *)MBOX1_WRITE) = request;
+	do {
+		SYNC;
+		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		response = *((volatile uint32_t *)MBOX0_READ);
+	} while ((response & 0xf) != 8);
+
+	//arm_mem_req = (request_response_t *)(response & ((~0) << 4));
+	linelen = (arm_mem_req->tag_msg_len) & 0x7fffffff;
+	//if (linelen > 1024) linelen = 1024;
+	linelen = 1024;
+	for (i=0; i<linelen-1; i++) line[i] = arm_mem_req->tag_buff.byte_buff[i];
+	line[linelen-1] = '\0';
+}
+
 void rpi2_set_vectors()
 {
-	unsigned int cpsr_store;
+	int i;
+	unsigned int v;
 #ifdef DEBUG_EXCEPTIONS
 	uint32_t tmp;
 #endif
-	cpsr_store = rpi2_disable_save_ints();
-
 	rpi2_upper_vec_address = (uint32_t)&__hivec;
 	rpi2_set_upper_vectable();
 	// set hivec address
@@ -2312,6 +2664,25 @@ void rpi2_set_vectors()
 	);
 	rpi2_set_lower_vectable(); // write exception vectors
 
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		((uint32_t *)rpi2_upper_vec_address)[14] = (uint32_t)(&rpi2_reroute_exc_irq);
+		((uint32_t *)rpi2_upper_vec_address)[15] = (uint32_t)(&rpi2_fiq_handler);
+	}
+
+	v = (unsigned int) rpi2_upper_vec_address;
+	for (i=0; i< 16; i++)
+	{
+		rpi2_flush_address(v);
+		v += 4;
+	}
+	v = 0;
+	for (i=0; i< 16; i++)
+	{
+		rpi2_flush_address(v);
+		v += 4;
+	}
+
 #ifdef DEBUG_EXCEPTIONS
 	serial_raw_puts("\r\nset vecs\r\n");
 	serial_raw_puts("up vec: ");
@@ -2323,14 +2694,185 @@ void rpi2_set_vectors()
 	serial_raw_puts(" vbar: ");
 	asm volatile (
 			"mrc p15, 0, %[reg], c12, c0, 0\n\t"
-			::[reg] "r" (tmp):
+			"dsb\n\t"
+		::[reg] "r" (tmp):
 	);
 	util_word_to_hex(dbg_tmp_buff, (unsigned int) tmp);
 	serial_raw_puts(dbg_tmp_buff);
 	serial_raw_puts("\r\n");
 #endif
 
-	rpi2_restore_ints(cpsr_store);
+}
+
+// now that we have write-through caches, we don't need to
+// clean, but just invalidate
+void rpi2_flush_address(unsigned int addr)
+{
+	if (rpi2_use_mmu)
+	{
+		asm volatile ("mcr p15, 0, %0, c7, c6, 1\n\t" :: "r" (addr)); // DCIMVAC
+		asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+		asm volatile ("mcr p15, 0, %0, c7, c5, 1\n\t" :: "r" (addr)); // ICIMVAU
+		asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+		asm volatile ("mcr p15, 0, %0, c7, c5, 7\n\t" :: "r" (addr)); // BPIMVA
+		asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+	}
+}
+
+void rpi2_invalidate_caches()
+{
+	uint32_t loc, tmp, i, j, k, cssidr, ctype;
+	uint32_t num_sets, num_assoc;
+	uint32_t set_offset, way_offset, level_offset;
+
+	if (!rpi2_use_mmu) return;
+	// disable caches
+	/*
+	asm volatile ("mrc p15, 0, %0, c1, c0, 0\n\t" : "=r" (tmp) :: "memory");
+	tmp &= ~(3 << 11); // I-cache and branch predictor
+	tmp &= ~4; // D-cache
+	asm volatile ("mcr p15, 0, %0, c1, c0, 0\n\t" :: "r" (tmp) : "memory");
+	asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+	 */
+	asm volatile ("mrc p15, 1, %0, c0, c0, 1\n\t" : "=r" (tmp)); // CLIDR
+	loc = (tmp >> 24) & 0x7;
+	for (i = 0; i <= loc; i++) // for each cache level until LoC
+	{
+		ctype = tmp >> (i*3);
+		if (ctype & 0x6) // if data or unified cache
+		{
+			// select cache to check
+			tmp = (i<<1) | 0; // InD = data/unified
+			asm volatile ("mcr p15, 2, %0, c0, c0, 0\n\t" :: "r" (tmp)); // CSSELR
+			asm volatile ("dsb\n\tisb\n\t");
+			// get cache info
+			asm volatile ("mrc p15, 1, %0, c0, c0, 0\n\t" : "=r" (cssidr)); // CSSIDR
+			num_sets = ((cssidr >> 13) & 0x7fff) + 1;
+			num_assoc = ((cssidr >> 3) & 0x3ff) + 1;
+			level_offset = 1;
+			set_offset = (cssidr & 7) + 2; // line_size_bits
+			way_offset = 31 - util_num_bits(num_assoc);
+			for (j = 0; j < num_sets; j++)
+			{
+				for (k = 0; k < num_assoc; k++)
+				{
+					tmp = i << level_offset;
+					tmp |= j << set_offset;
+					tmp |= k << way_offset;
+					asm volatile ("mcr p15, 0, %0, c7, c10, 2\n\t" :: "r" (tmp)); // DCCSW(tmp)
+				}
+			}
+		}
+		if (ctype & 0x1) // if instruction cache
+		{
+			asm volatile ("mcr p15, 0, r0, c7, c5, 0\n\t"); // ICIALLU(ignored);
+		}
+	}
+	// branch predictor
+	asm volatile ("mcr p15, 0, r0, c7, c5, 6\n\t"); // BPIALL(ignored);
+	asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+
+	// enable caches
+	/*
+	asm volatile ("mrc p15, 0, %0, c1, c0, 0\n\t" : "=r" (tmp) :: "memory");
+	tmp |= (3 << 11); // I-cache and branch predictor
+	tmp |= 4; // D-cache
+	asm volatile ("mcr p15, 0, %0, c1, c0, 0\n\t" :: "r" (tmp) : "memory");
+	asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+	*/
+}
+
+// should only be called from rpi2_enable_mmu()
+void rpi2_invalidate_tlbs()
+{
+	uint32_t tmp;
+
+	asm volatile ("mrc p15, 0, %0, c0, c0, 3\n\t" : "=r" (tmp)); // TLBTR
+	if (tmp & 1) // 0 = unified
+	{
+		// invalidate istr TLB
+		asm volatile ("mcr p15, 0, r0, c8, c5, 0\n\t"); // ITLBIALL(ignored)
+		// invalidate data TLB
+		asm volatile ("mcr p15, 0, r0, c8, c6, 0\n\t"); // DTLBIALL(ignored)
+	}
+	else
+	{
+		//invalidate unified TLB
+		asm volatile ("mcr p15, 0, r0, c8, c7, 0\n\t"); // TLBIALL(ignored)
+	}
+
+	asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+}
+
+// enable MMU and caches
+void rpi2_enable_mmu()
+{
+	uint32_t tmp;
+	uint32_t ramsz;
+	uint32_t ramstart;
+
+	ramsz = (uint32_t)rpi2_arm_ramsize;
+	ramsz >>= 20; // bytes to megs
+	ramstart = (uint32_t)rpi2_arm_ramstart;
+	ramstart >>= 20; // bytes to megs
+	// disable MMU
+	tmp = 0;
+	asm volatile ("mcr p15, 0, %0, c1, c0, 0\n\t" :: "r" (tmp) : "memory");
+#if 0
+	// program RAM
+	for (tmp=0; tmp<0x3b0; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_NORMAL);
+	}
+	// video RAM (?)
+	for (tmp=0x3b0; tmp<0x3f0; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_DEV);
+	}
+#else
+	// program RAM
+	for (tmp=ramstart; tmp<ramsz; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_NORMAL);
+	}
+	// video RAM (?)
+	for (tmp=ramsz; tmp<0x3f0; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_DEV);
+	}
+#endif
+	// peripherals
+	for (tmp=0x3f0; tmp<0xfff; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_DEV);
+	}
+
+	// set SMP bit in ACTLR - needed, otherwise caches are disabled
+	asm volatile ("mrc p15, 0, %0, c1, c0, 1\n\t" : "=r" (tmp));
+	tmp |= 1 << 6;
+	asm volatile ("mcr p15, 0, %0, c1, c0, 1\n\t" :: "r" (tmp));
+
+	// set domain 0 to client (DACR)
+	asm volatile ("mcr p15, 0, %0, c3, c0, 0\n\t" :: "r" (1));
+
+	// always use TTBR0 (TTBCR)
+	asm volatile ("mcr p15, 0, %0, c2, c0, 2\n\t" :: "r" (0));
+
+	// set TTBR0 (page table walk inner and outer non-cacheable, non-shareable memory)
+	tmp = MMU_VAL_TTBR0((uint32_t)master_xlat_tbl, 0);
+	asm volatile ("mcr p15, 0, %0, c2, c0, 0\n\t" :: "r" (tmp));
+
+	//rpi2_invalidate_caches();
+	rpi2_invalidate_tlbs();
+
+	// enable MMU, caches and branch prediction in SCTLR
+	// asm volatile ("mrc p15, 0, %0, c1, c0, 0\n\t" : "=r" (tmp));
+	// tmp |= 0x1805;
+	tmp = 0x1805;
+	asm volatile ("mcr p15, 0, %0, c1, c0, 0\n\t" :: "r" (tmp) : "memory");
+	asm volatile ("dsb\n\tisb\n\t" ::: "memory");
+
+	rpi2_invalidate_caches();
 }
 
 void rpi2_init()
@@ -2343,12 +2885,18 @@ void rpi2_init()
 
 	exception_info = RPI2_EXC_NONE;
 	exception_extra = 0;
-	rpi2_irq_flag = 0;
+	rpi2_pabt_reroute = 0;
+	rpi2_sigint_flag = 0;
 	rpi2_ctrl_c_flag = 0;
 	rpi2_dgb_enabled = 0; // disable use of gdb trap handler
+	rpi2_debuggee_running = 0;
+	gdb_dyn_debug = 0;
+	rpi2_arm_ramsize = rpi2_get_arm_ram(&rpi2_arm_ramstart);
+
+	// TODO: add set-up for UART0 handling by FIQ
 
 #if 0
-	serial_set_ctrlc((void *)rpi2_pend_trap);
+	serial_enable_ctrlc();
 #endif
 
 	/* calculate debug register file base address */
@@ -2374,6 +2922,7 @@ void rpi2_init()
 #if 1
 	asm volatile (
 			"mrc p14, 0, %[retreg], c1, c0, 0 @ get DBGDRAR\n\t"
+			"dsb\n\t"
 			: [retreg] "=r" (tmp1)::
 	);
 
@@ -2381,6 +2930,7 @@ void rpi2_init()
 	tmp1 &= 0xfffff000; // debug ROM address
 	tmp3 = (uint32_t *) tmp1; // to pointer
 	tmp2 = *tmp3; // get first debug peripheral entry
+	asm volatile("dsb\n\t");
 	tmp2 &= 0xfffff000; // get the base address offset (from debug ROM)
 	dbg_reg_base = (tmp1 + tmp2);
 #endif
@@ -2406,7 +2956,18 @@ void rpi2_init()
 	 * and.w r1, r0
 	 * mcr p14, 0, r1, 0, 1, 0
 	 */
+#ifdef RPI2_DEBUG_TIMER
+	rpi2_timer_init();
+#endif
+
+	cpsr_store = rpi2_disable_save_ints();
 	rpi2_set_vectors();
+	if (rpi2_use_mmu)
+	{
+		rpi2_enable_mmu();
+		rpi2_invalidate_caches();
+	}
+	rpi2_restore_ints(cpsr_store);
 }
 
 #if 0
@@ -2468,10 +3029,30 @@ void rpi2_led_on()
 	*((volatile uint32_t *)GPIO_SETREG1) = (1 << 15);
 }
 
-void rpi2_delay_loop(unsigned int loop_count)
+void rpi2_delay_loop(unsigned int delay_ms)
 {
 	int i,j;
-	for (i=0; i< loop_count; i++)
+#if 1
+	uint32_t tm_start, tm_curr, tm_period, tm_delay;
+	volatile uint32_t *tmr;
+
+	if (delay_ms == 0) return;
+	tmr = (volatile uint32_t *)SYSTMR_CLO; // default: 1MHZ timer
+	tm_period = 0;
+	tm_delay = (uint32_t)(delay_ms * 1000);
+	tm_start = tm_curr = *tmr;
+	while (tm_period < tm_delay)
+	{
+		tm_curr = *tmr;
+
+		// if tm_curr >= tm_start, tm_period = tm_curr - tm_start
+		// if tm_curr < tm_start (timer wraparound)
+		// 1<<32 - x = -x (with 32-bit numbers):
+		//(1<<32) - (tm_start - tm_curr) = tm_curr - tm_start
+		tm_period = (uint32_t)(tm_curr - tm_start);
+	}
+#else
+	for (i=0; i< delay_ms; i++)
 	{
 		// delay 1 ms
 		for (j=0; j<700; j++)
@@ -2480,6 +3061,7 @@ void rpi2_delay_loop(unsigned int loop_count)
 			asm volatile("nop\n\t");
 		}
 	}
+#endif
 }
 
 void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count)

@@ -42,8 +42,10 @@ volatile int ser_handle_ctrlc = 0;
 void (*ser_ctrlc_handler)();
 volatile int ser_ctrl_c = 0;
 
+void serial_irq();
 void serial_rx();
 void serial_tx();
+void serial_poll();
 
 /* delay() borrowed from OSDev.org */
 static inline void delay(int32_t count)
@@ -58,7 +60,10 @@ static inline uint32_t disable_save_ints()
 	asm volatile (
 			"mrs %[var_reg], cpsr\n\t"
 			"dsb\n\t"
+			"isb\n\t"
 			"cpsid aif\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			:[var_reg] "=r" (status)::
 	);
 	return status;
@@ -68,6 +73,8 @@ static inline void restore_ints(uint32_t status)
 {
 	asm volatile (
 			"msr cpsr_fsxc, %[var_reg]\n\t"
+			"dsb\n\t"
+			"isb\n\t"
 			::[var_reg] "r" (status):
 	);
 }
@@ -105,51 +112,85 @@ int serial_get_ctrl_c()
 	return retval;
 }
 
-void serial_set_ctrlc(void *handler)
+void serial_enable_ctrlc()
 {
-	if (handler)
-	{
-		/* enable ctrl-C detection */
-		ser_ctrlc_handler = (void (*)()) handler;
-		ser_handle_ctrlc = 1;
-	}
-	else
-	{
-		/* disable ctrl-C detection */
-		ser_handle_ctrlc = 0;
-		ser_ctrlc_handler = 0;
-	}
+	ser_handle_ctrlc = 1;
+	SYNC;
 }
+
+void serial_disable_ctrlc()
+{
+	ser_handle_ctrlc = 0;
+	SYNC;
+}
+
 
 void serial_init(io_device *device)
 {
 	uint32_t tmp; // scratchpad
 	uint32_t cpsr_store;
 
+#if 0
+	for (tmp=0; tmp < 2; tmp++)
+	{
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(500);
+	}
+	rpi2_delay_loop(2000);
+#endif
+
+
 	// no messing with interrupt
 	cpsr_store = disable_save_ints();
 
+#if 0
+	for (tmp=0; tmp < 3; tmp++)
+	{
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(500);
+	}
+	rpi2_delay_loop(2000);
+#endif
+
 	// Disable uart interrupts
-	// Writing a 1 to a bit will clear the corresponding IRQ enable bit.
-	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		*((volatile uint32_t *)IRC_FIQCTRL) &= ~(1 << 7);
+	}
+	else
+	{
+		// Writing a 1 to a bit will clear the corresponding IRQ enable bit.
+		*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+	}
 
 	// Disable UART0 for configuration - sorry, took the only "real" UART,
 	// but with that, uploading is faster and so is debugging
 	*((volatile uint32_t *)UART0_CR) = 0x00000000;
+
+	SYNC;
 
 	// Flush FIFOs by disabling them
 	*((volatile uint32_t *)UART0_LCRH) = 0;
 
 	// Fill up the device structure
 	device->get_char = serial_get_char;
+	rpi2_flush_address((unsigned int) &(device->get_char));
 	device->get_string = serial_get_string;
+	rpi2_flush_address((unsigned int) &(device->get_string));
 	device->put_char = serial_put_char;
+	rpi2_flush_address((unsigned int) &(device->put_char));
 	device->put_string = serial_put_string;
+	rpi2_flush_address((unsigned int) &(device->put_string));
 	device->read = serial_read;
+	rpi2_flush_address((unsigned int) &(device->read));
 	device->write = serial_write;
+	rpi2_flush_address((unsigned int) &(device->write));
 	device->start = serial_start;
-	device->set_ctrlc = serial_set_ctrlc;
-	device->get_ctrl_c = serial_get_ctrl_c;
+	rpi2_flush_address((unsigned int) &(device->start));
+	device->enable_ctrlc = serial_enable_ctrlc;
+	rpi2_flush_address((unsigned int) &(device->enable_ctrlc));
+	device->disable_ctrlc = serial_disable_ctrlc;
+	rpi2_flush_address((unsigned int) &(device->enable_ctrlc));
 
 	// Clear ring buffers
 	ser_rx_head = 0;
@@ -163,14 +204,23 @@ void serial_init(io_device *device)
 	ser_handle_ctrlc = 0;
 	ser_ctrl_c = 0;
 
+#if 0
+	for (tmp=0; tmp < 4; tmp++)
+	{
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(500);
+	}
+	rpi2_delay_loop(2000);
+#endif
 	// Setup the GPIO pin 14 & 15.
-
 	// Change pull up/down to pull-down & delay for 150 cycles
 	*((volatile uint32_t *)GPPUD) = 0x00000002; // pull-up for pins 14 & 15
+	SYNC;
 	delay(150);
 
 	// Target pull up/down change to pin 14,15 & delay for 150 cycles.
 	*((volatile uint32_t *)GPPUDCLK0) = ((1 << 14) | (1 << 15));
+	SYNC;
 	delay(150);
 
 	// Change pull up/down to disabled & delay for 150 cycles
@@ -178,6 +228,12 @@ void serial_init(io_device *device)
 
 	// Write 0 to GPPUDCLK0 to 'un-target' the pull up/down change
 	*((volatile uint32_t *)GPPUDCLK0) = 0x00000000;
+	SYNC;
+
+#if 0
+	rpi2_led_blink(100, 100, 3);
+	rpi2_delay_loop(1000);
+#endif
 
 	// GPIO 14,15 to UART0 rx & tx
 	tmp = *((volatile uint32_t *)GPFSEL1);
@@ -205,22 +261,53 @@ void serial_init(io_device *device)
 	// FIFO-interrupt levels: rx 1/2, tx 1/2
 	//*((volatile uint32_t *)UART0_IFLS) = (0x2 << 3) | (0x2) ;
 	*((volatile uint32_t *)UART0_IFLS) = (0x3 << 3) | (0x1) ;
+	SYNC;
 
 	// Enable UART0, receive & transfer part of UART
 	*((volatile uint32_t *)UART0_CR) = (1 << 0) | (1 << 8) | (1 << 9);
+	SYNC;
 
 	// Clear interrupts
 	*((volatile uint32_t *)UART0_ICR) = 0x7ff;
+	SYNC;
 
 	// Set UART0 interrupt mask
 	// HIGH = enable, tx int enabled at write
-	*((volatile uint32_t *)UART0_IMSC) = 0x7D2;
-	//*((volatile uint32_t *)UART0_IMSC) = (7 << 4);
+	//*((volatile uint32_t *)UART0_IMSC) = 0x7D2;
+	*((volatile uint32_t *)UART0_IMSC) = (7 << 4);
+	SYNC;
 
 	// Enable uart0 interrupt
-	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+	{
+		*((volatile uint32_t *)IRC_FIQCTRL) = ((1 << 7) | 57);
+	}
+	else
+	{
+		*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+	}
+	SYNC;
+
+#if 0
+	for (tmp=0; tmp < 5; tmp++)
+	{
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(500);
+	}
+	rpi2_delay_loop(2000);
+#endif
 
 	restore_ints(cpsr_store);
+
+#if 0
+	for (tmp=0; tmp < 6; tmp++)
+	{
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(500);
+	}
+	rpi2_delay_loop(2000);
+#endif
+
 }
 
 void serial_start()
@@ -232,11 +319,13 @@ void serial_start()
 void enable_uart0_ints()
 {
 	*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+	SYNC;
 }
 
 void disable_uart0_ints()
 {
 	*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+	SYNC;
 }
 // waits until transmit fifo is empty and writes the string
 // directly in the tx fifo and returns the number of chars
@@ -305,6 +394,14 @@ int serial_get_char()
 {
 	char ch;
 
+	SYNC;
+
+	if (ser_rx_tail == ser_rx_head)
+	{
+		serial_poll();
+	}
+	SYNC;
+
 	// if rx buffer is empty
 	if (ser_rx_tail == ser_rx_head)
 	{
@@ -323,6 +420,12 @@ int serial_get_char()
 
 int serial_write_char(char c)
 {
+	if (ser_tx_tail + 1 == ser_tx_head)
+	{
+		serial_poll();
+	}
+	SYNC;
+
 	// if tx buffer is full
 	if (ser_tx_tail + 1 == ser_tx_head)
 	{
@@ -350,9 +453,45 @@ int serial_put_char(char c)
 }
 
 // n is max string length
-int serial_get_string(char *st, int n)
+int serial_get_string(char *st, char delim, int n)
 {
-	return -1; // not implemented
+	int m = n; // count
+
+	// Read one by one to let more characters to accumulate
+	// This also takes care of negative n
+	while (m > 0)
+	{
+		SYNC;
+
+		if (ser_rx_tail == ser_rx_head)
+		{
+			serial_poll();
+		}
+		SYNC;
+
+		// if rx buffer is empty
+		if (ser_rx_tail == ser_rx_head)
+		{
+#if 1
+			// quit reading
+			break;
+#else
+			// wait
+			continue;
+#endif
+		}
+		else
+		{
+			// get character from ring buffer
+			*st = ser_rx_buff[ser_rx_head++];
+			ser_rx_head %= SER_RX_BUFF_SIZE;
+			// a character less to read
+			m--;
+			if (*(st++) == delim) break;
+		}
+	}
+	SYNC;
+	return n - m; // characters actually got
 }
 
 // n is max string length
@@ -397,6 +536,14 @@ int serial_read(char *buf, int n)
 	// This also takes care of negative n
 	while (m > 0)
 	{
+		SYNC;
+
+		if (ser_rx_tail == ser_rx_head)
+		{
+			serial_poll();
+		}
+		SYNC;
+
 		// if rx buffer is empty
 		if (ser_rx_tail == ser_rx_head)
 		{
@@ -420,9 +567,17 @@ int serial_read(char *buf, int n)
 int serial_write(char *buf, int n)
 {
 	int m = n; // count
+	if (n == 0) return 0;
 	// write one by one to let more space to emerge
 	while (m > 0)
 	{
+
+		if (ser_tx_tail + 1 == ser_tx_head)
+		{
+			serial_poll();
+		}
+		SYNC;
+
 		// if tx buffer is full
 		if (ser_tx_tail + 1 == ser_tx_head)
 		{
@@ -444,19 +599,52 @@ int serial_write(char *buf, int n)
 
 /* IRQ routines */
 
+// a "pseudo-irq"
+void serial_poll()
+{
+	uint32_t status;
+	uint32_t curr_cpsr;
+	uint32_t flagbit;
+
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ) flagbit = 7;
+	else flagbit = 8;
+
+	// only do this if UART0 interrupts are disabled
+	asm volatile ("mrs %[reg], cpsr\n\t" :[reg] "=r" (curr_cpsr)::);
+	if (curr_cpsr & (1 << flagbit))
+	{
+		status = *((volatile uint32_t *)UART0_MIS);
+		while (status & (7 << 4)) // UART0 interrupts
+		{
+			serial_irq();
+			status = *((volatile uint32_t *)UART0_MIS);
+		}
+		while (ser_tx_tail != ser_tx_head)
+		{
+			serial_irq();
+		}
+	}
+}
+
 void serial_irq()
 {
 	uint32_t status;
 
-	status = *((volatile uint32_t *)UART0_MIS);
-	SYNC;
 
+	status = *((volatile uint32_t *)UART0_MIS);
+#if 0
+	while (!(status & (7 << 4)))
+	{
+		status = *((volatile uint32_t *)UART0_MIS);
+	}
+#endif
 	// clear all UART0 interrupts except tx, rx and rx timeout
 	// this should happen early enough due to the pipeline and
 	// write buffer
 	*((volatile uint32_t *)UART0_ICR) = 0x782; //all other
 	//*((volatile uint32_t *)UART0_ICR) = 0x7f2; // all official
 	//*((volatile uint32_t *)UART0_ICR) = 0x7ff; // all
+	SYNC;
 
 	if (status & (1<<4))
 	{
@@ -479,6 +667,9 @@ void serial_irq()
 		// Clear rx timeout interrupt
 		//*((volatile uint32_t *)UART0_ICR) = (1<<6);
 	}
+#if 0
+	serial_rx();
+#endif
 }
 
 // Note: rx only reads rx_head, and only rx writes rx_tail
@@ -486,13 +677,17 @@ void serial_irq()
 void serial_rx()
 {
 	uint32_t ch;
+	uint32_t uart0_fr;
+	char scratchpad[16];
 
 	SYNC;
 	// if buffer is full
 	if (ser_rx_tail + 1 == ser_rx_head)
 	{
 		// if receive fifo is full
-		if (*((volatile uint32_t *)UART0_FR) & (1 << 6))
+		uart0_fr = *((volatile uint32_t *)UART0_FR);
+		asm volatile("dsb\n\t");
+		if (uart0_fr & (1 << 6))
 		{
 			// if we don't clear the interrupt, we'll be here all the time
 			// and no one has a chance to read anything
@@ -503,9 +698,11 @@ void serial_rx()
 			// received character re-assignes the interrupt
 			// At least a char-time for someone to read
 			ch = *((volatile uint32_t *)UART0_DR);
+			asm volatile("dsb\n\t");
 			ser_rx_dropped_count++;
 			// Clear receive interrupt
 			*((volatile uint32_t *)UART0_ICR) = (1<<4);
+			asm volatile("dsb\n\t");
 			if (ch & 0x800) ser_rx_ovr_count++;
 			/* if BRK character (CTRL-C) */
 			/* It can't be handled if it doesn't fit into HW FIFO */
@@ -515,7 +712,8 @@ void serial_rx()
 				if (ser_handle_ctrlc)
 				{
 					ser_ctrl_c = 1;
-					ser_ctrlc_handler();
+					SYNC;
+					rpi2_pend_trap();
 				}
 			}
 
@@ -526,6 +724,7 @@ void serial_rx()
 			{
 				// Read char in ch
 				ch = *((volatile uint32_t *)UART0_DR);
+				asm volatile("dsb\n\t");
 				ser_rx_dropped_count++;
 				if (ch & 0x800) ser_rx_ovr_count++;
 				/* if BRK character (CTRL-C) */
@@ -536,7 +735,9 @@ void serial_rx()
 					if (ser_handle_ctrlc)
 					{
 						ser_ctrl_c = 1;
-						ser_ctrlc_handler();
+						SYNC;
+						rpi2_pend_trap();
+						continue;
 					}
 				}
 			}
@@ -547,7 +748,9 @@ void serial_rx()
 	while (ser_rx_tail + 1 != ser_rx_head)
 	{
 		// If receive FIFO is empty
-		if (*((volatile uint32_t *)UART0_FR) & (1 << 4))
+		uart0_fr = *((volatile uint32_t *)UART0_FR);
+		asm volatile("dsb\n\t");
+		if (uart0_fr & (1 << 4))
 		{
 			// Quit reading
 			break;
@@ -556,6 +759,7 @@ void serial_rx()
 		{
 			// Read char in ch
 			ch = *((volatile uint32_t *)UART0_DR);
+			asm volatile("dsb\n\t");
 			if (ch & 0x800) ser_rx_ovr_count++;
 			/* if BRK character (CTRL-C) */
 			/* It can't be handled if it doesn't fit into HW FIFO */
@@ -565,7 +769,8 @@ void serial_rx()
 				if (ser_handle_ctrlc)
 				{
 					ser_ctrl_c = 1;
-					ser_ctrlc_handler();
+					SYNC;
+					rpi2_pend_trap();
 					continue;
 				}
 			}
@@ -585,13 +790,15 @@ void serial_rx()
 void serial_tx()
 {
 	uint32_t ch;
-
+	uint32_t uart0_fr;
 	SYNC;
 	// While buffer is not empty
 	while (ser_tx_tail != ser_tx_head)
 	{
+		uart0_fr = *((volatile uint32_t *)UART0_FR);
+		asm volatile("dsb\n\t");
 		// If transmit FIFO is full
-		if (*((volatile uint32_t *)UART0_FR) & (1 << 5))
+		if (uart0_fr & (1 << 5))
 		{
 			// Quit transmitting
 			break;
@@ -603,6 +810,8 @@ void serial_tx()
 			ser_tx_head %= SER_TX_BUFF_SIZE;
 			// Write ch in transmitter
 			*((volatile uint32_t *)UART0_DR) = ch;
+			asm volatile("dsb\n\t");
+
 		}
 	}
 	// if buffer is empty

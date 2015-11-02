@@ -32,9 +32,9 @@ extern char __load_end;
 extern char __code_begin;
 #endif
 
-void start1_fun()
+void start1_fun(uint32_t R0, uint32_t R1, uint32_t R2)
 {
-	uint32_t i;
+	uint32_t i = 0;
 #ifdef DO_RELOC_HERE
 	char *s, *d;
 	s = &__load_start;
@@ -45,15 +45,16 @@ void start1_fun()
 	}
 #endif
 	// rpi2_init_led(); already done in start.S
-	/*
-	while(1)
+#if 0
+	do
 	{
-		//rpi2_led_blink(1000, 1000, 3);
-		rpi2_delay_loop(5000);
-	}
-	*/
+		rpi2_led_blink(300, 1000, 3);
+		rpi2_delay_loop(1000);
+		i++;
+	} while(i < 4);
+#endif
 	//rpi2_led_blink(1000, 100, 5);
 
 	// here we could set up 'boot parameters'
-	(void) main(0, 0, 0);
+	(void) main(R0, R1, R2);
 }

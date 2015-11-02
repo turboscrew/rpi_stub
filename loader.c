@@ -26,9 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "util.h"
 
 // put the SW into 'echo-mode' instead of starting gdb-stub
-//#define SERIAL_TEST
+// #define SERIAL_TEST
 
 io_device serial_io;
+char cmdline[1024];
 
 extern volatile gdb_program_rec gdb_debuggee;
 
@@ -43,58 +44,87 @@ void loader_main()
 
 	// for debugging
 	int len;
-	const int dbg_buff_len = 512;
+	const int dbg_buff_len = 1024;
 	static char scratchpad[16]; // scratchpad
-	static char dbg_buff[512]; // message buffer
+	static char dbg_buff[1024]; // message buffer
 	static char scratch2[16];
-	
+
+#if 0
+	rpi2_led_blink(2000, 300, 3);
+	rpi2_delay_loop(2000);
+#endif	
+
 	/* initialize rpi2 */
 	rpi2_init();
 	
+#if 0	
+	rpi2_led_blink(2000, 300, 4);
+	rpi2_delay_loop(2000);
+#endif
+
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
 
+#if 0
+	rpi2_led_blink(2000, 300, 5);
+	rpi2_delay_loop(2000);
+#endif
+
 	/* enable all exceptions */
 	rpi2_enable_excs();
-	
-#ifdef SERIAL_TEST
-	serial_io.set_ctrlc((void *)rpi2_pend_trap);
+
+#if 0
+	rpi2_led_blink(2000, 300, 6);
+	rpi2_delay_loop(2000);
+#endif
+
+#if 0
+	rpi2_get_cmdline(dbg_buff);
+	serial_io.put_string(dbg_buff, dbg_buff_len);
+#endif
+
+#if 0
+	msg = "\r\nrpi2_use_mmu = ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_use_mmu);
+	serial_io.put_string(scratchpad, 9);
+	msg = " rpi2_uart0_excmode = ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_uart0_excmode);
+	serial_io.put_string(scratchpad, 9);
+	msg = "\r\nrpi2_arm_ramsize = ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_arm_ramsize);
+	serial_io.put_string(scratchpad, 9);
+	msg = " rpi2_arm_ramstart = ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_arm_ramstart);
+	serial_io.put_string(scratchpad, 9);
+	serial_io.put_string("\r\n", 3);
+	//serial_io.put_string(cmdline, 1024);
+	//serial_io.put_string("\r\n", 3);
+#endif
+
+#if 0
 	// debug-line
 	msg = "Got into main()\r\n";
+	i=0;
+	do {i = serial_raw_puts(msg); msg += i;} while (i) ;
+	msg = "serial should work\r\n";
+	serial_io.put_string(msg, util_str_len(msg));
+#endif
+
+#ifdef SERIAL_TEST
+	serial_io.enable_ctrlc();
+	// debug-line
+	msg = "Serial test\r\n";
 	i=0;
 	do {i = serial_raw_puts(msg); msg += i;} while (i) ;
 
 	// rpi2_check_debug();
 	
-	rpi2_led_blink(1000, 1000, 3);
-	rpi2_delay_loop(3000);
-#endif
-
-#if 0		
-	//  dump vectors (debug)
-	len = 0;
-	len = util_str_copy(dbg_buff, "vectors: addr, value\r\n", dbg_buff_len);
-	for (i=0; i< 16; i++)
-	{
-		tmp1 = (i * 4); // address
-		tmp2 = *((volatile uint32_t *) (tmp1)); // vector
-
-		util_word_to_hex(scratchpad, tmp1);
-		len = util_append_str(dbg_buff, scratchpad, dbg_buff_len);
-		len = util_append_str(dbg_buff, ", ", dbg_buff_len);
-		util_word_to_hex(scratchpad, tmp2);
-		len = util_append_str(dbg_buff, scratchpad, dbg_buff_len);
-		len = util_append_str(dbg_buff, "\r\n", dbg_buff_len);
-		
-	}
-	if (len > 0)
-	{
-		serial_io.put_string(dbg_buff, len+1);
-	}
-	else
-	{
-		serial_io.put_string("Too long line 1\r\n", 18);	
-	}
+	//rpi2_led_blink(1000, 1000, 3);
+	//rpi2_delay_loop(2000);
 #endif
 
 #if 0
@@ -129,26 +159,6 @@ void loader_main()
 	msg = "\r\nreturned from BKPT\r\n";
 	//i=0;
 	//do {i = serial_raw_puts(msg); msg += i;} while (i);
-	serial_io.put_string(msg, util_str_len(msg)+1);
-#endif
-#if 0
-	// test SMC exception handling
-	msg = "trying SMC\r\n";
-	serial_io.put_string(msg, util_str_len(msg)+1);
-	// a little delay for serial output
-	rpi2_led_blink(1000, 1000, 3);
-	asm volatile ("smc #0\n\t");
-	msg = "returned from SMC\r\n";
-	serial_io.put_string(msg, util_str_len(msg)+1);
-#endif
-#if 0
-	// test HVC exception handling
-	msg = "trying HVC\r\n";
-	serial_io.put_string(msg, util_str_len(msg)+1);
-	// a little delay for serial output
-	rpi2_led_blink(1000, 1000, 3);
-	asm volatile ("hvc #0\n\t");
-	msg = "returned from HVC\r\n";
 	serial_io.put_string(msg, util_str_len(msg)+1);
 #endif
 
@@ -222,10 +232,15 @@ void loader_main()
 
 	while (1)
 	{
+		//msg = "setting up gdb\r\n";
+		//serial_io.put_string(msg, util_str_len(msg));
+#if 0		
+		rpi2_check_debug();
+#endif		
 		/* initialize debugger */
 		gdb_init(&serial_io);
 		/* reset debugger */
-		gdb_reset();
+		gdb_reset(0);
 		/* enter gdb monitor */
 		gdb_trap();	
 	}
@@ -234,18 +249,72 @@ void loader_main()
 
 void main(uint32_t r0, uint32_t r1, uint32_t r2)
 {
-	/* kernel parameters - for future use? */
+	/* device tree parameters - for future use? */
 	(void) r0;
 	(void) r1;
 	(void) r2;
 	
-/*
+	int i;
+		
+#if 0
 	int i;
 	for(i=0; i<5; i++)
 	{
-		rpi2_led_blink(300, 300, 3);
+		rpi2_led_blink(300, 300, 5);
 		rpi2_delay_loop(1000);
 	}
-*/	
+#endif
+	rpi2_uart0_excmode = RPI2_UART0_POLL; // default
+	rpi2_use_mmu = 0; // default - no mmu
+	rpi2_get_cmdline(cmdline);
+#if 1
+	for (i=0; i< 1024; i++)
+	{
+		if (cmdline[i] == 'r')
+		{
+			if (util_cmp_substr("rpi_stub_", cmdline + i) >= util_str_len("rpi_stub_"))
+			{
+				i += util_str_len("rpi_stub_");
+				if (util_cmp_substr("mmu", cmdline + i) >= util_str_len("mmu"))
+				{
+					i += util_str_len("mmu");
+					// set flag for mmu setup
+					// rpi_stub_mmu
+					rpi2_use_mmu = 1;
+				}
+				else if (util_cmp_substr("interrupt=", cmdline + i) >= util_str_len("interrupt="))
+				{
+					i += util_str_len("interrupt=");
+					if (util_cmp_substr("irq", cmdline + i) >= util_str_len("irq"))
+					{
+						i += util_str_len("irq");
+						// set flag for UART0 using IRQ
+						rpi2_uart0_excmode = RPI2_UART0_IRQ;
+					}
+					else if (util_cmp_substr("fiq", cmdline + i) >= util_str_len("fiq"))
+					{
+						i += util_str_len("fiq");
+						// set flag for UART0 using FIQ
+						rpi2_uart0_excmode = RPI2_UART0_FIQ;
+					}
+					else if (util_cmp_substr("poll", cmdline + i) >= util_str_len("poll"))
+					{
+						i += util_str_len("poll");
+						// set flag for UART0 using poll
+						// rpi_stub_interrupt=poll
+						rpi2_uart0_excmode = RPI2_UART0_POLL;
+					}
+				}
+#if 0
+				else if (util_cmp_substr("baud=", cmdline + i) >= util_str_len("baud="))
+				{
+					i += util_str_len("baud=");
+					// get baud for serial
+				}
+#endif
+			}
+		}
+	}
+#endif
 	loader_main();
 }

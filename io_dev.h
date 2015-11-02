@@ -28,13 +28,12 @@ typedef struct
 	void (*start)();
 	int (*get_char)();
 	int (*put_char)(char);
-	int (*get_string)(char *, int);
+	int (*get_string)(char *, char, int);
 	int (*put_string)(char *, int);
 	int (*read)(char *, int);
 	int (*write)(char *, int);
-	void (*set_ctrlc)(void *);
-	int (*get_ctrl_c)();
-
+	void (*enable_ctrlc)();
+	void (*disable_ctrlc)();
 }io_device;
 
 

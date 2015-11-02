@@ -23,18 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // needs to be here to be visible to both rpi2 and serial
 //#define DEBUG_EXCEPTIONS
+//#define DEBUG_GDB_EXC
 //#define DEBUG_CTRLC
 
 //#define DEBUG_UNDEF
 //#define DEBUG_SVC
 //#define DEBUG_AUX
-#define DEBUG_DABT
+//#define DEBUG_DABT
 //#define DEBUG_IRQ
 //#define DEBUG_FIQ
 //#define DEBUG_PABT
 
+//#define RPI2_DEBUG_TIMER
+
 // The peripherals base address
 #define PERIPH_BASE 0x3f000000
+
+// system timer low
+#define SYSTMR_CLO 0x3f003004
 
 // The GPIO registers base address.
 #define GPIO_BASE (PERIPH_BASE + 0x200000)
@@ -67,6 +73,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define IRC_DIS1	(IRC_BASE + 0x21C)
 #define IRC_DIS2	(IRC_BASE + 0x220)
 
+/* ARM timer definitions */
+#define ARM_TIMER_BASE	(PERIPH_BASE + 0xB000)
+#define ARM_TIMER_LOAD	(ARM_TIMER_BASE + 0x400)
+#define ARM_TIMER_VALUE	(ARM_TIMER_BASE + 0x404)
+#define ARM_TIMER_CTL	(ARM_TIMER_BASE + 0x408)
+#define ARM_TIMER_CLI	(ARM_TIMER_BASE + 0x40C)
+#define ARM_TIMER_RIS	(ARM_TIMER_BASE + 0x410)
+#define ARM_TIMER_MIS	(ARM_TIMER_BASE + 0x414)
+#define ARM_TIMER_RELOAD (ARM_TIMER_BASE + 0x418)
+#define ARM_TIMER_DIV	(ARM_TIMER_BASE + 0x41C)
+#define ARM_TIMER_CNT	(ARM_TIMER_BASE + 0x420)
+
 /* UART0 definitions */
 
 // The base address for UART.
@@ -92,6 +110,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define UART0_ITOP   (UART0_BASE + 0x88)
 #define UART0_TDR    (UART0_BASE + 0x8C)
 
+// definitions for the undocumented mailbox
+#define MBOX_BASE (PERIPH_BASE + 0xB800)
+// MBOX0: GPU -> ARM
+#define MBOX0_READ (MBOX_BASE + 0x80)
+#define MBOX0_POLL (MBOX_BASE + 0x90)
+#define MBOX0_CONF (MBOX_BASE + 0x9c)
+#define MBOX0_STATUS (MBOX_BASE + 0x98)
+// MBOX1 ARM -> GPU
+#define MBOX1_WRITE (MBOX_BASE + 0xA0)
+#define MBOX1_STATUS (MBOX_BASE + 0xB8)
+
+#define MBOX_STATUS_FULL (1 << 31)
+#define MBOX_STATUS_EMPTY (1 << 30)
+
+typedef struct
+{
+	unsigned int buff_size;
+	unsigned int req_resp_code;
+	unsigned int tag;
+	unsigned int tag_buff_len;
+	unsigned int tag_msg_len;
+	union {
+		unsigned char byte_buff[1024];
+		unsigned int word_buff[256];
+	} tag_buff;
+	unsigned int end_tag;
+} request_response_t;
 
 /* exception_info values
    exception numbers - these had to be hardcoded in the
@@ -113,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RPI2_USER_BKPT_THUMB 0xbebe
 
 // exception_extra values used in PABT
+#define RPI2_EXTRA_NOTHING 0
 // our ARM-breakpoint
 #define RPI2_TRAP_ARM 1
 // our THUMB-breakpoint
@@ -131,12 +177,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define RPI2_REASON_HW_EXC 10
 #define RPI2_REASON_SW_EXC 12
 
-#define SYNC asm volatile ("dsb\n\tisb\n\t")
+#define SYNC asm volatile ("dsb\n\tisb\n\t":::"memory")
 
 // exception info
 // 8x = SW-caused
 extern volatile int exception_info;
 extern volatile int exception_extra;
+
+#define RPI2_UART0_POLL 0
+#define RPI2_UART0_FIQ 1
+#define RPI2_UART0_IRQ 2
+// which exception UART0 uses
+extern unsigned int rpi2_uart0_excmode;
+extern unsigned int rpi2_use_mmu;
+
+extern unsigned int rpi2_arm_ramsize; // ARM ram in megs
+extern unsigned int rpi2_arm_ramstart; // ARM ram start address
 
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of
@@ -174,25 +230,38 @@ void rpi2_enable_excs();
 void rpi2_disable_ints();
 void rpi2_enable_ints();
 void set_gdb_enabled(unsigned int state);
+void rpi2_get_cmdline(char *line);
 
 void rpi2_set_vectors();
+void rpi2_enable_mmu();
+void rpi2_flush_address(unsigned int addr);
+void rpi2_invalidate_caches();
 void rpi2_trap();
 void rpi2_gdb_trap();
 void rpi2_init();
 void rpi2_set_trap(void *address, int kind);
 void rpi2_pend_trap();
+
+void rpi2_timer_kick();
+void rpi2_timer_start();
+void rpi2_timer_stop();
+
 // access functions
-unsigned int rpi2_get_irq_flag();
-void rpi2_set_irq_flag(unsigned int val);
+unsigned int rpi2_get_sigint_flag();
+void rpi2_set_sigint_flag(unsigned int val);
 unsigned int rpi2_get_exc_reason();
 void rpi2_set_exc_reason(unsigned int val);
 
 /* for debugging */
+
+void rpi2_unset_watchpoint(unsigned int num);
+void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int range);
+
 // ACT-led: gpio 47, active high
 void rpi2_init_led();
 void rpi2_led_off();
 void rpi2_led_on();
-void rpi2_delay_loop(unsigned int loop_count);
+void rpi2_delay_loop(unsigned int delay_ms);
 void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count);
 
 // debug-debug

@@ -18,10 +18,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef DEBUG_H_
-#define DEBUG_H_
+#ifndef GDB_H_
+#define GDB_H_
 
 #include "io_dev.h"
+
+//#define DEBUG_GDB
+//#define GDB_INVALIDATE_CACHES
+//#define GDB_DEBUG_LED
+//#define GDB_DEBUG_RX
+//#define GDB_DEBUG_TX
+//#define GDB_DEBUG_RX_LED
 
 // program
 typedef struct {
@@ -37,4 +44,4 @@ void gdb_trap();
 void gdb_reset();
 void gdb_trap_handler();
 
-#endif /* DEBUG_H_ */
+#endif /* GDB_H_ */

@@ -84,4 +84,7 @@ int util_read_dec(char *str, int *result);
 // converts a word endianness (swaps bytes)
 void util_swap_bytes(unsigned int *src, unsigned int *dst);
 
+// number of bits needed to represent a value
+int util_num_bits(unsigned int val);
+
 #endif /* UTIL_H_ */

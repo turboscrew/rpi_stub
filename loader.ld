@@ -73,22 +73,24 @@ SECTIONS
         bss = .;
         *(.bss)
         stacks = .;
-		. = . + 512;	/* fiq stack size */
+		. = . + 1024;	/* fiq stack size */
 		__fiq_stack = .;
-		. = . + 1024;	/* usr & sys stack size (common) */
+		. = . + 512;	/* usr & sys stack size (common) */
 		__usrsys_stack = .;
-		. = . + 16384;	/* svc stack size (start-up) */
+		. = . + 512;	/* svc stack size (start-up) */
 		__svc_stack = .;
-		. = . + 16384;	/* irq stack size (serial) */
+		. = . + 1024;	/* irq stack size (serial) */
 		__irq_stack = .;
 		. = . + 512;	/* mon stack size */
 		__mon_stack = .;
 		. = . + 512;	/* hyp stack size */
 		__hyp_stack = .;
-		. = . + 4096;	/* und stack size */
+		. = . + 512;	/* und stack size */
 		__und_stack = .;
-		. = . + 16384;	/* abrt stack size (gdb-stub) */
+		. = . + 2048;	/* abrt stack size */
 		__abrt_stack = .;
+		. = . + 16384;	/* gdb stack size (gdb-stub) */
+		__gdb_stack = .;
     } >EXEC AT>LOAD
     __bss_end = .;
 

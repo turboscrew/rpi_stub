@@ -46,10 +46,14 @@ _start:
 	to leave the core in HYP mode.
 	(Issue #369 opened on Feb 18 by yann-morin-1998)
 	*/
+	str r0, r0_store
+	str r1, r1_store
+	str r2, r2_store
 	mrs r0, cpsr
 	and r1, r0, #0x1f
 	cmp r1, #0x1a @ HYP-mode?
 	bne codecopy
+	ldr sp, =__hyp_stack @ hard to set later
 	movw r0, #0x1d3 @ aif-masks set, SVC-mode, other bits zeroed
 	@ rough write in cpsr doesn't work - see pseudo code in
 	@ architecture reference manual:
@@ -58,10 +62,26 @@ _start:
 	msr ELR_hyp, r1
 	msr SPSR_hyp, r0
 	eret
+r0_store:
+	.int 0
+r1_store:
+	.int 0
+r2_store:
+	.int 0
 
 	// copy loader/stub into upper memory
 codecopy:
 	cpsid aif
+	ldr r13, =__svc_stack @ our stack (at startup)
+	bl init_debug_led @ for start-up debugging
+#if 0
+	ldr r0, =1000 @ led on - a second
+	ldr r1, =1000 @ led off - a second
+	mov r2, #3  @ 3 times
+	bl debug_blink
+	ldr r3, =3000 @ 3 s pause
+	bl debug_wait
+#endif
 	ldr r4, =__load_start
 	ldr	r5, =__load_end
 	ldr	r6, =__code_begin
@@ -71,28 +91,40 @@ loop$:
 	cmp r4, r5
 	bls	loop$
 
-	/* Enable caches & branch prediction */
 #if 0
-
-	@ bit 6 = enable coherent reqs
-	MRC p15, 0, r1, c1, c0, 1 @ read ACTLR
-	movw r0, #0x1804 @ bin 0000000001000000
-	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 1 @ write to ACTLR
-
-	@ bit 12 = I-cache, bit 11 = branch pred, bit 2 = D-cache
-	MRC p15, 0, r1, c1, c0, 0 @ read SCTLR
-	movw r0, #0x1804 @ bin 0001100000000100
-	orr r1, r0
-	MCR p15, 0, r1, c1, c0, 0 @ write to SCTLR
+	ldr r0, =1000 @ led on - a second
+	ldr r1, =1000 @ led off - a second
+	mov r2, #4  @ 4 times
+	bl debug_blink
+	ldr r3, =3000 @ 3 s pause
+	bl debug_wait
 #endif
+
 	// Set up initial stacks
 	// ARM stack is conventionally 'Decrement Before'-type
 	// = SP points to last used, and is decremented before write
 
-	ldr r13, =__svc_stack @ our stack (at startup)
+	@ldr r13, =__svc_stack @ our stack (at startup)
 
-
+#if 0
+	ldr r0, =__fiq_stack @ fast interrupt mode stack
+	msr SP_fiq, r0
+	ldr r0, =__usrsys_stack @ system and user mode stack
+	msr SP_usr, r0
+	ldr r0, =__irq_stack @ irq mode stack
+	msr SP_irq, r0
+	@ldr r0, =__svc_stack @ supervisor mode stack - skip: our mode
+	@msr SP_svc, r0
+	@ldr r0, =__mon_stack @ monitor mode stack - not from this mode
+	@msr SP_mon, r0
+	@ldr r0, =__hyp_stack @ hypervisor mode stack - not from this mode
+	@msr SP_hyp, r0
+	ldr r0, =__und_stack @ undefined instruction mode stack
+	msr SP_und, r0
+	ldr r0, =__abrt_stack @ abort mode stack
+	msr SP_abt, r0
+	dsb
+#else
 	// store our cpsr to r4
 	mrs r6, cpsr
 	mov r4, r6
@@ -103,49 +135,78 @@ loop$:
 	// handle FIQ mode
 	orr r5, r6, #0x01 @ set FIQ mode
 	msr cpsr, r5
-	ldr r13, =__fiq_stack @ fast interrupt mode stack
+	dsb
+	isb
+	ldr sp, =__fiq_stack @ fast interrupt mode stack
 
 	// handle user and system modes - common sp and lr
 	// but sys is privileged
 	orr r5, r6, #0x0f @ set system mode
 	msr cpsr, r5
-	ldr r13, =__usrsys_stack @ system and user mode stack
+	dsb
+	isb
+	ldr sp, =__usrsys_stack @ system and user mode stack
 
 	//handle IRQ mode
 	orr r5, r6, #0x02 @ set IRQ mode
 	msr cpsr_c, r5
-	ldr r13, =__irq_stack @ irq mode stack
+	dsb
+	isb
+	ldr sp, =__irq_stack @ irq mode stack
 
 	//handle SVC mode - our mode: skip
 	/*
 	orr r5, r6, #0x03 @ set IRQ mode
 	msr cpsr_c, r5
-	ldr r13, =__svc_stack @ irq mode stack
+	dsb
+	isb
+	ldr sp, =__svc_stack @ irq mode stack
 	*/
 
-	// handle monitor mode
-	// probably won't work due to non-secure state
+	/* handle monitor mode - unpredictable in svc-mode
 	orr r5, r6, #0x06 @ set monitor mode
 	msr cpsr_c, r5
-	ldr r13, =__mon_stack @ monitor mode stack
+	dsb
+	isb
+	ldr sp, =__mon_stack @ monitor mode stack
+	*/
 
-	// handle hyp mode
+	/* handle hyp mode - unpredictable in svc-mode
 	orr r5, r6, #0x0a @ set hyp mode
 	msr cpsr_c, r5
-	ldr r13, =__hyp_stack @ hypervisor mode stack
+	dsb
+	isb
+	ldr sp, =__hyp_stack @ hypervisor mode stack
+	*/
 
 	// handle und mode
 	orr r5, r6, #0x0b @ set und mode
 	msr cpsr_c, r5
-	ldr r13, =__und_stack @ undefined instruction mode stack
+	dsb
+	isb
+	ldr sp, =__und_stack @ undefined instruction mode stack
 
 	// handle abort modes
 	orr r5, r6, #0x07 @ set abort mode
 	msr cpsr_c, r5
-	ldr r13, =__abrt_stack @ abort mode stack
+	dsb
+	isb
+	ldr sp, =__abrt_stack @ abort mode stack
 
 	// return to our original mode
 	msr cpsr, r4
+	dsb
+	isb
+#endif
+
+#if 0
+	ldr r0, =1000 @ led on - a second
+	ldr r1, =1000 @ led off - a second
+	mov r2, #5  @ 5 times
+	bl debug_blink
+	ldr r3, =3000 @ 3 s pause
+	bl debug_wait
+#endif
 
 	@ copy vectors - will be overwritten later
 	ldr r4, =_Int_vectors
@@ -157,23 +218,21 @@ loop1$:
 	subs r5, r5, #1
 	bne	loop1$
 
-	bl init_debug_led
-
-/*
-	mov r3, #0x5000 @ 5 s pause
-	bl debug_wait
-	ldr r0, =0x500 @ led on - half a second
-	ldr r1, =0x500 @ led off - half a second
-	mov r2, #3  @ 3 times
+#if 0
+	@ mov r3, #0x1000 @ 1 s pause
+	@bl debug_wait
+	ldr r0, =1000 @ led on - half a second
+	ldr r1, =1000 @ led off - half a second
+	mov r2, #6  @ 6 times
 	bl debug_blink
-	mov r3, #0x5000 @ 5 s pause
+	ldr r3, =3000 @ 3 s pause
 	bl debug_wait
-*/
-	//cpsie aif @ enable interrupts
-	//dsb
-	//isb
-	ldr r0, =start1_fun
-	blx r0
+#endif
+	ldr r0, r0_store
+	ldr r1, r1_store
+	ldr r2, r2_store
+	ldr r3, =start1_fun
+	blx r3
 	// ldr pc, =start1_fun
 	// bl start1_fun
 
@@ -210,57 +269,57 @@ _Int_vectors:
 	// dummy exception handlers
 gen_exc_0:
 1:
-	ldr r0, =0x500 @ led on - half a second
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =500 @ led on - half a second
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r0, =0x1000 @ led on - 1 second
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =1000 @ led on - 1 second
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r3, =0x5000 @ 5 s pause
+	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 1b @ eternal loop
 
 gen_exc_2:
 2:
-	mov r0, #0x500 @ led on - half a second
-	mov r1, #0x500 @ led off - half a second
+	ldr r0, =500 @ led on - half a second
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	mov r0, #0x8000 @ led on - 8 seconds
-	mov r1, #0x500 @ led off - half a second
+	ldr r0, =8000 @ led on - 8 seconds
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	mov r3, #0x5000 @ 5 s pause
+	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 2b @ eternal loop
 
 gen_exc_4:
 3:
-	ldr r0, =0x500 @ led on - half a second
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =500 @ led on - half a second
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r0, =0x2000 @ led on - 2 seconds
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =2000 @ led on - 2 seconds
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r3, =0x5000 @ 5 s pause
+	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 3b @ eternal loop
 
 gen_exc_8:
 4:
-	ldr r0, =0x500 @ led on - half a second
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =500 @ led on - half a second
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r0, =0x4000 @ led on - 4 seconds
-	ldr r1, =0x500 @ led off - half a second
+	ldr r0, =4000 @ led on - 4 seconds
+	ldr r1, =500 @ led off - half a second
 	mov r2, #3  @ 5 times
 	bl debug_blink
-	ldr r3, =0x5000 @ 5 s pause
+	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 4b @ eternal loop
 
@@ -273,19 +332,24 @@ init_debug_led:
 	@movt r6, #0x3f20 @ GPIO base
 	ldr r6, =0x3f200000
 	str r0, [r6, #0x94] @ 0 -> GPPUD
+	dsb
 5:
 	subs	r2, r2, #1 @ delay 150 cycles
 	bne 5b
 	str r1, [r6, #0x9c] @ 0 -> GPPUDCLK1
+	dsb
 6:
 	subs	r3, r3, #1 @ delay 150 cycles
 	bne 6b
 	str r0, [r6, #0x94] @ 0 -> GPPUD
 	str r0, [r6, #0x9c] @ 0 -> GPPUDCLK1
+	dsb
 
 	str r1, [r6, #0x2c] @ (1<<15) -> GPIO_CLRREG1
+	dsb
 
 	ldr r3, [r6, #0x10] @ read GPFSEL4
+	dsb
 	ldr r4, =0x00e00000
 	bic r3, r4
 	@bic	r3, #0xe00000
@@ -293,6 +357,21 @@ init_debug_led:
 	lsl r2, #21
 	orr r3, r2
 	str r3, [r6, #0x10] @ write GPFSEL4
+	dsb
+	bx lr
+
+systmr_wait:
+	push {r0, r1, r2, r3}
+	movw r1, 0x3004 @ sys timer low
+	movt r1, 0x3f00
+	ldr r3, [r1] @ start time
+1:
+	ldr r2, [r1] @ current time
+	@ with 32-bit numbers (1<<32) - (start - curr) = curr - start
+	sub r2, r3 @ with 32-bit numbers works
+	cmp r0, r2
+	bhi 1b
+	pop {r0, r1, r2, r3}
 	bx lr
 
 debug_wait: @ ms count in r3
@@ -304,6 +383,15 @@ debug_wait: @ ms count in r3
 	bx lr
 
 debug_wait1: @ ms count in r8
+#if 1
+	push {r0, r1, lr}
+	mov r0, r8
+	movw r1, 0x3e8 @ 1000
+	mul r0, r1
+	bl systmr_wait
+	pop {r0, r1, lr}
+	bx lr
+#else
 	cmp	r8, #0
 	bxeq	lr
 	mov	r10, #0
@@ -319,6 +407,7 @@ loop5$:
 	cmp	r10, r8
 	bne loop4$
 	bx	lr
+#endif
 
 debug_blink: @ r0=on, r1=off, r2=count, 0x1000 ~ 1s
 	push {r0, r1, r6, r7, r8, r9, r10, lr}
@@ -328,9 +417,11 @@ debug_blink: @ r0=on, r1=off, r2=count, 0x1000 ~ 1s
 	ldr r7, =0x3f200000 @ GPIO base
 loop6$:
 	str r6, [r7,#0x20] @ (1<<15) -> GPIO_SETREG1
+	dsb
 	mov r8, r0 @ on
 	bl debug_wait1
 	str r6, [r7,#0x2c] @ (1<<15) -> GPIO_CLRREG1
+	dsb
 	mov r8, r1 @ off
 	bl debug_wait1
 	subs r2, #1
