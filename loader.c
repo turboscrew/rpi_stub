@@ -100,7 +100,12 @@ void loader_main()
 	serial_io.put_string(msg, util_str_len(msg));
 	util_word_to_hex(scratchpad, rpi2_arm_ramstart);
 	serial_io.put_string(scratchpad, 9);
+	msg = " rpi2_keep_ctrlc ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_keep_ctrlc);
+	serial_io.put_string(scratchpad, 9);
 	serial_io.put_string("\r\n", 3);
+	
 	//serial_io.put_string(cmdline, 1024);
 	//serial_io.put_string("\r\n", 3);
 #endif
@@ -266,6 +271,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 #endif
 	rpi2_uart0_excmode = RPI2_UART0_POLL; // default
 	rpi2_use_mmu = 0; // default - no mmu
+	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
 	rpi2_get_cmdline(cmdline);
 #if 1
 	for (i=0; i< 1024; i++)

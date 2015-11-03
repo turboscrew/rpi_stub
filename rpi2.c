@@ -525,6 +525,18 @@ static inline void write_context()
 			"b 9f\n\t"
 
 			"10:\n\t"
+			"cmp r3, #0x01 @ our mode is FIQ?\n\t"
+			"bne 11f\n\t"
+
+			"mrs r8, r8_usr\n\t"
+			"mrs r9, r9_usr\n\t"
+			"mrs r10, r10_usr\n\t"
+			"mrs r11, r11_usr\n\t"
+			"mrs r12, r12_usr\n\t"
+			"add r7, r0, #4*8\n\t"
+			"stmia r7, {r8 - r12} @ overwrite r8 - 12 with banked regs\n\t"
+
+			"11:\n\t"
 			"cmp r1, #0x00 @ USR\n\t"
 			"cmpne r1, #0x0f @ SYS\n\t"
 			"bne 1f\n\t"
@@ -1099,6 +1111,22 @@ void gdb_exception_handler()
 #endif
 
 	rpi2_trap_handler();
+
+	if (rpi2_keep_ctrlc)
+	{
+		if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
+		{
+			// BCM8235 ARM Peripherals ch 7.3
+			*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
+			*((volatile uint32_t *)IRC_FIQCTRL) = ((1 << 7) | 57);
+			rpi2_reg_context.reg.cpsr &= ~(1<<6); // enable fiq
+		}
+		else
+		{
+			*((volatile uint32_t *)IRC_EN2) = (1 << 25);
+			rpi2_reg_context.reg.cpsr &= ~(1<<7); // enable irq
+		}
+	}
 }
 
 void show_go(uint32_t retaddr)
@@ -1560,7 +1588,7 @@ void rpi2_dabt_handler()
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
 			"push {r12} @ popped in write_context\n\t"
-			"sub lr, #4 @ fix return address - skip bad instruction\n\t"
+			"sub lr, #8 @ fix return address\n\t"
 			"ldr r12, =rpi2_dabt_context\n\t"
 	);
 	write_context();
@@ -1631,13 +1659,19 @@ uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
 
 	retval = 0; // default: goto low vector
 
-	irq_status =  *((volatile uint32_t *)IRC_PENDB);
-	if (irq_status & (1 << 19)) // bit 19 = UART0
+	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
 	{
-		irq_status &= ~(1 << 19); // clear bit 9
 		serial_irq();
 	}
-
+	else
+	{
+		irq_status =  *((volatile uint32_t *)IRC_PENDB);
+		if (irq_status & (1 << 19)) // bit 19 = UART0
+		{
+			irq_status &= ~(1 << 19); // clear bit 9
+			serial_irq();
+		}
+	}
 	if (!rpi2_sigint_flag)
 	{
 		if (rpi2_ctrl_c_flag)
@@ -1654,11 +1688,18 @@ uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
 
 	if (retval == 0)
 	{
-		if (irq_status == 0)
+		if (rpi2_uart0_excmode != RPI2_UART0_FIQ)
 		{
-			retval = 1; // return to interrupted program
+			if (irq_status == 0)
+			{
+				retval = 1; // return to interrupted program
+			}
+			// else retval = 0
 		}
-		// else retval = 0
+		else
+		{
+			retval = 1; // can't be other fiq
+		}
 	}
 
 #ifdef SER_DEBUG
@@ -1672,7 +1713,7 @@ uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
 	if (rpi2_sigint_flag)
 //	if (gdb_dyn_debug)
 	{
-		p = "\r\nIRQ EXCEPTION\r\n";
+		p = "\r\nSIGINT EXCEPTION\r\n";
 		do {i = serial_raw_puts(p); p += i;} while (i);
 
 		serial_raw_puts("exc_addr: ");
@@ -1911,7 +1952,7 @@ void rpi2_fiq_handler()
 			"ldr r0, =rpi2_uart0_excmode\n\t"
 			"ldr r0, [r0]\n\t"
 			"cmp r0, #1 @ RPI2_UART0_FIQ\n\t"
-			"beq 1f @ serial doesn't use fiq - other fiq\n\t"
+			"bne 1f @ serial doesn't use fiq - other fiq\n\t"
 
 			"ldr r0, fiq_sp_store2\n\t"
 			"mov r1, lr\n\t"
@@ -2186,7 +2227,7 @@ void rpi2_unhandled_pabt()
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
-			"@sub lr, #4 @ for now we skip the bad instruction\n\t"
+			"@sub lr, #4 @ for now we skip the instruction\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
 	);
@@ -2223,6 +2264,7 @@ void rpi2_unhandled_pabt()
 			"and r0, #0x0f @ bit 10\n\t"
 			"cmp r0, #0x2 @ debug event\n\t"
 			"bne 2f\n\t"
+
 			"@ breakpoint\n\t"
 			"mov r1, #4 @ RPI2_TRAP_BKPTn\t"
 			"ldr r0, =exception_extra\n\t"
@@ -2231,10 +2273,6 @@ void rpi2_unhandled_pabt()
 			"mov r1, #12 @ RPI2_REASON_SW_EXC\n\t"
 			"str r1, [r0]\n\t"
 			"@ fix return address\n\t"
-			"ldr r0, =rpi2_pabt_context\n\t"
-			"ldr r1, [r0, #15*4]\n\t"
-			"sub r1, #4\n\t"
-			"str r1, [r0, #15*4]\n\t"
 			"b 3f\n\t"
 
 			"2: \n\t"
@@ -2243,6 +2281,10 @@ void rpi2_unhandled_pabt()
 			"ldr r0, =rpi2_exc_reason\n\t"
 			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
+			"ldr r0, =rpi2_pabt_context\n\t"
+			"ldr r1, [r0, #15*4]\n\t"
+			"sub r1, #4 @ fix address to exception address\n\t"
+			"str r1, [r0, #15*4]\n\t"
 
 			"3:\n\t"
 	);
@@ -2892,7 +2934,6 @@ void rpi2_init()
 	rpi2_debuggee_running = 0;
 	gdb_dyn_debug = 0;
 	rpi2_arm_ramsize = rpi2_get_arm_ram(&rpi2_arm_ramstart);
-	rpi2_keep_ctrlc = 0;
 	// TODO: add set-up for UART0 handling by FIQ
 
 #if 0

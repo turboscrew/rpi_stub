@@ -2214,7 +2214,6 @@ void gdb_monitor(int reason)
 	}
 	// enable CTRL-C
 	gdb_iodev->enable_ctrlc(); // enable
-	if (rpi2_keep_ctrlc) enable_uart0_ints();
 
 #ifdef DEBUG_GDB
 	msg = "\r\ngdb_monitor returns\r\n";

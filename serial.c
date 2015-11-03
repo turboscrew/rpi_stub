@@ -280,6 +280,8 @@ void serial_init(io_device *device)
 	// Enable uart0 interrupt
 	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
 	{
+		// BCM8235 ARM Peripherals ch 7.3
+		*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
 		*((volatile uint32_t *)IRC_FIQCTRL) = ((1 << 7) | 57);
 	}
 	else
@@ -321,11 +323,14 @@ void enable_uart0_ints()
 	// Enable uart0 interrupt
 	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
 	{
+		// BCM8235 ARM Peripherals ch 7.3
+		*((volatile uint32_t *)IRC_DIS2) = (1 << 25);
 		*((volatile uint32_t *)IRC_FIQCTRL) = ((1 << 7) | 57);
 		asm volatile ("cpsie f\n\t");
 	}
 	else
 	{
+		*((volatile uint32_t *)IRC_FIQCTRL) &= ~(1 << 7);
 		*((volatile uint32_t *)IRC_EN2) = (1 << 25);
 		asm volatile ("cpsie i\n\t");
 	}
