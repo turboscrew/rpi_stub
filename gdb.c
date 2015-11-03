@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SIG_TRAP 5
 #define SIG_ILL  4
 #define SIG_BUS  7
+#define SIG_SEGV  11
 #define SIG_USR1 RPI2_REASON_HW_EXC
 #define SIG_USR2 RPI2_REASON_SW_EXC
 #define ALOHA 32
@@ -257,7 +258,7 @@ void gdb_trap_handler()
 			}
 			break;
 		case RPI2_EXC_DABT:
-			reason = SIG_BUS;
+			reason = SIG_SEGV;
 			break;
 		case RPI2_EXC_UNDEF:
 			reason = SIG_ILL;
@@ -930,9 +931,18 @@ void gdb_resp_target_halted(int reason)
 		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
-	case SIG_BUS: // pabt/dabt
-		// T07 - pabt/dabt response
+	case SIG_BUS: // pabt
+		// T07 - pabt response
 		len = util_str_copy(resp_buff, "T07", resp_buff_len);
+		// PC value given
+		//len = util_append_str(resp_buff, "f:", resp_buff_len);
+		// put PC-value into message
+		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
+		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+		break;
+	case SIG_SEGV: // dabt
+		// T011 - dabt response
+		len = util_str_copy(resp_buff, "T11", resp_buff_len);
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
