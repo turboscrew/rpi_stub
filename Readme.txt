@@ -20,8 +20,8 @@ There are also three command line parameters.
 'rpi_stub_mmu' causes rpi_stub to use MMU and caches. Default is no mmu or caches.
 'rpi_stub_interrupt=<int>' makes rpi_stub to handle UART0 interrupts
 in a different way:
-If <int> is 'irq' rpi_stub uses irq exception also withing the debugger.
-If <int> is 'fiq' rpi_stub uses fiq exception also withing the debugger.
+If <int> is 'irq' rpi_stub uses irq exception also within the debugger.
+If <int> is 'fiq' rpi_stub uses fiq exception also within the debugger.
 if <int> is 'poll' rpi_stub uses irq when the debuggee runs, but the debugger
 is run with interrupts masked, and the UART0 is handled by polling.
 The default (and recommended) option is 'poll'.
@@ -31,7 +31,7 @@ the execution is returned to the debuggee.
 At the moment the main restrictions are:
 - Only ARM instruction set is supported
 - Floating point and vector HW are not supported
-- No single stepping (yet).
+- No single stepping (yet, but gdb seems to be able to single-step using breakpoint).
 - Only single core supported
 - UART0 (the full UART) is reserved exclusively for the rpi_stub.
 - The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
@@ -67,91 +67,192 @@ Feel free to download them and play with them.
 
 
 --------------------------
-Some kind of description (obsolete - I'll make a new one)
+Some kind of description
 
 This is a rough 'conceptual' pseudocode of the program
 Here asynchronous/independent code sequences are called processes
+
 PROCESS loader
-    set up exceptions
-    set up serial
-    set up gdb-stub
+	handle command line parameters
+    // set up exceptions and some other low level stuff (MMU, caches)
+    CALL rpi2_init
+    // set up serial (UART0)
+    CALL serial_init
     FOREVER
-        reset gdb-stub
-        START gdb_stub
+    	CALL gdb_init // initialize debugger
+        CALL gdb_reset // initialize for debugging a program
+        execute initial-entry bkpt
     ENDFOREVER
 ENDPROCESS
 
-PROCESS ctrl_c_trap
-    do BKPT
+// called from excepion initializations and reset_gdb_stub
+PROCEDURE set_up_exception_vectors
+	lower_vectors =
+		".word rpi2_reset_handler\n\t"
+		".word rpi2_undef_handler\n\t"
+		".word rpi2_svc_handler\n\t"
+		".word rpi2_dabt_handler\n\t"
+		".word rpi2_unhandled_dabt\n\t"
+		".word rpi2_aux_handler @ used in some cases\n\t "
+		".word rpi2_unhandled_irq\n\t"
+		".word rpi2_unhandled_fiq\n\t"
+		
+	upper_vectors =
+		".word rpi2_reroute_reset\n\t"
+		".word rpi2_reroute_exc_und\n\t"
+		".word rpi2_reroute_exc_svc\n\t"
+		".word rpi2_pabt_handler\n\t"
+		".word rpi2_reroute_exc_dabt\n\t"
+		".word rpi2_reroute_exc_aux @ in some cases\n\t "
+		".word rpi2_irq_handler\n\t"
+		".word rpi2_reroute_exc_fiq\n\t"
+		
+	IF rpi_stub_interrupt is 'fiq' THEN
+		rpi2_upper_vector[IRQ] = &rpi2_reroute_exc_irq
+		rpi2_upper_vector[FIQ] = &rpi2_fiq_handler
+	ENDIF
+ENDPROC
+
+PROCESS rpi2_reroute_<exception>
+	"mov PC, low_vector_address_of<exception>
+ENDPROC
+
+PROCESS rpi2_unhandled_<exception>
+    store sp locally
+    switch to rpi_stub stack
+	fix return address
+	store register cotext to this exception's register storage
+	mark exception reason and type
+	GOTO gdb_exception
+ENDPROC
+
+PROCESS pabt_exception_handler (upper vector)
+    store sp locally
+    switch to rpi_stub stack
+    push registers
+	IF debug event THEN
+		IF rpi_stub breakpoint THEN
+			mark exception reason and type
+          	pop registers
+    		load locally stored sp
+    		fix return address
+    		store register cotext to this exception's register storage
+    		GOTO gdb_exception			
+		ELSE
+			pop registers
+			load locally stored sp
+			"mov PC, low_vector_address_of_PABT
+		ENDIF
+	ELSE
+		pop registers
+		load locally stored sp
+		"mov PC, low_vector_address_of_PABT
+	ENDIF
 ENDPROCESS
 
-PROCESS exception_handler (really kind of exception vector)
-    store registers
-    IF exception is reset THEN
-        START reset
-    ELSIF exception is IRQ THEN
-        IF exception is serial tx THEN
-            START serial_output
-        ELSIF exception is serial rx THEN
-            START serial_output
-        ENDIF
-        IF ctrl-C flag is set THEN
-            set sig_int flag
-            clear ctrl_C flag
-            restore registers
-            set return address to ctrl_c_trap
-            return from exception
-        ENDIF
-    ELSIF exception is PABT
-        IF bkpt THEN
-            set breakpoint info
-        ELSIF sig_int flag is set
-            copy registers from IRQ context store to gdb context store
-        ENDIF
-        call gdb_stub
+PROCESS irq_fiq_exception_handler (upper vector)
+    store sp locally
+    switch to rpi_stub stack
+    push registers
+    IF UART0 interrupt THEN
+    	CALL serial_interrupt_handler
+    	IF ctrl-C flag THEN
+    		clear ctrl-C flag
+    		set sigint flag (instead)
+    		mark exception reason and type
+          	pop registers
+    		load locally stored sp
+    		fix return address
+    		store register cotext to this exception's register storage
+    		GOTO gdb_exception
+    	ELSE
+    		IF irq THEN
+    			IF other irqs THEN
+        			pop registers
+    				load locally stored sp
+    				"mov PC, low_vector_address_of<exception>
+    			ENDIF
+    		ENDIF
+          	pop registers
+    		load locally stored sp
+    		return from interrupt
+    	ENDIF
     ELSE
-        set exception info
-        CALL gdb_stub
+    	pop registers
+    	load locally stored sp
+    	"mov PC, low_vector_address_of<exception>
     ENDIF
-    restore registers
-    return from exception
+ENDPROCESS    
+
+PROCEDURE gdb_exception
+	switch mode to ABT
+	START gdb_exception_handler
+ENDPROC
+
+PROCESS gdb_exception_handler
+	check which exception type
+	copy processor context from exception register storage to
+		debugger register storage
+	CALL gdb_monitor
+	IF rpi_stub_keep_ctrlc THEN
+		IF rpi_stub_interrupt is 'fiq' THEN
+			try to force-enable UART0 FIQ
+		ELSE
+			try to force-enable UART0 IRQ
+		ENDIF
+	ENDIF
+	load registers from debugger storage
+	return from exception
 ENDPROCESS
 
-PROCESS reset
-    move program to upper memory
-    START loader
-ENDPROCESS
-
-PROCESS serial_output
+PROCEDURE serial_interrupt_handler
     IF data to send in queue THEN
         send data from queue
     ENDIF
-    restore registers
-    return from exception
-ENDPROCESS
 
-PROCESS serial_input
     IF data to receive THEN
         receive data to queue
         IF ctrl-C encountered THEN
-            set ctrl_C flag
+        	IF ctrl-C handling enabled
+            	set ctrl_C flag
+            	discard ctrl-C character
+            ENDIF
         ENDIF
     ENDIF
-ENDPROCESS
+ENDPROC
 
-PROCESS gdb-stub
-    enable IRQ
+PROCEDURE gdb_monitor
+	IF rpi_stub_interrupt is not 'poll' THEN
+    	enable UART0 interrupt
+    ENDIF
     handle debug exception (all except reset, serial tx and serial rx)
+    set stub_running to TRUE
     handle pending status (like remove single-stepping breakpoints)
     send pending response to gdb-client (response for s,c,...)
-    set stub_running to TRUE
+    IF pending status expects continuation THEN
+    	set stub_running to FALSE
+    ENDIF
+    disable ctrl-C handling 
     WHILE stub_running DO
+    	get command packet
+    	IF NACK received THEN
+    		resend last packet
+    		continue
+    	ENDIF
+    	IF ACK received THEN
+    		continue
+    	ENDIF
+    	IF command packet is good THEN
+    		send ACK
+    	ELSE
+    		send NACK
+    		continue
+    	ENDIF
         CALL gdb-stub command_interpreter
         // to resume, set stub_running to FALSE and return from call
     ENDWHILE
-    restore registers
-    return from exception
-ENDPROCESS
+    enable ctrl-C handling 
+ENDPROC
 
 When resume takes place, a variable 'gdb_resuming' is set (to the index of
 the trapping breakpoint) for resuming from single stepping over the
@@ -160,10 +261,15 @@ the trapping breakpoint) for resuming from single stepping over the
 When the single step fires, the single step handling in gdb_handle_pending_state
 puts the "missing" bkpt in the code and resumes again.
 
+
+------------------------
+Notes and reminders to myself
+
+
 single-stepping
 in command interpreter s-command checks the next instruction
 if instruction is branch, set breakpoint to branch target
-if instruction is cónditiomal branch, set bkpt to branch target and next instruction
+if instruction is cï¿½nditiomal branch, set bkpt to branch target and next instruction
 else set set bkpt to next instruction
 set stub_running to FALSE and return from command interpreter
 (that's resume)
@@ -198,121 +304,5 @@ That is: Bkpt is replaced with the original instruction and an 's'-command is
 internally executed. When a single-step breakpoint is hit, the single-step
 breakpoint(s) are removed and the breakpoint is re-installed to the place defined
 by the earlier 'Z'-command.
-
-
-------------------------
-Notes and reminders to myself
-
-single-step
-- marker: we need to know if we were single-stepping when we hit breakpoint.
-
-- we should take into account all branching instructions
-  both ARM and THUMB
-  
-- Also jumps and loading PC should be treated as branches
-
-Instruction classification for single stepping
-
-
- qOffsets. Report the offsets to use when relocating downloaded code.
-
- qSupported. Report the features supported by the RSP server.
-   As a minimum, just the packet size can be reported.
-
- A RSP server supporting standard remote debugging (i.e. using the GDB target
- remote command) should implement at least the following RSP packets in
- addition to those required for standard remote debugging:
-
-    !. Advise the target that extended remote debugging is being used.
-
-    R. Restart the program being run.
-
-    vAttach. Attach to a new process with a specified process ID.
-      This packet need not be implemented if the target has no concept of
-      a process ID, but should return an error code.
-
-    vRun. Specify a new program and arguments to run. A minimal implementation
-      may restrict this to the case where only the current program may be run again. 
-    
- In the RSP, the s packet indicates stepping of a single machine instruction,
- not a high level statement. In this way it maps to GDB's stepi command, not its
- step command (which confusingly can be abbreviated to just s). 
-    
-
-------
-0xef9f0001 = SWI/SVC 9f0001
-0xe7f001f0 = Architecturally undefined
-
-/* Correct in either endianness.  */
-static const unsigned long arm_breakpoint = 0xef9f0001;
-#define arm_breakpoint_len 4
-static const unsigned short thumb_breakpoint = 0xde01;
-static const unsigned short thumb2_breakpoint[] = { 0xf7f0, 0xa000 };
-
-/* For new EABI binaries.  We recognize it regardless of which ABI
-   is used for gdbserver, so single threaded debugging should work
-   OK, but for multi-threaded debugging we only insert the current
-   ABI's breakpoint instruction.  For now at least.  */
-static const unsigned long arm_eabi_breakpoint = 0xe7f001f0;
-
---------
-
-instructions
-
-BX = branch and change ARM/THUMB mode
-
-ARM
-Each ARM instruction is a single 32-bit word
- 
-branches
-conditional branches
-
-THUMB
-branches
-conditional branches
-
---------
-
-example:
-
-static int
-arm_breakpoint_at (CORE_ADDR where)
-{
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
-  unsigned long cpsr;
-
-  collect_register_by_name (regcache, "cpsr", &cpsr);
-
-  if (cpsr & 0x20)
-    {
-      /* Thumb mode.  */
-      unsigned short insn;
-
-      (*the_target->read_memory) (where, (unsigned char *) &insn, 2);
-      if (insn == thumb_breakpoint)
-    return 1;
-
-      if (insn == thumb2_breakpoint[0])
-    {
-      (*the_target->read_memory) (where + 2, (unsigned char *) &insn, 2);
-      if (insn == thumb2_breakpoint[1])
-        return 1;
-    }
-    }
-  else
-    {
-      /* ARM mode.  */
-      unsigned long insn;
-
-      (*the_target->read_memory) (where, (unsigned char *) &insn, 4);
-      if (insn == arm_breakpoint)
-    return 1;
-
-      if (insn == arm_eabi_breakpoint)
-    return 1;
-    }
-
-  return 0;
-}
 
 
