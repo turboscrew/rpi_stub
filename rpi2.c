@@ -101,6 +101,8 @@ volatile __attribute__ ((aligned (TBL_ALIGNMENT))) uint32_t master_xlat_tbl[TBL_
 extern void gdb_trap_handler(); // TODO: make callback?
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
+uint32_t dbg_rom_base;
+
 volatile uint32_t rpi2_dgb_enabled; // flag to pabt that this is IRQ-case
 volatile uint32_t rpi2_debuggee_running;
 volatile uint32_t rpi2_ctrl_c_flag;
@@ -2259,7 +2261,7 @@ void rpi2_unhandled_pabt()
 			"str r1, [r0]\n\t"
 			"mrc p15, 0, r0, c5, c0, 1 @ IFSR\n\t"
 			"dsb\n\t"
-			"and r1, r0, #0x400 @ bit 10\n\t"
+			"ands r1, r0, #0x400 @ bit 10\n\t"
 			"bne 2f\n\t"
 			"and r0, #0x0f @ bit 10\n\t"
 			"cmp r0, #0x2 @ debug event\n\t"
@@ -2272,21 +2274,31 @@ void rpi2_unhandled_pabt()
 			"ldr r0, =rpi2_exc_reason\n\t"
 			"mov r1, #12 @ RPI2_REASON_SW_EXC\n\t"
 			"str r1, [r0]\n\t"
-			"@ fix return address\n\t"
 			"b 3f\n\t"
-
+#if 0
+			"ldr r0, =dbg_rom_base @ cause DABT\n\t"
+			"ldr r0, [r0]\n\t"
+			"str r1,[r0]\n\t"
+#endif
 			"2: \n\t"
+#ifdef DEBUG_PABT
+	);
+	naked_debug();
+	asm volatile (
+#endif
 			"ldr r0, =exception_extra\n\t"
 			"mov r1, #5 @ RPI2_TRAP_BUS\n\t"
+			"str r1, [r0]\n\t"
 			"ldr r0, =rpi2_exc_reason\n\t"
 			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
-			"ldr r0, =rpi2_pabt_context\n\t"
+			"@ fix return address\n\t"
 			"ldr r1, [r0, #15*4]\n\t"
 			"sub r1, #4 @ fix address to exception address\n\t"
 			"str r1, [r0, #15*4]\n\t"
+			"ldr r0, =rpi2_pabt_context\n\t"
 
-			"3:\n\t"
+			"3: \n\t"
 	);
 #ifdef DEBUG_PABT
 	asm volatile (
@@ -2414,7 +2426,6 @@ void rpi2_pabt_handler()
 			"mov r1, lr\n\t"
 			"bl rpi2_pabt_handler2\n\t"
 	);
-	// naked_debug();
 #endif
 	asm volatile (
 			"b rpi2_gdb_exception\n\t"
@@ -2969,6 +2980,7 @@ void rpi2_init()
 
 	// calculate debug registers base address from debug ROM address (DBGRAR)
 	tmp1 &= 0xfffff000; // debug ROM address
+	dbg_rom_base = tmp1;
 	tmp3 = (uint32_t *) tmp1; // to pointer
 	tmp2 = *tmp3; // get first debug peripheral entry
 	asm volatile("dsb\n\t");
