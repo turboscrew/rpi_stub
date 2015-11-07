@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include "rpi2.h"
 #include "serial.h"
+#include "util.h"
 
 // I/O buffers, we write to tail and read from head
 // buffers are post-incrementing
@@ -129,7 +130,9 @@ void serial_init(io_device *device)
 {
 	uint32_t tmp; // scratchpad
 	uint32_t cpsr_store;
-
+	uint32_t ibrd;
+	uint32_t fbrd;
+	char scratch[9];
 #if 0
 	for (tmp=0; tmp < 2; tmp++)
 	{
@@ -249,11 +252,20 @@ void serial_init(io_device *device)
 	// Divider = UART_CLOCK/(16 * Baud)
 	// Fraction part register = (Fractional part * 64) + 0.5
 	// UART_CLOCK = 3000000; Baud = 115200
-
 	// Divider = 3000000 / (16 * 115200) = 1.627 = ~1
 	// Fractional part register = (0.627 * 64) + 0.5 = 40.6 = ~40
-	*((volatile uint32_t *)UART0_IBRD) = 1;
-	*((volatile uint32_t *)UART0_FBRD) = 40;
+	// Really: BRD = 4*UART_CLOCK/BAUD
+	// FBRD = BRD[5:0], IBRD = BRD[21:6]
+	// IBRD = BRD div 64, FBRD = BRD mod 64
+	// this should be able to handle uart clocks upto about 500 MHz
+	tmp = (8*rpi2_uart_clock)/rpi2_uart0_baud + 1; // round
+	tmp >>= 1;
+	ibrd = tmp >> 6;
+	fbrd = tmp & 0x3f;
+
+
+	*((volatile uint32_t *)UART0_IBRD) = ibrd;
+	*((volatile uint32_t *)UART0_FBRD) = fbrd;
 
 	// Enable FIFO & 8 bit data transmission (1 stop bit, no parity)
 	*((volatile uint32_t *)UART0_LCRH) = (1 << 4) | (1 << 5) | (1 << 6);
@@ -309,7 +321,16 @@ void serial_init(io_device *device)
 	}
 	rpi2_delay_loop(2000);
 #endif
-
+#if 0
+	serial_raw_puts("\r\nserial");
+	util_word_to_hex(scratch, (unsigned int) ibrd);
+	serial_raw_puts("\r\nibrd: ");
+	serial_raw_puts(scratch);
+	util_word_to_hex(scratch, (unsigned int) fbrd);
+	serial_raw_puts(" fbrd: ");
+	serial_raw_puts(scratch);
+	serial_raw_puts("\r\n");
+#endif
 }
 
 void serial_start()

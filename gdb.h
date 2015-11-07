@@ -43,5 +43,6 @@ void gdb_init(io_device *device);
 void gdb_trap();
 void gdb_reset();
 void gdb_trap_handler();
+void gdb_send_text_packet(char *msg, unsigned int msglen);
 
 #endif /* GDB_H_ */

@@ -124,6 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MBOX_STATUS_FULL (1 << 31)
 #define MBOX_STATUS_EMPTY (1 << 30)
 
+// Clock IDs for mailbox queries
+
+#define CLOCK_RESERVED 0
+#define CLOCK_EMMC  1
+#define CLOCK_UART  2
+#define CLOCK_ARM   3
+#define CLOCK_CORE  4
+#define CLOCK_V3D   5
+#define CLOCK_H264  6
+#define CLOCK_ISP   7
+#define CLOCK_SDRAM 8
+#define CLOCK_PIXEL 9
+#define CLOCK_PWM  10
+
 typedef struct
 {
 	unsigned int buff_size;
@@ -169,6 +183,10 @@ typedef struct
 #define RPI2_TRAP_BKPT 4
 // prefetch abort
 #define RPI2_TRAP_BUS 5
+// logging - null terminated
+#define RPI2_TRAP_LOGZ 13
+// logging - size in r1
+#define RPI2_TRAP_LOGN 14
 // our initial breakpoint
 #define RPI2_TRAP_INITIAL 15
 
@@ -187,14 +205,17 @@ extern volatile int exception_extra;
 #define RPI2_UART0_POLL 0
 #define RPI2_UART0_FIQ 1
 #define RPI2_UART0_IRQ 2
-// which exception UART0 uses
-extern unsigned int rpi2_uart0_excmode;
-extern unsigned int rpi2_use_mmu;
 
 extern unsigned int rpi2_arm_ramsize; // ARM ram in megs
 extern unsigned int rpi2_arm_ramstart; // ARM ram start address
+extern unsigned int rpi2_uart_clock;
 
+// command line parameters
 extern unsigned int rpi2_keep_ctrlc; // ARM ram start address
+extern unsigned int rpi2_uart0_excmode;
+extern unsigned int rpi2_uart0_baud;
+extern unsigned int rpi2_use_mmu;
+
 
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of

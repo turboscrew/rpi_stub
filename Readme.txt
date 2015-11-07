@@ -27,6 +27,9 @@ is run with interrupts masked, and the UART0 is handled by polling.
 The default (and recommended) option is 'poll'.
 'rpi_stub_keep_ctrlc' makes rpi_stub to re-enable UART0 interrupts each time
 the execution is returned to the debuggee.
+'rpi_stub_baud=<baudrate>' makes rpi_stub set the UART0 baudrate to <baudrate>
+It uses the UART clock from the GPU and the <baudrate> parameter to calculate the
+ibrd and fbrd for UART0. The sensibility of the parameters are not checked.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported
@@ -37,6 +40,10 @@ At the moment the main restrictions are:
 - The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
   reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
+
+Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
+The pointer to the string needs to be in r0.
+#0x7ffc sends a null-terminated string and #0x7ffb needs the length to be in r1.
 
 I could list the gdb serial protocol commands that rpi_stub supports,
 but it wouldn't be of much help for a gdb user - the gdb-commands and gdb

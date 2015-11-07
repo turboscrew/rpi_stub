@@ -22,11 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "util.h"
 
 extern void serial_irq(); // this shouldn't be public, so it's not in serial.h
-extern int serial_raw_puts(char *str); // used for debugging - may be removed
-extern void serial_enable_ctrlc(); // used for debugging
+extern int serial_raw_puts(char *str); // used for debugging
+// extern void serial_enable_ctrlc(); // used for debugging
 extern volatile uint32_t gdb_dyn_debug;
 extern char __hivec;
-extern int gdb_send_packet(char *src, int count); // for debugging ('O'-packets)
+extern int gdb_send_packet(char *src, int count); // for debugging
+// for logging via 'O'-packets
+extern void gdb_send_text_packet(char *msg, unsigned int msglen);
 // Another naughty trick - allocates
 // exception_info, exception_extra and rpi2_reg_context
 // This way definitions and extern-declarations don't clash
@@ -98,7 +100,7 @@ typedef struct
 #define MMU_VAL_TTBR0(addr, attr) ((addr & ((~0)<< TBL_OFFSET_BITS)) | attr)
 #define MMU_SECT_ENTRY(addr_meg, attr) ((addr_meg << 20) | attr)
 volatile __attribute__ ((aligned (TBL_ALIGNMENT))) uint32_t master_xlat_tbl[TBL_WORD_SIZE];
-extern void gdb_trap_handler(); // TODO: make callback?
+extern void gdb_trap_handler();
 extern uint32_t jumptbl;
 uint32_t dbg_reg_base;
 uint32_t dbg_rom_base;
@@ -910,6 +912,27 @@ static inline void check_irq_stack()
 }
 #endif
 
+void rpi2_gdb_log(char *ptr, uint32_t size, uint32_t fun)
+{
+	int len;
+	char scratch[9];
+	len = size;
+	if (fun == RPI2_TRAP_LOGZ)
+	{
+		len = util_str_len(ptr);
+	}
+#if 0
+	util_word_to_hex(scratch, fun);
+	serial_raw_puts("\r\nlog: fun= ");
+	serial_raw_puts(scratch);
+	util_word_to_hex(scratch, len);
+	serial_raw_puts(" len= ");
+	serial_raw_puts(scratch);
+	serial_raw_puts("\r\n");
+#endif
+	gdb_send_text_packet(ptr, (unsigned int) len);
+}
+
 // common trap handler outside exception handlers
 void rpi2_trap_handler()
 {
@@ -1646,7 +1669,7 @@ void rpi2_dabt_handler()
 #ifdef DEBUG_CTRLC
 #define SER_DEBUG
 #endif
-extern volatile int ser_handle_ctrlc;
+//extern volatile int ser_handle_ctrlc; // used for debugging
 
 // returns code for what to do after return
 uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
@@ -2328,6 +2351,8 @@ void rpi2_pabt_handler()
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
 			"push {r0 - r12}\n\t"
+			"mov r5, r0 @ possible parameters\n\t"
+			"mov r6, r1\n\t"
 			"mrs r0, cpsr\n\t"
 			"dsb\n\t"
 			"push {r0, r1, lr} @ to keep stack 8-byte aligned\n\t"
@@ -2354,6 +2379,16 @@ void rpi2_pabt_handler()
 			"cmp r1, r0\n\t"
 			"moveq r3, #1 @ RPI2_TRAP_ARM\n\t"
 			"beq 2f @ our bkpt\n\t"
+			"movw r0, #0xff7c @ logging bkpt\n\t"
+			"movt r0, #0xe127\n\t"
+			"cmp r1, r0\n\t"
+			"moveq r3, #13 @ RPI2_TRAP_LOGZ\n\t"
+			"beq bkpt_log @ our bkpt\n\t"
+			"movw r0, #0xff7b @ logging bkpt\n\t"
+			"movt r0, #0xe127\n\t"
+			"cmp r1, r0\n\t"
+			"moveq r3, #14 @ RPI2_TRAP_LOGN\n\t"
+			"beq bkpt_log @ our bkpt\n\t"
 			"movw r0, #0xff7d @ internal bkpt\n\t"
 			"movt r0, #0xe127\n\t"
 			"cmp r1, r0\n\t"
@@ -2429,7 +2464,22 @@ void rpi2_pabt_handler()
 #endif
 	asm volatile (
 			"b rpi2_gdb_exception\n\t"
-
+	);
+	asm volatile (
+			"bkpt_log: @ logging\n\t"
+			"mov r0, r5\n\t"
+			"mov r1, r6\n\t"
+			"mov r2, r3\n\t"
+			"bl rpi2_gdb_log\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"ldr sp, pabt_sp_store2\n\t"
+			"subs pc, lr, #0\n\t"
+	);
+	asm volatile (
 			"pabt_sp_store2:\n\t"
 			".int 0\n\t"
 			".ltorg @ literal pool\n\t"
@@ -2630,6 +2680,41 @@ void rpi2_check_debug()
 
 	/* remember to check the lock: DBGLSR, DBGLAR */
 
+}
+
+unsigned int rpi2_get_clock(unsigned int clock_id)
+{
+	int i;
+	uint32_t request, response;
+	request_response_t *arm_clk_req = (request_response_t *)rpi2_mbox_buff;
+	arm_clk_req->buff_size = 8*4;
+	arm_clk_req->req_resp_code = 0;
+	arm_clk_req->tag = 0x00030002; // get clock rate
+	arm_clk_req->tag_buff_len = 2*4;
+	arm_clk_req->tag_msg_len = 4;
+	for (i=0; i<256; i++) arm_clk_req->tag_buff.word_buff[i] = 0;
+	arm_clk_req->tag_buff.word_buff[0] = clock_id;
+	arm_clk_req->end_tag = 0;
+
+	request = (uint32_t)(arm_clk_req);
+	request &= ((~0) << 4);
+	request |= 8; // channel for property tags
+
+	SYNC;
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	*((volatile uint32_t *)MBOX1_WRITE) = request;
+	do {
+		SYNC;
+		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		response = *((volatile uint32_t *)MBOX0_READ);
+	} while ((response & 0xf) != 8);
+
+	// base address = arm_mem_req->tag_buff.word_buff[0];
+	// size in bytes = arm_mem_req->tag_buff.word_buff[1];
+	if (arm_clk_req->tag_buff.word_buff[0] == clock_id)
+		return (arm_clk_req->tag_buff.word_buff[1]);
+	else
+		return 0; // error
 }
 
 unsigned int rpi2_get_arm_ram(unsigned int *start)
@@ -2945,7 +3030,7 @@ void rpi2_init()
 	rpi2_debuggee_running = 0;
 	gdb_dyn_debug = 0;
 	rpi2_arm_ramsize = rpi2_get_arm_ram(&rpi2_arm_ramstart);
-	// TODO: add set-up for UART0 handling by FIQ
+	rpi2_uart_clock = rpi2_get_clock(CLOCK_UART);
 
 #if 0
 	serial_enable_ctrlc();

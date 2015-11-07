@@ -876,10 +876,21 @@ void gdb_response_not_supported()
 	//gdb_iodev->put_string("$#00", 5);
 }
 
+void gdb_send_text_packet(char *msg, unsigned int msglen)
+{
+	int len;
+
+	*gdb_tmp_packet = 'O';
+	len = 1;
+	len += gdb_write_hex_data((uint8_t *)msg, (int)msglen, (char *)(gdb_tmp_packet + 1),
+					 GDB_MAX_MSG_LEN - 6); // -5 to allow message overhead
+
+	gdb_send_packet((char *)gdb_tmp_packet, len);
+}
+
 /*
  * gdb_commands
  */
-
 
 // answer to query '?'
 void gdb_resp_target_halted(int reason)
@@ -2195,8 +2206,30 @@ void gdb_monitor(int reason)
 				break;
 			case 'Z':	// add Z0-breakpoint +
 				// Z1 - Z4 = HW breakpoints/watchpoints
+#if 0
+				switch (*(++inpkg))
+				{
+				case '0': // SW breakpoint
+					packet_len--;
+					gdb_cmd_add_breakpoint(++inpkg, --packet_len);
+					break;
+				case '1': // HW breakpoint
+					gdb_response_not_supported();
+					break;
+				case '2':
+				case '3':
+				case '4':
+					packet_len--;
+					gdb_cmd_add_watchpoint(inpkg, packet_len);
+					break;
+				default:
+					gdb_response_not_supported();
+					break;
+				}
+#endif
 				if (*(++inpkg) == '0') // if Z0
 				{
+					packet_len--;
 					gdb_cmd_add_breakpoint(++inpkg, --packet_len);
 				}
 				else // Z1 - Z4 not supported
@@ -2206,8 +2239,30 @@ void gdb_monitor(int reason)
 				break;
 			case 'z':	// remove Z0-breakpoint +
 				// z1 - z4 = HW breakpoints/watchpoints
+#if 0
+				switch (*(++inpkg))
+				{
+				case '0': // SW breakpoint
+					packet_len--;
+					gdb_cmd_delete_breakpoint(++inpkg, --packet_len);
+					break;
+				case '1': // HW breakpoint
+					gdb_response_not_supported();
+					break;
+				case '2':
+				case '3':
+				case '4':
+					packet_len--;
+					gdb_cmd_del_watchpoint(inpkg, packet_len);
+					break;
+				default:
+					gdb_response_not_supported();
+					break;
+				}
+#endif
 				if (*(++inpkg) == '0') // if z0
 				{
+					packet_len--;
 					gdb_cmd_delete_breakpoint(++inpkg, --packet_len);
 				}
 				else // z1 - z4 not supported
@@ -2225,6 +2280,8 @@ void gdb_monitor(int reason)
 	// enable CTRL-C
 	gdb_iodev->enable_ctrlc(); // enable
 
+	//ch = "\r\nLeaving GDB-monitor\r\n";
+	//gdb_send_text_packet(ch, util_str_len(ch));
 #ifdef DEBUG_GDB
 	msg = "\r\ngdb_monitor returns\r\n";
 	gdb_iodev->put_string(msg, util_str_len(msg)+1);

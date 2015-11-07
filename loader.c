@@ -104,8 +104,16 @@ void loader_main()
 	serial_io.put_string(msg, util_str_len(msg));
 	util_word_to_hex(scratchpad, rpi2_keep_ctrlc);
 	serial_io.put_string(scratchpad, 9);
-	serial_io.put_string("\r\n", 3);
+	msg = "\r\nrpi2_uart0_baud ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_uart0_baud);
+	serial_io.put_string(scratchpad, 9);
+	msg = " rpi2_uart_clock ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_uart_clock);
+	serial_io.put_string(scratchpad, 9);
 	
+	serial_io.put_string("\r\n", 3);
 	//serial_io.put_string(cmdline, 1024);
 	//serial_io.put_string("\r\n", 3);
 #endif
@@ -260,6 +268,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	(void) r2;
 	
 	int i;
+	int tmp;
 		
 #if 0
 	int i;
@@ -272,8 +281,9 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_uart0_excmode = RPI2_UART0_POLL; // default
 	rpi2_use_mmu = 0; // default - no mmu
 	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
+	rpi2_uart0_baud = 115200;
 	rpi2_get_cmdline(cmdline);
-#if 1
+	
 	for (i=0; i< 1024; i++)
 	{
 		if (cmdline[i] == 'r')
@@ -317,16 +327,16 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 					i += util_str_len("keep_ctrlc");
 					rpi2_keep_ctrlc = 1;
 				}
-#if 0
 				else if (util_cmp_substr("baud=", cmdline + i) >= util_str_len("baud="))
 				{
+					// rpi_stub_baud=115200
 					i += util_str_len("baud=");
 					// get baud for serial
+					i += util_read_dec(cmdline + i, &tmp);
+					rpi2_uart0_baud = tmp;
 				}
-#endif
 			}
 		}
 	}
-#endif
 	loader_main();
 }
