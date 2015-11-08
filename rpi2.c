@@ -2557,25 +2557,15 @@ void rpi2_set_exc_reason(unsigned int val)
 	rpi2_exc_reason = (uint32_t)val;
 }
 
-void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int range)
+void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int control)
 {
 	//  96-111 0x180-0x1BC DBGWVRm 4 watchpoint values
 	// 112-127 0x1C0-0x1FC DBGWCRm 4 watchpoint controls
-	// for now, num is always 0, and no range
-	// if range = 2 words, BAS = 0xff
-	// if range is > 8 bytes (2**n), BAS = 0xff, MASK = n-1
 	uint32_t *pval, *pctrl;
-	uint32_t tmp;
 	pval = (uint32_t *)(dbg_reg_base + 0x180);
 	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
-	*pval = (((uint32_t)addr) & ~(3));
-	tmp = 0 << 24; // MASK
-	tmp |= (1 << 13); // HMC
-	tmp |= (0x0f << 5); // BAS: 4 bytes
-	tmp |= (2 << 3); // LSC 2=store
-	tmp |= (3 << 1); // PAC
-	tmp |= 1; // enable
-	*pctrl = tmp;
+	pval[num] = (uint32_t)addr;
+	pctrl[num] = control;
 }
 
 void rpi2_unset_watchpoint(unsigned int num)
@@ -2585,7 +2575,7 @@ void rpi2_unset_watchpoint(unsigned int num)
 
 	//pval = (uint32_t *)(dbg_reg_base + 0x180);
 	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
-	*pctrl = 0;
+	pctrl[num] = 0;
 }
 
 // for dumping info about debug HW

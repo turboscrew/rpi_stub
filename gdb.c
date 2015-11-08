@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define PANIC 34
 
 #define GDB_MAX_BREAKPOINTS 64
+#define GDB_MAX_WATCHPOINTS 4
 #define GDB_MAX_MSG_LEN 1024
 
 //extern void loader_main();
@@ -68,6 +69,19 @@ typedef struct {
 volatile gdb_trap_rec gdb_usr_breakpoint[GDB_MAX_BREAKPOINTS];
 // number of breakpoints in use
 volatile int gdb_num_bkpts = 0;
+
+// watchpoint
+typedef struct {
+	void *address;
+	uint32_t type;
+	uint32_t size;
+	int valid;	// 1=valid
+} gdb_watch_rec;
+
+// debug breakpoints set by user
+volatile gdb_watch_rec gdb_usr_watchpoint[GDB_MAX_WATCHPOINTS];
+// number of breakpoints in use
+volatile int gdb_num_watchps = 0;
 
 // breakpoint for single-stepping
 volatile gdb_trap_rec gdb_step_bkpt;
@@ -178,6 +192,27 @@ void gdb_clear_breakpoints(int remove_traps)
 	gdb_step_bkpt.trap_address = (void *)0xffffffff;
 	gdb_step_bkpt.valid = 0;
 	gdb_single_stepping = 0;
+}
+
+void gdb_clear_watchpoints(int remove_traps)
+{
+	int i;
+	for(i=0; i<GDB_MAX_WATCHPOINTS; i++)
+	{
+		if (remove_traps)
+		{
+			if (gdb_usr_watchpoint[i].valid)
+			{
+				// remove watchpoint
+				rpi2_unset_watchpoint((unsigned int) i);
+			}
+		}
+		gdb_usr_watchpoint[i].valid = 0;
+		gdb_usr_watchpoint[i].address = (void *)0;
+		gdb_usr_watchpoint[i].size = 0;
+		gdb_usr_watchpoint[i].type = 0;
+	}
+	gdb_num_watchps = 0;
 }
 
 // exception handler
@@ -296,7 +331,6 @@ void gdb_init(io_device *device)
 	gdb_iodev = device;
 	// number of breakpoints in use
 	gdb_num_bkpts = 0;
-
 	gdb_single_stepping = 0; // flag: 0 = currently not single stepping
 	gdb_single_stepping_address = 0xffffffff; // not valid
 	gdb_trap_num = -1; // breakpoint number
@@ -323,6 +357,7 @@ void gdb_reset(int remove_traps)
 	rpi2_set_sigint_flag(0);
 	set_gdb_enabled(1); // enable gdb calls
 	gdb_clear_breakpoints(remove_traps);
+	gdb_clear_watchpoints(remove_traps);
 #ifdef GDB_INVALIDATE_CACHES
 	if (rpi2_use_mmu)
 	{
@@ -428,6 +463,120 @@ int dgb_unset_trap(void *address, int kind)
 		}
 	}
 	return 3; // failure - not found
+}
+
+int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
+{
+	int i, num;
+	uint32_t control;
+	uint32_t value;
+	uint32_t alignment;
+	uint32_t mask;
+	uint32_t bas;
+	uint32_t tmp;
+	char scratch[9];
+
+	if (bytes == 0) return -2; // invalid range
+
+	for(num=0; num<GDB_MAX_WATCHPOINTS; num++)
+	{
+		if (gdb_usr_watchpoint[num].valid == 0)
+		{
+			break;
+		}
+	}
+	if (num >= GDB_MAX_WATCHPOINTS) return -1; // full
+
+	gdb_usr_watchpoint[i].type = type;
+	gdb_usr_watchpoint[i].size = bytes;
+	gdb_usr_watchpoint[i].address = (void *)addr;
+
+	if (bytes <= 4)
+	{
+		value = addr & (~3); // word aligned address
+		alignment = addr & 3;	// first byte in word
+		bas = 0;
+		for (i=0; i<bytes; i++)
+		{
+			bas |= (1 << (alignment + i));
+		}
+		mask = 0;
+	}
+	else
+	{
+		// check alignment
+		alignment = 0;
+		tmp = bytes;
+		while (tmp >>= 1)
+		{
+			alignment++;
+		}
+		if (alignment > 31) return -2; // invalid range
+		if (alignment < 3) return -2; // invalid range
+
+		if (bytes & (~(1 << alignment)))
+		{
+			return -2; // illegal range, must be 2^n bytes
+		}
+#if 1
+		if (addr & ((1 << alignment) -1 )) return -3; // address not aligned with range
+#else
+		// make base alignment consistent with the range
+		value = addr & (~((1<<high) - 1)); // mask off lower bits
+#endif
+		mask = alignment - 1;
+		bas = 0xff; // must be if mask is used
+	}
+	control = mask << 24; // MASK
+	control |= (1 << 13); // HMC
+	control |= (bas << 5); // BAS: 4 bytes
+	control |= (type << 3);
+	control |= (3 << 1); // PAC
+	control |= 1; // enable
+
+	gdb_iodev->put_string("\r\nwatch num= ", 14);
+	util_word_to_hex(scratch, num);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" val= ", 4);
+	util_word_to_hex(scratch, value);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" ctrl= ", 4);
+	util_word_to_hex(scratch, control);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string("\r\n", 3);
+
+	rpi2_set_watchpoint((unsigned int) num, (unsigned int) value,
+			(unsigned int) control);
+	gdb_usr_watchpoint[num].valid = 1;
+	gdb_num_watchps++;
+	return num;
+}
+
+int dgb_del_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
+{
+	int i;
+
+	for(i=0; i<GDB_MAX_WATCHPOINTS; i++)
+	{
+		if (gdb_usr_watchpoint[i].valid)
+		{
+			if (gdb_usr_watchpoint[i].address == (void *) addr)
+			{
+				if (gdb_usr_watchpoint[i].size == bytes)
+				{
+					if (gdb_usr_watchpoint[i].type == type)
+					{
+						// delete watchpoint
+						rpi2_unset_watchpoint((unsigned int) i);
+						gdb_usr_watchpoint[i].valid = 0;
+						gdb_num_watchps--;
+						return i;
+					}
+				}
+			}
+		}
+	}
+	return -1; // not found
 }
 
 void gdb_resume()
@@ -893,6 +1042,7 @@ void gdb_send_text_packet(char *msg, unsigned int msglen)
  */
 
 // answer to query '?'
+// signal numbers from gdb_7.9.0/binutils-gdb/include/gdb/signals.def
 void gdb_resp_target_halted(int reason)
 {
 	int len;
@@ -902,6 +1052,7 @@ void gdb_resp_target_halted(int reason)
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
 	unsigned int tmp;
+	char *text;
 #ifdef DEBUG_GDB
 	char *msg;
 #endif
@@ -942,9 +1093,11 @@ void gdb_resp_target_halted(int reason)
 		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
-	case SIG_BUS: // pabt
-		// T07 - pabt response
-		len = util_str_copy(resp_buff, "T07", resp_buff_len);
+	case SIG_BUS: // pabt - BUS
+		// T10 - pabt response
+		text = "Prefetch Abort";
+		gdb_send_text_packet(text, util_str_len(text));
+		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
@@ -952,8 +1105,10 @@ void gdb_resp_target_halted(int reason)
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_SEGV: // dabt
-		// T011 - dabt response
-		len = util_str_copy(resp_buff, "T11", resp_buff_len);
+		// T10 - dabt response - BUS (could be 7: EMT)
+		text = "Data Abort";
+		gdb_send_text_packet(text, util_str_len(text));
+		len = util_str_copy(resp_buff, "T10", resp_buff_len);
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
@@ -962,15 +1117,19 @@ void gdb_resp_target_halted(int reason)
 		break;
 	case SIG_USR1: // unhandled HW interrupt - no defined response
 		// send 'OUnhandled HW interrupt'
+		text = "Unhandled HW interrupt";
+		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T10", resp_buff_len);
+		len = util_str_copy(resp_buff, "T30", resp_buff_len);
 		break;
 	case SIG_USR2: // unhandled SW interrupt - no defined response
 		// send 'OUnhandled SW interrupt'
+		text = "Unhandled SW interrupt";
+		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T12", resp_buff_len);
+		len = util_str_copy(resp_buff, "T31", resp_buff_len);
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
 		// send 'Ogdb stub started'
@@ -988,11 +1147,13 @@ void gdb_resp_target_halted(int reason)
 		// gdb_monitor_running = 0; // TODO: check
 		break;
 	default:
+		// T17 - STOP
 		// send 'Ounknown event'
+		text = "Unknown event";
+		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnknown event", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T10", resp_buff_len);
-		return; // don't send anything more
+		len = util_str_copy(resp_buff, "T17", resp_buff_len);
 		break;
 	}
 	// send response
@@ -1739,6 +1900,104 @@ void gdb_cmd_special(volatile uint8_t *gdb_in_packet, int packet_len)
 }
 
 // Z1 - Z4 = HW breakpoints/watchpoints
+
+void gdb_cmd_add_watchpoint(volatile uint8_t *gdb_in_packet, int packet_len)
+{
+	int len;
+	int result;
+	uint32_t addr;
+	uint32_t bytes;
+	uint32_t type;
+	uint8_t tmp;
+	char *okresp = "OK";
+	const int scratch_len = 16;
+	char scratchpad[scratch_len]; // scratchpad
+
+	switch (*gdb_in_packet)
+	{
+	case '2': // write
+		type = 2;
+		break;
+	case '3': // read
+		type = 1;
+		break;
+	case '4': // read-write
+		type = 3;
+		break;
+	default:
+		return;
+		break;
+	}
+	gdb_in_packet += 2; // skip number and ','
+	packet_len -= 2;
+	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
+	gdb_in_packet += len+1; // skip address and delimiter
+	addr = util_hex_to_word(scratchpad);
+	bytes = util_hex_to_word((char *)gdb_in_packet);
+
+	result = dgb_add_watchpoint(type, addr, bytes);
+	if (result < 0)
+	{
+		tmp = (uint8_t)(-result);
+		scratchpad[0] = 'E';
+		util_byte_to_hex(scratchpad + 1, (unsigned char) tmp);
+		gdb_send_packet(scratchpad, util_str_len(scratchpad));
+	}
+	else
+	{
+		gdb_send_packet(okresp, util_str_len(okresp));
+	}
+}
+
+void gdb_cmd_del_watchpoint(volatile uint8_t *gdb_in_packet, int packet_len)
+{
+	int len;
+	int result;
+	uint32_t addr;
+	uint32_t bytes;
+	uint32_t type;
+	uint8_t tmp;
+	char *okresp = "OK";
+	const int scratch_len = 16;
+	char scratchpad[scratch_len]; // scratchpad
+
+	switch (*gdb_in_packet)
+	{
+	case '2': // write
+		type = 2;
+		break;
+	case '3': // read
+		type = 1;
+		break;
+	case '4': // read-write
+		type = 3;
+		break;
+	default:
+		return;
+		break;
+	}
+	gdb_in_packet += 2; // skip number and ','
+	packet_len -= 2;
+	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
+	gdb_in_packet += len+1; // skip address and delimiter
+	addr = util_hex_to_word(scratchpad);
+	bytes = util_hex_to_word((char *)gdb_in_packet);
+
+	result = dgb_del_watchpoint(type, addr, bytes);
+	if (result < 0)
+	{
+		tmp = (uint8_t)(-result);
+		scratchpad[0] = 'E';
+		util_byte_to_hex(scratchpad + 1, (unsigned char) tmp);
+		gdb_send_packet(scratchpad, util_str_len(scratchpad));
+	}
+	else
+	{
+		gdb_send_packet(okresp, util_str_len(okresp));
+	}
+
+}
+
 // These breakpoint kinds are defined for the Z0 and Z1 packets.
 // 2 16-bit Thumb mode breakpoint
 // 3 32-bit Thumb mode (Thumb-2) breakpoint
@@ -1758,7 +2017,7 @@ void gdb_cmd_add_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 	gdb_in_packet += len+1; // skip address and delimiter
 	addr = util_hex_to_word(scratchpad);
-	kind = util_hex_to_word((char *)gdb_in_packet); // does this work?
+	kind = util_hex_to_word((char *)gdb_in_packet);
 	//rpi2_unset_watchpoint(0);
 	if (kind == 2) // 16-bit THUMB
 	{
@@ -1805,7 +2064,7 @@ void gdb_cmd_delete_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	len = util_cpy_substr(scratchpad, (char *)gdb_in_packet, ',', scratch_len);
 	gdb_in_packet += len+1; // skip address and delimiter
 	addr = util_hex_to_word(scratchpad);
-	kind = util_hex_to_word((char *)gdb_in_packet); // does this work?
+	kind = util_hex_to_word((char *)gdb_in_packet);
 	//rpi2_unset_watchpoint(0);
 	if (kind == 2) // 16-bit THUMB
 	{
@@ -2206,7 +2465,7 @@ void gdb_monitor(int reason)
 				break;
 			case 'Z':	// add Z0-breakpoint +
 				// Z1 - Z4 = HW breakpoints/watchpoints
-#if 0
+#if 1
 				switch (*(++inpkg))
 				{
 				case '0': // SW breakpoint
@@ -2226,7 +2485,7 @@ void gdb_monitor(int reason)
 					gdb_response_not_supported();
 					break;
 				}
-#endif
+#else
 				if (*(++inpkg) == '0') // if Z0
 				{
 					packet_len--;
@@ -2236,10 +2495,11 @@ void gdb_monitor(int reason)
 				{
 					gdb_response_not_supported();
 				}
+#endif
 				break;
 			case 'z':	// remove Z0-breakpoint +
 				// z1 - z4 = HW breakpoints/watchpoints
-#if 0
+#if 1
 				switch (*(++inpkg))
 				{
 				case '0': // SW breakpoint
@@ -2259,7 +2519,7 @@ void gdb_monitor(int reason)
 					gdb_response_not_supported();
 					break;
 				}
-#endif
+#else
 				if (*(++inpkg) == '0') // if z0
 				{
 					packet_len--;
@@ -2269,6 +2529,7 @@ void gdb_monitor(int reason)
 				{
 					gdb_response_not_supported();
 				}
+#endif
 				break;
 			default:
 				gdb_response_not_supported();
