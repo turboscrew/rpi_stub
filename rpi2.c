@@ -26,7 +26,6 @@ extern int serial_raw_puts(char *str); // used for debugging
 // extern void serial_enable_ctrlc(); // used for debugging
 extern volatile uint32_t gdb_dyn_debug;
 extern char __hivec;
-extern int gdb_send_packet(char *src, int count); // for debugging
 // for logging via 'O'-packets
 extern void gdb_send_text_packet(char *msg, unsigned int msglen);
 // Another naughty trick - allocates
@@ -143,7 +142,7 @@ void rpi2_reset_handler() __attribute__ ((naked));
 void rpi2_undef_handler() __attribute__ ((naked));
 void rpi2_svc_handler() __attribute__ ((naked));
 void rpi2_aux_handler() __attribute__ ((naked));
-void rpi2_dabt_handler() __attribute__ ((naked));
+void rpi2_unhandled_dabt() __attribute__ ((naked));
 void rpi2_irq_handler() __attribute__ ((naked));
 void rpi2_fiq_handler() __attribute__ ((naked));
 void rpi2_pabt_handler() __attribute__ ((naked));
@@ -283,7 +282,7 @@ void rpi2_set_lower_vectable()
 			".word rpi2_undef_handler\n\t"
 			".word rpi2_svc_handler\n\t"
 			".word rpi2_unhandled_pabt\n\t"
-			".word rpi2_dabt_handler\n\t"
+			".word rpi2_unhandled_dabt\n\t"
 			".word rpi2_aux_handler @ used in some cases\n\t "
 			".word rpi2_unhandled_irq\n\t"
 			".word rpi2_unhandled_fiq\n\t"
@@ -332,7 +331,7 @@ void rpi2_set_upper_vectable()
 			".word rpi2_reroute_exc_und\n\t"
 			".word rpi2_reroute_exc_svc\n\t"
 			".word rpi2_pabt_handler\n\t"
-			".word rpi2_reroute_exc_dabt\n\t"
+			".word rpi2_dabt_handler\n\t"
 			".word rpi2_reroute_exc_aux @ in some cases\n\t "
 			".word rpi2_irq_handler\n\t"
 			".word rpi2_reroute_exc_fiq\n\t"
@@ -795,12 +794,6 @@ void rpi2_timer_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
-	// for fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	//rpi2_reg_context.reg.r15 -= 4; // PC (already done in assembly)
-
 	p = "\r\nTIMER EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
 
@@ -828,7 +821,7 @@ void naked_debug_2(uint32_t src, uint32_t link, uint32_t stack)
 
 	if (rpi2_debuggee_running)
 	{
-#if 0
+
 		serial_raw_puts("\r\nnak_dbg");
 		serial_raw_puts("\r\nPC: ");
 		util_word_to_hex(tmp, src);
@@ -840,23 +833,6 @@ void naked_debug_2(uint32_t src, uint32_t link, uint32_t stack)
 		util_word_to_hex(tmp, stack);
 		serial_raw_puts(tmp);
 		serial_raw_puts("\r\n");
-#else
-		// \175\055\175\052 is \r\n escaped
-		util_str_copy(dbg_msg_buff, "O", DBG_MSG_SZ);
-		len = util_append_str(dbg_msg_buff, "\175\055\175\052nak_dbg", DBG_MSG_SZ);
-		len = util_append_str(dbg_msg_buff, "\175\055\175\052PC: ", DBG_MSG_SZ);
-		util_word_to_hex(tmp, src);
-		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
-		len = util_append_str(dbg_msg_buff, " LR: ", DBG_MSG_SZ);
-		util_word_to_hex(tmp, link);
-		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
-		len = util_append_str(dbg_msg_buff, " SP: ", DBG_MSG_SZ);
-		util_word_to_hex(tmp, stack);
-		len = util_append_str(dbg_msg_buff, tmp, DBG_MSG_SZ);
-		len = util_append_str(dbg_msg_buff, "\175\055\175\052", DBG_MSG_SZ);
-
-		gdb_send_packet(dbg_msg_buff, len);
-#endif
 	}
 }
 
@@ -912,10 +888,13 @@ static inline void check_irq_stack()
 }
 #endif
 
+// for through-gdb logging
 void rpi2_gdb_log(char *ptr, uint32_t size, uint32_t fun)
 {
 	int len;
+#if 0
 	char scratch[9];
+#endif
 	len = size;
 	if (fun == RPI2_TRAP_LOGZ)
 	{
@@ -1023,17 +1002,17 @@ void rpi2_reroute_exc_fiq()
 
 
 
-// The exception handlers
-// The exception handlers are split in two parts: the primary and secondary
-// The primaries are attributed as 'naked'so that C function prologue
+// The exception handlers are attributed as 'naked'so that C function prologue
 // doesn't disturb the stack before the exception stack frame is pushed
 // into the stack, because the prologue would change the register values, and
 // we would return from exception before we get to the C function epilogue,
 // and we'd return with unbalanced stack.
 // Naked functions shouldn't have any C-code in them.
-//
-// The secondary handlers are mainly used for debugging, except for PABT
-// where the secondary handler does things for entering the debugger.
+
+// There are two exception handlers per exception: the upper vector handlers
+// and the (emulated) lower vector handlers. Some upper vector handlers just
+// jump to the lower vector, and if the vector is not overwritten by debuggee,
+// the vector contains a jump to unhandled exception handler.
 
 // upper level handler for gdb entry
 void gdb_exception_handler()
@@ -1154,6 +1133,7 @@ void gdb_exception_handler()
 	}
 }
 
+// for debugging
 void show_go(uint32_t retaddr)
 {
 	uint32_t xspsr;
@@ -1202,6 +1182,19 @@ void rpi2_gdb_exception()
 			"bl show_go\n\t"
 			"pop {r0 - r4, lr}\n\t"
 #endif
+			"push {r0, r1}\n\t"
+			"ldr r0, =rpi2_use_debug_mode\n\t"
+			"ldr r1, [r0]\n\t"
+			"cmp r1, #0\n\t"
+			"beq 2f\n\t"
+			"mrc p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"orr r0, #0x8000 @ MDBGen\n\t"
+			"mcr p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"2: \n\t"
+			"pop {r0, r1}\n\t"
 			"subs pc, lr, #0\n\t"
 	);
 }
@@ -1557,10 +1550,12 @@ void rpi2_aux_handler()
 void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
-	uint32_t dfsr, dfar;
+	uint32_t dfsr, dfar, dbgdscr;
+
 	static char scratchpad[16];
 	int i;
 	char *p;
+
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -1568,18 +1563,14 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			:[var_reg] "=r" (exc_cpsr) ::
 	);
 
-	// fix for the exception return address
-	// see ARM DDI 0406C.c, ARMv7-A/R ARM issue C p. B1-1173
-	// Table B1-7 Offsets applied to Link value for exceptions taken to PL1 modes
-	// UNDEF: 4, SVC: 0, PABT: 4, DABT: 8, IRQ: 4, FIQ: 4
-	// rpi2_reg_context.reg.r15 -= 8; // done in the primary handler
-
 	// TODO: add DFSR.FS, DFAR
 	// MRC p15, 0, <Rt>, c5, c0, 0 ; Read DFSR into Rt
 	// MRC p15, 0, <Rt>, c6, c0, 0 ; Read DFAR into Rt
 	// LR = faulting instruction address
 	asm volatile ("mrc p15, 0, %0, c5, c0, 0\n\t" : "=r" (dfsr) ::);
 	asm volatile ("mrc p15, 0, %0, c6, c0, 0\n\t" : "=r" (dfar) ::);
+	asm volatile ("mrc p14, 0, %0, c0, c2, 2\n\t" : "=r" (dbgdscr) ::);
+
 	p = "\r\nDABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(p); p += i;} while (i);
 
@@ -1595,12 +1586,15 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(" DFAR: ");
 	util_word_to_hex(scratchpad, dfar);
 	serial_raw_puts(scratchpad);
+	serial_raw_puts(" DBGDSCR: ");
+	util_word_to_hex(scratchpad, dbgdscr);
+	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context(&rpi2_dabt_context);
 }
 #endif
 
-void rpi2_dabt_handler()
+void rpi2_unhandled_dabt()
 {
 #ifdef DEBUG_EXCEPTIONS
 	naked_debug();
@@ -1658,6 +1652,123 @@ void rpi2_dabt_handler()
 			"mov pc, r0\n\t"
 
 			"dabt_sp_store: @ close enough for simple pc relative\n\t"
+			".int 0\n\t"
+			".ltorg @ literal pool\n\t"
+	);
+}
+
+void rpi2_dabt_handler()
+{
+#ifdef DEBUG_EXCEPTIONS
+	naked_debug();
+#endif
+	asm volatile (
+			"str sp, dabt_sp_store2\n\t"
+			"dsb\n\t"
+			"movw sp, #:lower16:__abrt_stack\n\t"
+			"movt sp, #:upper16:__abrt_stack\n\t"
+			"dsb\n\t"
+			"push {r0 - r12}\n\t"
+			"mrs r0, cpsr\n\t"
+			"dsb\n\t"
+			"push {r0, r1, lr} @ to keep stack 8-byte aligned\n\t"
+
+			"@ turn off debug monitor mode\n\t"
+			"mrc p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"bic r0, #0x8000 @ MDBGen\n\t"
+			"mcr p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+
+			"@ check the exception cause\n\t"
+			"mrc p15, 0, r0, c6, c0, 0 @ DFAR\n\t"
+			"dsb\n\t"
+			"ldr r1, =rpi2_dbg_rec\n\t"
+			"str r0, [r1]\n\t"
+			"str lr, [r1, #0xc]\n\t"
+			"mrc p15, 0, r0, c5, c0, 0 @ DFSR\n\t"
+			"dsb\n\t"
+			"ldr r1, =rpi2_dbg_rec\n\t"
+			"str r0, [r1, #4]\n\t"
+			"ands r1, r0, #0x400 @ bit 10\n\t"
+			"bne dabt_other\n\t"
+			"and r0, #0x0f\n\t"
+			"cmp r0, #0x2 @ debug event\n\t"
+			"bne dabt_other\n\t"
+			"mrc p14, 0, r0, c0, c2, 2 @ read dbgdscr\n\t"
+			"dsb\n\t"
+			"ldr r1, =rpi2_dbg_rec\n\t"
+			"str r0, [r1, #8]\n\t"
+			"lsr r0, #2 @ MOE-field\n\t"
+			"and r0, #0xf\n\t"
+			"cmp r0, #0xa @ synch watchpoint?\n\t"
+			"bne dabt_other\n\t"
+
+			"@ watchpoint\n\t"
+			"mov r3, #6 @ RPI2_TRAP_WATCH\n\t"
+			"ldr r0, =exception_extra\n\t"
+			"str r3, [r0]\n\t"
+			"ldr r0, =exception_info\n\t"
+			"mov r1, #4 @ RPI2_EXC_DABT\n\t"
+			"str r1, [r0]\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"sub lr, #8 @ fix lr - gdb doesn't do it\n\t"
+			"pop {r0 - r12}\n\t"
+);
+
+	asm volatile (
+			"push {r12} @ popped in write_context\n\t"
+			"ldr r12, =rpi2_dabt_context\n\t"
+	);
+	// store processor context
+	write_context();
+
+	asm volatile (
+			"@ fix sp in the context, if needed\n\t"
+			"mrs r0, spsr @ interrupted mode\n\t"
+			"mrs r2, cpsr @ our mode\n\t"
+			"dsb\n\t"
+			"mov r1, #0xf @ all valid modes have bit 4 set\n\t"
+			"and r0, r1\n\t"
+			"and r2, r1\n\t"
+			"@ our own mode?\n\t"
+			"cmp r0, r2\n\t"
+			"bne 1f @ not our own mode, no fix needed\n\t"
+
+			"@ our mode\n\t"
+			"ldr r0, dabt_sp_store2\n\t"
+			"ldr r1, =rpi2_dabt_context\n\t"
+			"str r0, [r1, #13*4]\n\t"
+
+			"1:\n\t"
+	);
+#ifdef DEBUG_PDBT
+	// rpi2_dabt_handler2() // - No C in naked function
+	asm volatile (
+			"ldr r0, dabt_sp_store2\n\t"
+			"mov r1, lr\n\t"
+			"bl rpi2_dabt_handler2\n\t"
+	);
+#endif
+	asm volatile (
+			"b rpi2_gdb_exception\n\t"
+	);
+	asm volatile (
+			"dabt_other: @ not ours - re-route\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"ldr sp, dabt_sp_store2\n\t"
+			"mov pc, #16 @ low DABT vector address\n\t"
+	);
+	asm volatile (
+			"dabt_sp_store2:\n\t"
 			".int 0\n\t"
 			".ltorg @ literal pool\n\t"
 	);
@@ -2052,7 +2163,7 @@ write_context();
 	);
 }
 
-
+// for debugging
 void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
 {
 	uint32_t xpc;
@@ -2357,6 +2468,15 @@ void rpi2_pabt_handler()
 			"dsb\n\t"
 			"push {r0, r1, lr} @ to keep stack 8-byte aligned\n\t"
 
+			"@ turn off debug monitor mode\n\t"
+			"mrc p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"bic r0, #0x8000 @ MDBGen\n\t"
+			"mcr p14, 0, r0, c0, c2, 2 @ dbgdscr_ext\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+
+			"@ check the cause of exception\n\t"
 			"mrc p15, 0, r0, c5, c0, 1 @ IFSR\n\t"
 			"dsb\n\t"
 			"ands r1, r0, #0x400 @ bit 10\n\t"
@@ -2559,30 +2679,132 @@ void rpi2_set_exc_reason(unsigned int val)
 
 void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int control)
 {
+	uint32_t dbgdscr;
+	SYNC;
+
+	volatile uint32_t *pval;
+	pval = (volatile uint32_t *)(dbg_reg_base + 0x088);
+
+#if 1
+	// set debug monitor mode
+	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (dbgdscr) ::);
+	dbgdscr |= (1 << 15); // MDBGen
+	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (dbgdscr) :);
+	SYNC;
+#endif
+
+#if 0
+	// if memory-mapped interface works
 	//  96-111 0x180-0x1BC DBGWVRm 4 watchpoint values
 	// 112-127 0x1C0-0x1FC DBGWCRm 4 watchpoint controls
 	uint32_t *pval, *pctrl;
-	pval = (uint32_t *)(dbg_reg_base + 0x180);
-	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
+	pval = (volatile uint32_t *)(dbg_reg_base + 0x180);
+	pctrl = (volatile uint32_t *)(dbg_reg_base + 0x1c0);
 	pval[num] = (uint32_t)addr;
 	pctrl[num] = control;
+#else
+	// have to use cp14
+	switch (num)
+	{
+	case 0:
+		// write to DBGWVR0
+		asm volatile ("mcr p14, 0, %[val], c0, c0, 6\n\t" ::[val] "r" (addr) :);
+		// write to DBGWCR0
+		asm volatile ("mcr p14, 0, %[ctl], c0, c0, 7\n\t" ::[ctl] "r" (control) :);
+		break;
+	case 1:
+		// write to DBGWVR1
+		asm volatile ("mcr p14, 0, %[val], c0, c1, 6\n\t" ::[val] "r" (addr) :);
+		// write to DBGWCR1
+		asm volatile ("mcr p14, 0, %[ctl], c0, c1, 7\n\t" ::[ctl] "r" (control) :);
+		break;
+	case 2:
+		// write to DBGWVR2
+		asm volatile ("mcr p14, 0, %[val], c0, c2, 6\n\t" ::[val] "r" (addr) :);
+		// write to DBGWCR2
+		asm volatile ("mcr p14, 0, %[ctl], c0, c2, 7\n\t" ::[ctl] "r" (control) :);
+		break;
+	case 3:
+		// write to DBGWVR3
+		asm volatile ("mcr p14, 0, %[val], c0, c3, 6\n\t" ::[val] "r" (addr) :);
+		// write to DBGWCR3
+		asm volatile ("mcr p14, 0, %[ctl], c0, c3, 7\n\t" ::[ctl] "r" (control) :);
+		break;
+	default:
+		// do nothing;
+		break;
+	}
+#endif
+	SYNC;
+
+#if 1
+	// unset debug monitor mode
+	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (dbgdscr) ::);
+	dbgdscr |= ~(1 << 15); // MDBGen
+	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (dbgdscr) :);
+	SYNC;
+#endif
 }
 
 void rpi2_unset_watchpoint(unsigned int num)
 {
-	// only watchpoint 0 is used for now
+	uint32_t dbgdscr;
+	SYNC;
+#if 1
+	// set debug monitor mode
+	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (dbgdscr) ::);
+	dbgdscr |= (1 << 15); // MDBGen
+	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (dbgdscr) :);
+	SYNC;
+#endif
+
+#if 0
+	// if memory-mapped interface works
 	uint32_t *pval, *pctrl;
 
 	//pval = (uint32_t *)(dbg_reg_base + 0x180);
 	pctrl = (uint32_t *)(dbg_reg_base + 0x1c0);
 	pctrl[num] = 0;
+#else
+	switch (num)
+	{
+	case 0:
+		// write to DBGWCR0
+		asm volatile ("mcr p14, 0, %[ctl], c0, c0, 7\n\t" ::[ctl] "r" (0) :);
+		break;
+	case 1:
+		// write to DBGWCR1
+		asm volatile ("mcr p14, 0, %[ctl], c0, c1, 7\n\t" ::[ctl] "r" (0) :);
+		break;
+	case 2:
+		// write to DBGWCR2
+		asm volatile ("mcr p14, 0, %[ctl], c0, c2, 7\n\t" ::[ctl] "r" (0) :);
+		break;
+	case 3:
+		// write to DBGWCR3
+		asm volatile ("mcr p14, 0, %[ctl], c0, c3, 7\n\t" ::[ctl] "r" (0) :);
+		break;
+	default:
+		// do nothing;
+		break;
+	}
+#endif
+	SYNC;
+#if 1
+	// unset debug monitor mode
+	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (dbgdscr) ::);
+	dbgdscr |= ~(1 << 15); // MDBGen
+	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (dbgdscr) :);
+	SYNC;
+#endif
 }
 
 // for dumping info about debug HW
 void rpi2_check_debug()
 {
 	int i;
-	uint32_t tmp1, tmp2, tmp3;
+	uint32_t tmp1, tmp2, tmp3, tmp4;
+	uint32_t rom_addr, own_debug;
 	uint32_t *ptmp1, *ptmp2;
 	static char scratchpad[16]; // scratchpad
 
@@ -2596,6 +2818,11 @@ void rpi2_check_debug()
 			"dsb\n\t"
 			: [retreg] "=r" (tmp2)::
 	);
+	asm volatile (
+			"mrc p14, 0, %[retreg], c7, c14, 6 @ get DBGAUTHSTATUS\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp3)::
+	);
 
 	serial_raw_puts("\r\nDBGDRAR: ");
 	util_word_to_hex(scratchpad, tmp1);
@@ -2603,22 +2830,103 @@ void rpi2_check_debug()
 	serial_raw_puts(" DBGDSAR: ");
 	util_word_to_hex(scratchpad, tmp2);
 	serial_raw_puts(scratchpad);
-
-	tmp2 &= 0xfffff000;
-	tmp3 = *((uint32_t *) (tmp2 + 0xfb4)); // DBGLSR
-	SYNC;
-	serial_raw_puts(" DBGLSR: ");
-	util_word_to_hex(scratchpad, tmp3);
-	serial_raw_puts(scratchpad);
-	*((uint32_t *) (tmp2 + 0xfb0)) = 0xC5ACCE55; // DBGLAR
-	SYNC;
-	tmp3 = *((uint32_t *) (tmp2 + 0xfb4)); // DBGLSR
-	SYNC;
-	serial_raw_puts(" DBGLSR2: ");
+	serial_raw_puts(" DBGAUTH: ");
 	util_word_to_hex(scratchpad, tmp3);
 	serial_raw_puts(scratchpad);
 
 	tmp1 &= 0xfffff000; // masked DBGDRAR (ROM table address)
+	rom_addr = tmp1;
+	tmp2 &= 0xfffff000;
+	own_debug = tmp2;
+
+	// double lock
+	asm volatile (
+			"mrc p14, 0, %[retreg], c1, c3, 4 @ get DBGOSDLR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp4)::
+	);
+	serial_raw_puts("\r\nDBGOSDLR: ");
+	util_word_to_hex(scratchpad, tmp4);
+	serial_raw_puts(scratchpad);
+
+	if (tmp4 & 1) // double lock on
+	{
+		tmp3 = 0;
+		asm volatile (
+				"mcr p14, 0, %[retreg], c1, c1, 4 @ set DBGOSLSR\n\t"
+				"dsb\n\t"
+				:: [retreg] "r" (tmp3):
+		);
+		SYNC;
+	}
+
+	// OS lock
+	asm volatile (
+			"mrc p14, 0, %[retreg], c1, c1, 4 @ get DBGOSLSR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp4)::
+	);
+	serial_raw_puts("\r\nDBGOSLSR: ");
+	util_word_to_hex(scratchpad, tmp4);
+	serial_raw_puts(scratchpad);
+	tmp3 = *((uint32_t *) (own_debug + 0x024)); // DBGECR
+	SYNC;
+	serial_raw_puts(" DBGECR: ");
+	util_word_to_hex(scratchpad, tmp3);
+	serial_raw_puts(scratchpad);
+	if (tmp4 & 2) // OS lock on
+	{
+		if (tmp3 & 1) // unlock event enabled
+		{
+			asm volatile (
+					"mrc p14, 0, %[retreg], c1, c5, 4 @ get DBGPRSR\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp4)::
+			);
+			serial_raw_puts(" DBGPRSR: ");
+			util_word_to_hex(scratchpad, tmp4);
+			serial_raw_puts(scratchpad);
+			tmp4 = 1;
+			asm volatile (
+					"mcr p14, 0, %[retreg], c1, c4, 4 @ set DBGPRCR\n\t"
+					:: [retreg] "r" (tmp4):
+			);
+			SYNC;
+			*((uint32_t *) (own_debug + 0x024)) = 0; // DBGECR
+			SYNC;
+		}
+		tmp3 = 0;
+		asm volatile (
+				"mcr p14, 0, %[retreg], c1, c0, 4 @ set DBGOSLAR\n\t"
+				:: [retreg] "r" (tmp3):
+		);
+		asm volatile (
+				"mrc p14, 0, %[retreg], c1, c1, 4 @ get DBGOSLSR\n\t"
+				"dsb\n\t"
+				: [retreg] "=r" (tmp4)::
+		);
+		serial_raw_puts(" DBGOSLSR2: ");
+		util_word_to_hex(scratchpad, tmp4);
+		serial_raw_puts(scratchpad);
+		SYNC;
+	}
+
+	tmp3 = *((uint32_t *) (own_debug + 0xfb4)); // DBGLSR
+	SYNC;
+	serial_raw_puts("\r\nDBGLSR: ");
+	util_word_to_hex(scratchpad, tmp3);
+	serial_raw_puts(scratchpad);
+	if (tmp3 & 2) // locked
+	{
+		*((uint32_t *) (own_debug + 0xfb0)) = 0xC5ACCE55; // DBGLAR
+		SYNC;
+		tmp3 = *((uint32_t *) (tmp2 + 0xfb4)); // DBGLSR
+		SYNC;
+		serial_raw_puts(" DBGLSR2: ");
+		util_word_to_hex(scratchpad, tmp3);
+		serial_raw_puts(scratchpad);
+	}
+	tmp1 = rom_addr; // masked DBGDRAR (ROM table address)
 	ptmp1 = (uint32_t *)tmp1; // ptmp1: pointer to component entries
 	for (i=0; i<(0xf00/4); i++)
 	{
@@ -2634,6 +2942,12 @@ void rpi2_check_debug()
 		if (tmp2 == 0) break; // end of component entries
 
 		tmp2 &= 0xfffff000; // masked component offset
+
+		ptmp2 = (uint32_t *)(tmp1 + tmp2);
+		tmp3 = *ptmp2;
+		serial_raw_puts("\r\nDBGDIDR: ");
+		util_word_to_hex(scratchpad, tmp3);
+		serial_raw_puts(scratchpad);
 
 		ptmp2 = (uint32_t *)(tmp1 + tmp2 + 0xff4);
 		tmp3 = ((*ptmp2) & 0xff);
@@ -2652,6 +2966,14 @@ void rpi2_check_debug()
 		serial_raw_puts("\r\nDEVTYPE: ");
 		util_word_to_hex(scratchpad, tmp3);
 		serial_raw_puts(scratchpad);
+		if ((tmp3 & 0xf) == 5)
+		{
+			serial_raw_puts(" (debug)");
+		}
+		else if ((tmp3 & 0xf) == 6)
+		{
+			serial_raw_puts(" (perfmon)");
+		}
 
 		ptmp2 = (uint32_t *)(tmp1 + tmp2 + 0xfe0);
 		tmp3 = ((*(ptmp2++)) & 0xff);
@@ -3046,7 +3368,7 @@ void rpi2_init()
 	 * Extract the 4KB count field, bits [7:4], from the value of the Peripheral ID4 Register
 	 * Use the 4KB count value to calculate the start address of the address space for the component
 	 */
-#if 1
+
 	asm volatile (
 			"mrc p14, 0, %[retreg], c1, c0, 0 @ get DBGDRAR\n\t"
 			"dsb\n\t"
@@ -3061,32 +3383,57 @@ void rpi2_init()
 	asm volatile("dsb\n\t");
 	tmp2 &= 0xfffff000; // get the base address offset (from debug ROM)
 	dbg_reg_base = (tmp1 + tmp2);
-#endif
-	/* All interrupt vectors to point to dummy interrupt handler? */
-	/* cp15, cn=1: v-bit(bit 13)=0 (low vectors), ve-bit(bit 24)=0 (fixed vectors) */
-	/* MRC/MCR{<cond>} p15, 0, <Rd>, <CRn>, <CRm>{, <opcode2>} */
-	/*
-	 * mvn.w r0, #0
-	 * bic.w r0, #1, lsl 24
-	 * bic.w r0, #2, lsl 12
-	 * mrc p15, 0, r1, 1, 0, 0
-	 * and.w r1, r0
-	 * mcr p15, 0, r1, 1, 0, 0
-	 */
-	/* make sure that debug is disabled */
-	/* cp14, DBGDSCR: MDBGen(bit[15])=0, HDBGen(bit[14])=0 */
-	/* - For now - to disable debug mode */
-	/* and make BKPT to cause Prefetch Abort exception */
-	/*
-	 * mvn.w r0, #0
-	 * bic.w r0, #3, lsl 14
-	 * mrc p14, 0, r1, 0, 1, 0
-	 * and.w r1, r0
-	 * mcr p14, 0, r1, 0, 1, 0
-	 */
-#ifdef RPI2_DEBUG_TIMER
-	rpi2_timer_init();
-#endif
+
+	// dbg register lock
+	tmp1 = *((uint32_t *) (dbg_reg_base + 0xfb4)); // DBGLSR
+	SYNC;
+	if (tmp1 & 2) // locked
+	{
+		// unlock
+		*((uint32_t *) (dbg_reg_base + 0xfb0)) = 0xC5ACCE55; // DBGLAR
+		SYNC;
+	}
+
+	// double lock
+	asm volatile (
+			"mrc p14, 0, %[retreg], c1, c3, 4 @ get DBGOSDLR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp1)::
+	);
+
+	if (tmp1 & 1) // double lock on
+	{
+		asm volatile (
+				"mcr p14, 0, %[retreg], c1, c1, 4 @ set DBGOSLSR\n\t"
+				"dsb\n\t"
+				:: [retreg] "r" (0):
+		);
+		SYNC;
+	}
+
+	// OS lock
+	asm volatile (
+			"mrc p14, 0, %[retreg], c1, c1, 4 @ get DBGOSLSR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp1)::
+	);
+	SYNC;
+	if (tmp1 & 2) // OS lock set
+	{
+		tmp2 = *((uint32_t *) (dbg_reg_base + 0x024)); // DBGECR
+		if (tmp2 & 1) // unlock event enabled
+		{
+			// disable unlock event
+			*((uint32_t *) (dbg_reg_base + 0x024)) = 0; // DBGECR
+			SYNC;
+		}
+		// release OS lock
+		asm volatile (
+				"mcr p14, 0, %[retreg], c1, c0, 4 @ set DBGOSLAR\n\t"
+				:: [retreg] "r" (0):
+		);
+		SYNC;
+	}
 
 	cpsr_store = rpi2_disable_save_ints();
 	rpi2_set_vectors();
@@ -3096,6 +3443,15 @@ void rpi2_init()
 		rpi2_invalidate_caches();
 	}
 	rpi2_restore_ints(cpsr_store);
+
+#if 1
+	// set debug monitor mode
+	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (tmp1) ::);
+	tmp1 |= (1 << 15); // MDBGen
+	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (tmp1) :);
+	SYNC;
+#endif
+
 }
 
 #if 0

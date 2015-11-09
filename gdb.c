@@ -75,6 +75,9 @@ typedef struct {
 	void *address;
 	uint32_t type;
 	uint32_t size;
+	uint32_t value;
+	uint32_t mask;
+	uint32_t bas;
 	int valid;	// 1=valid
 } gdb_watch_rec;
 
@@ -118,7 +121,7 @@ void gdb_do_single_step();
 // packet sending
 int gdb_send_packet(char *src, int count);
 
-// ckeck if cause of exception was a breakpoint
+// check if cause of exception was a breakpoint
 // return breakpoint number, or -1 if none
 int gdb_check_breakpoint()
 {
@@ -194,6 +197,68 @@ void gdb_clear_breakpoints(int remove_traps)
 	gdb_single_stepping = 0;
 }
 
+// return watchpoint number, or -1 if none
+int gdb_check_watchpoint()
+{
+	uint32_t tmp;
+	int num = -1;
+	int i;
+#if 1
+	char scratch[9];
+#endif
+
+	num = 0;
+	for (i=0; i<GDB_MAX_WATCHPOINTS; i++)
+	{
+		if (gdb_usr_watchpoint[i].valid)
+		{
+			if (gdb_usr_watchpoint[i].mask)
+			{
+				if (rpi2_dbg_rec.far & gdb_usr_watchpoint[i].mask
+					== gdb_usr_watchpoint[i].value)
+				{
+					num = i;
+					break;
+				}
+			}
+			else
+			{
+				if ((rpi2_dbg_rec.far & (~7)) == gdb_usr_watchpoint[i].value)
+				{
+					tmp = rpi2_dbg_rec.far & 7;
+					if ((1 << tmp) & gdb_usr_watchpoint[i].bas)
+					{
+						num = i;
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (i >= GDB_MAX_WATCHPOINTS) return -1; // not found
+
+#if 1
+	gdb_iodev->put_string("\r\nwatch! num= ", 15);
+	util_word_to_hex(scratch, num);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" far= ", 7);
+	util_word_to_hex(scratch, rpi2_dbg_rec.far);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string("\r\nmask= ", 9);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].mask);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" value= ", 4);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].value);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" bas= ", 4);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].bas);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string("\r\n", 3);
+
+#endif
+	return num;
+}
+
 void gdb_clear_watchpoints(int remove_traps)
 {
 	int i;
@@ -211,6 +276,9 @@ void gdb_clear_watchpoints(int remove_traps)
 		gdb_usr_watchpoint[i].address = (void *)0;
 		gdb_usr_watchpoint[i].size = 0;
 		gdb_usr_watchpoint[i].type = 0;
+		gdb_usr_watchpoint[i].value = 0;
+		gdb_usr_watchpoint[i].mask = 0;
+		gdb_usr_watchpoint[i].bas = 0;
 	}
 	gdb_num_watchps = 0;
 }
@@ -293,7 +361,14 @@ void gdb_trap_handler()
 			}
 			break;
 		case RPI2_EXC_DABT:
-			reason = SIG_SEGV;
+			if (exception_extra == RPI2_TRAP_WATCH)
+			{
+				reason = SIG_TRAP;
+			}
+			else
+			{
+				reason = SIG_SEGV;
+			}
 			break;
 		case RPI2_EXC_UNDEF:
 			reason = SIG_ILL;
@@ -491,16 +566,22 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 	gdb_usr_watchpoint[i].size = bytes;
 	gdb_usr_watchpoint[i].address = (void *)addr;
 
+	// Cortex-A8 Technical Reference Manual
+	// 12.4.16. Watchpoint Control Registers
+	// if 8-bit bas is implemented, alignment must be doubleword
+	// the basic idea is probably: one breakpoint - one type (aligned) and the
+	// range is maybe meant for memory pages and such (the 2**n limitation)
 	if (bytes <= 4)
 	{
-		value = addr & (~3); // word aligned address
-		alignment = addr & 3;	// first byte in word
+		value = addr & (~7); // word aligned address
+		alignment = addr & 7;	// first byte in doubleword
 		bas = 0;
 		for (i=0; i<bytes; i++)
 		{
 			bas |= (1 << (alignment + i));
 		}
 		mask = 0;
+		gdb_usr_watchpoint[num].mask = ((~0) << 3);
 	}
 	else
 	{
@@ -512,20 +593,21 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 			alignment++;
 		}
 		if (alignment > 31) return -2; // invalid range
-		if (alignment < 3) return -2; // invalid range
+		if (alignment < 4) return -2; // invalid range
 
-		if (bytes & (~(1 << alignment)))
+		if (bytes & (~(1 << (alignment - 1)))) // more than 1 bit set?
 		{
-			return -2; // illegal range, must be 2^n bytes
+			return -2; // illegal range, must be 2**n bytes
 		}
 #if 1
 		if (addr & ((1 << alignment) -1 )) return -3; // address not aligned with range
 #else
 		// make base alignment consistent with the range
-		value = addr & (~((1<<high) - 1)); // mask off lower bits
+		value = addr & (~((1<<alignment) - 1)); // mask off lower bits
 #endif
 		mask = alignment - 1;
 		bas = 0xff; // must be if mask is used
+		gdb_usr_watchpoint[num].mask = ((~0) << mask);
 	}
 	control = mask << 24; // MASK
 	control |= (1 << 13); // HMC
@@ -534,6 +616,7 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 	control |= (3 << 1); // PAC
 	control |= 1; // enable
 
+#if 1
 	gdb_iodev->put_string("\r\nwatch num= ", 14);
 	util_word_to_hex(scratch, num);
 	gdb_iodev->put_string(scratch, 9);
@@ -544,9 +627,11 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 	util_word_to_hex(scratch, control);
 	gdb_iodev->put_string(scratch, 9);
 	gdb_iodev->put_string("\r\n", 3);
-
+#endif
 	rpi2_set_watchpoint((unsigned int) num, (unsigned int) value,
 			(unsigned int) control);
+	gdb_usr_watchpoint[num].bas = bas;
+	gdb_usr_watchpoint[num].value = value;
 	gdb_usr_watchpoint[num].valid = 1;
 	gdb_num_watchps++;
 	return num;
@@ -1052,22 +1137,14 @@ void gdb_resp_target_halted(int reason)
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
 	unsigned int tmp;
+	int tmp2;
 	char *text;
 #ifdef DEBUG_GDB
 	char *msg;
 #endif
 
 	gdb_monitor_running = 1; // by default
-/*
-	if (reason == 0)
-	{
-		// No debuggee yet
-		if (gdb_debuggee.size == 0)
-		{
-			reason = ALOHA;
-		}
-	}
-*/
+
 	switch(reason)
 	{
 	case SIG_INT: // ctrl-C
@@ -1077,6 +1154,36 @@ void gdb_resp_target_halted(int reason)
 	case SIG_TRAP: // bkpt
 		// T05 - breakpoint response - swbreak is not supported by gdb client
 		len = util_str_copy(resp_buff, "T05", resp_buff_len);
+		if (exception_info == RPI2_EXC_DABT)
+		{
+			tmp2 = gdb_check_watchpoint();
+			if (tmp2 < 0)
+			{
+				// error
+			}
+			else
+			{
+				tmp = gdb_usr_watchpoint[tmp2].type;
+				switch (tmp)
+				{
+				case 1: // read
+					len = util_append_str(resp_buff, "rwatch:", resp_buff_len);
+					break;
+				case 2: // write
+					len = util_append_str(resp_buff, "watch:", resp_buff_len);
+					break;
+				case 3: // access
+					len = util_append_str(resp_buff, "awatch:", resp_buff_len);
+					break;
+				default:
+					len = util_append_str(resp_buff, "awatch:", resp_buff_len);
+					break;
+				}
+				util_word_to_hex(scratchpad, rpi2_dbg_rec.far);
+				len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+			}
+		}
+
 		// PC value given - current gdb client has a bug - this doesn't work
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
@@ -2478,8 +2585,15 @@ void gdb_monitor(int reason)
 				case '2':
 				case '3':
 				case '4':
-					packet_len--;
-					gdb_cmd_add_watchpoint(inpkg, packet_len);
+					if (rpi2_use_debug_mode)
+					{
+						packet_len--;
+						gdb_cmd_add_watchpoint(inpkg, packet_len);
+					}
+					else
+					{
+						gdb_response_not_supported();
+					}
 					break;
 				default:
 					gdb_response_not_supported();
@@ -2512,8 +2626,15 @@ void gdb_monitor(int reason)
 				case '2':
 				case '3':
 				case '4':
-					packet_len--;
-					gdb_cmd_del_watchpoint(inpkg, packet_len);
+					if (rpi2_use_debug_mode)
+					{
+						packet_len--;
+						gdb_cmd_del_watchpoint(inpkg, packet_len);
+					}
+					else
+					{
+						gdb_response_not_supported();
+					}
 					break;
 				default:
 					gdb_response_not_supported();

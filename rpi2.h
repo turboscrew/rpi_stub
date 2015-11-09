@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define DEBUG_UNDEF
 //#define DEBUG_SVC
 //#define DEBUG_AUX
-//#define DEBUG_DABT
+#define DEBUG_DABT
 //#define DEBUG_IRQ
 //#define DEBUG_FIQ
 //#define DEBUG_PABT
@@ -183,6 +183,8 @@ typedef struct
 #define RPI2_TRAP_BKPT 4
 // prefetch abort
 #define RPI2_TRAP_BUS 5
+// watchpoint
+#define RPI2_TRAP_WATCH 6
 // logging - null terminated
 #define RPI2_TRAP_LOGZ 13
 // logging - size in r1
@@ -198,6 +200,16 @@ typedef struct
 #define SYNC asm volatile ("dsb\n\tisb\n\t":::"memory")
 
 // exception info
+typedef struct
+{
+	unsigned int far;
+	unsigned int fsr;
+	unsigned int dbgdscr;
+	unsigned int exc_lr;
+}debug_exc_rec_t;
+
+extern debug_exc_rec_t rpi2_dbg_rec;
+
 // 8x = SW-caused
 extern volatile int exception_info;
 extern volatile int exception_extra;
@@ -215,7 +227,7 @@ extern unsigned int rpi2_keep_ctrlc; // ARM ram start address
 extern unsigned int rpi2_uart0_excmode;
 extern unsigned int rpi2_uart0_baud;
 extern unsigned int rpi2_use_mmu;
-
+extern unsigned int rpi2_use_debug_mode;
 
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of
