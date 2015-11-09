@@ -16,7 +16,7 @@ The bare metal program to be debugged is loaded on Raspberry Pi 2B using
 gdb's 'load'-command (see the INSTRUCTIONS.txt), and then run with gdb's
 'cont'-command. You can break a runaway program with ctrl-C.
 
-There are also three command line parameters.
+There are also some command line parameters.
 'rpi_stub_mmu' causes rpi_stub to use MMU and caches. Default is no mmu or caches.
 'rpi_stub_interrupt=<int>' makes rpi_stub to handle UART0 interrupts
 in a different way:
@@ -30,6 +30,10 @@ the execution is returned to the debuggee.
 'rpi_stub_baud=<baudrate>' makes rpi_stub set the UART0 baudrate to <baudrate>
 It uses the UART clock from the GPU and the <baudrate> parameter to calculate the
 ibrd and fbrd for UART0. The sensibility of the parameters are not checked.
+'rpi_stub_hw_dbg=<n>' enables or disables HW watchpoints, because using HW
+breaks makes the debuggee to run in debug monitor mode, and in some cases it
+may be harmful. If <n> = 1 the HW watchpoints are enabled, if <n> = 0. the HW
+watchpoints are disabled. Default is 1.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported
@@ -40,6 +44,9 @@ At the moment the main restrictions are:
 - The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
   reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
+- Continuing from watchpoint requires removal of the watchpoint first.
+  Advancing PC would leave the trapped access undone altogether.
+- Stop reasons look weird because of gdb's strange way of handling signal numbers.
 
 Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
 The pointer to the string needs to be in r0.
@@ -48,6 +55,19 @@ The pointer to the string needs to be in r0.
 I could list the gdb serial protocol commands that rpi_stub supports,
 but it wouldn't be of much help for a gdb user - the gdb-commands and gdb
 serial protocol commands do not map one-to-one.
+
+Roughly: rpi_stub supports:
+- loading programs
+- 'cont'
+- SW breakpoints
+- HW watchpoints (not well - see limitations)
+- reading and writing registers r0 - r15 and cpsr
+- reading and writing memory
+- stopping with ctrl-C
+- through-gdb logging
+
+Also, gdb can do single stepping without single-stepping support just
+by using breakpoints.
 
 
 

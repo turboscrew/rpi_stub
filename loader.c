@@ -285,7 +285,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_use_mmu = 0; // default - no mmu
 	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
 	rpi2_uart0_baud = 115200;
-	//rpi2_use_debug_mode = 1;
+	rpi2_use_debug_mode = 1;
 	
 	rpi2_get_cmdline(cmdline);
 	
@@ -339,6 +339,16 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 					// get baud for serial
 					i += util_read_dec(cmdline + i, &tmp);
 					rpi2_uart0_baud = tmp;
+				}
+				else if (util_cmp_substr("hw_dbg=", cmdline + i) >= util_str_len("hw_dbg="))
+				{
+					// rpi_stub_hw_dbg=1
+					i += util_str_len("hw_dbg=");
+					// get baud for serial
+					i += util_read_dec(cmdline + i, &tmp);
+					if (tmp == 1) rpi2_use_debug_mode = 1;
+					else if (tmp == 0) rpi2_use_debug_mode = 0;
+					// else ignore
 				}
 			}
 		}
