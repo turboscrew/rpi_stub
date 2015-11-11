@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SIG_INT  RPI2_REASON_SIGINT
 #define SIG_TRAP 5
 #define SIG_ILL  4
-#define SIG_BUS  7
-#define SIG_SEGV  11
+#define SIG_BUS  10
+#define SIG_EMT  7
 #define SIG_USR1 RPI2_REASON_HW_EXC
 #define SIG_USR2 RPI2_REASON_SW_EXC
 #define ALOHA 32
@@ -102,6 +102,10 @@ volatile io_device *gdb_iodev;
 static volatile uint8_t gdb_in_packet[GDB_MAX_MSG_LEN]; // packets from gdb
 static volatile uint8_t gdb_out_packet[GDB_MAX_MSG_LEN]; // packets to gdb
 static volatile uint8_t gdb_tmp_packet[GDB_MAX_MSG_LEN]; // for building packets
+
+// features
+static uint32_t gdb_swbreak;
+static uint32_t gdb_hwbreak;
 
 // flag: 0 = return to debuggee, 1 = stay in monitor
 static volatile int gdb_monitor_running = 0;
@@ -212,7 +216,7 @@ int gdb_check_watchpoint()
 	{
 		if (gdb_usr_watchpoint[i].valid)
 		{
-			if (gdb_usr_watchpoint[i].mask)
+			if (gdb_usr_watchpoint[i].size > 4)
 			{
 				if (rpi2_dbg_rec.far & gdb_usr_watchpoint[i].mask
 					== gdb_usr_watchpoint[i].value)
@@ -233,6 +237,24 @@ int gdb_check_watchpoint()
 					}
 				}
 			}
+#if 1
+	gdb_iodev->put_string("\r\nwatch! num= ", 15);
+	util_word_to_hex(scratch, num);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" far= ", 7);
+	util_word_to_hex(scratch, rpi2_dbg_rec.far);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string("\r\nmask= ", 9);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].mask);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" value= ", 4);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].value);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string(" bas= ", 4);
+	util_word_to_hex(scratch, gdb_usr_watchpoint[num].bas);
+	gdb_iodev->put_string(scratch, 9);
+	gdb_iodev->put_string("\r\n", 3);
+#endif
 		}
 	}
 	if (i >= GDB_MAX_WATCHPOINTS) return -1; // not found
@@ -254,7 +276,6 @@ int gdb_check_watchpoint()
 	util_word_to_hex(scratch, gdb_usr_watchpoint[num].bas);
 	gdb_iodev->put_string(scratch, 9);
 	gdb_iodev->put_string("\r\n", 3);
-
 #endif
 	return num;
 }
@@ -367,7 +388,7 @@ void gdb_trap_handler()
 			}
 			else
 			{
-				reason = SIG_SEGV;
+				reason = SIG_EMT;
 			}
 			break;
 		case RPI2_EXC_UNDEF:
@@ -410,6 +431,8 @@ void gdb_init(io_device *device)
 	gdb_single_stepping_address = 0xffffffff; // not valid
 	gdb_trap_num = -1; // breakpoint number
 	gdb_resuming = -1; // flag for single stepping over resumed breakpoint
+	gdb_swbreak = 0;
+	gdb_hwbreak = 0;
 	// flag: 0 = return to debuggee, 1 = stay in monitor
 	gdb_monitor_running = 0;
 	gdb_dyn_debug = 0;
@@ -616,7 +639,7 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 	control |= (3 << 1); // PAC
 	control |= 1; // enable
 
-#if 1
+#if 0
 	gdb_iodev->put_string("\r\nwatch num= ", 14);
 	util_word_to_hex(scratch, num);
 	gdb_iodev->put_string(scratch, 9);
@@ -1159,10 +1182,12 @@ void gdb_resp_target_halted(int reason)
 			tmp2 = gdb_check_watchpoint();
 			if (tmp2 < 0)
 			{
-				// error
+				text = "Watchpoint not found";
+				gdb_send_text_packet(text, util_str_len(text));
 			}
 			else
 			{
+				// if (gdb_hwbreak) needed?
 				tmp = gdb_usr_watchpoint[tmp2].type;
 				switch (tmp)
 				{
@@ -1179,9 +1204,29 @@ void gdb_resp_target_halted(int reason)
 					len = util_append_str(resp_buff, "awatch:", resp_buff_len);
 					break;
 				}
+#if 0
+				util_swap_bytes(&(rpi2_dbg_rec.far), &tmp);
+				util_word_to_hex(scratchpad, tmp);
+#else
 				util_word_to_hex(scratchpad, rpi2_dbg_rec.far);
 				len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+#endif
+				len = util_append_str(resp_buff, ";", resp_buff_len);
 			}
+			text = "Watchpoint";
+			gdb_send_text_packet(text, util_str_len(text));
+		}
+		else
+		{
+			text = "Breakpoint";
+			gdb_send_text_packet(text, util_str_len(text));
+#if 1
+			// don't use until the format is known
+			if (gdb_hwbreak)
+			{
+				len = util_append_str(resp_buff, "swbreak:;", resp_buff_len);
+			}
+#endif
 		}
 
 		// PC value given - current gdb client has a bug - this doesn't work
@@ -1200,22 +1245,22 @@ void gdb_resp_target_halted(int reason)
 		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
-	case SIG_BUS: // pabt - BUS
-		// T10 - pabt response
+	case SIG_BUS: // pabt
+		// T0A - pabt response (SIGBUS)
 		text = "Prefetch Abort";
 		gdb_send_text_packet(text, util_str_len(text));
-		len = util_str_copy(resp_buff, "T10", resp_buff_len);
+		len = util_str_copy(resp_buff, "T0A", resp_buff_len);
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
 		//util_word_to_hex(scratchpad, rpi2_reg_context.reg.r15);
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
-	case SIG_SEGV: // dabt
-		// T10 - dabt response - BUS (could be 7: EMT)
+	case SIG_EMT: // dabt - used to tell PABT and DABT apart
+		// T0A - dabt response (SIGBUS)
 		text = "Data Abort";
 		gdb_send_text_packet(text, util_str_len(text));
-		len = util_str_copy(resp_buff, "T10", resp_buff_len);
+		len = util_str_copy(resp_buff, "T0A", resp_buff_len);
 		// PC value given
 		//len = util_append_str(resp_buff, "f:", resp_buff_len);
 		// put PC-value into message
@@ -1223,20 +1268,20 @@ void gdb_resp_target_halted(int reason)
 		//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 		break;
 	case SIG_USR1: // unhandled HW interrupt - no defined response
-		// send 'OUnhandled HW interrupt'
+		// send 'OUnhandled HW interrupt' + T1F (SIGUSR1)
 		text = "Unhandled HW interrupt";
 		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T30", resp_buff_len);
+		len = util_str_copy(resp_buff, "T1f", resp_buff_len);
 		break;
 	case SIG_USR2: // unhandled SW interrupt - no defined response
-		// send 'OUnhandled SW interrupt'
+		// send 'OUnhandled SW interrupt' + T1f (SIGUSR2)
 		text = "Unhandled SW interrupt";
 		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnhandled SW interrupt", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T31", resp_buff_len);
+		len = util_str_copy(resp_buff, "T1f", resp_buff_len);
 		break;
 	case ALOHA: // no debuggee loaded yet - no defined response
 		// send 'Ogdb stub started'
@@ -1254,13 +1299,12 @@ void gdb_resp_target_halted(int reason)
 		// gdb_monitor_running = 0; // TODO: check
 		break;
 	default:
-		// T17 - STOP
-		// send 'Ounknown event'
+		// send 'Ounknown event' + T11 (SIGSTOP)
 		text = "Unknown event";
 		gdb_send_text_packet(text, util_str_len(text));
 		//len = util_str_copy(resp_buff, "OUnknown event", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
-		len = util_str_copy(resp_buff, "T17", resp_buff_len);
+		len = util_str_copy(resp_buff, "T11", resp_buff_len);
 		break;
 	}
 	// send response
@@ -1714,6 +1758,7 @@ void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
 void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 {
 	int len;
+	int packlen = 0, params = 0;
 	char *msg;
 	char *packet;
 	const int scratch_len = 32;
@@ -1734,52 +1779,143 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 		gdb_iodev->put_string("\r\n", 3);
 #endif
 		packet += len+1; // skip the read and delimiter
+		packet_len -= (len+1);
 		// len = util_cmp_substr(packet, "qSupported:");
 		// if (len == util_str_len("qSupported:"))
 		// {
 		// 		packet += len;
 		if (util_str_cmp(scratchpad, "qSupported") == 0)
 		{
-#if 0
-			packet_len -= (len + 1);
+#if 1
 			while (packet_len > 0)
 			{
 				len = util_cpy_substr(scratchpad, packet, ';', scratch_len);
 				packet += len+1; // the read and delimiter
 				packet_len -= (len + 1);
-#ifdef DEBUG_GDB
+//#ifdef DEBUG_GDB
+#if 0
 				gdb_iodev->put_string("\r\nparam: ", 12);
 				gdb_iodev->put_string(scratchpad, util_str_len(scratchpad)+1);
 #endif
 				// reply: 'stubfeature [;stubfeature]...'
 				// 'name=value', 'name+' or 'name-'
-
+#if 1
 				if (util_str_cmp(scratchpad, "PacketSize") == 0)
 				{
+					packlen = 1;
+					if (params)
+					{
+						len = util_append_str(resp_buff + len, ";", resp_buff_len);
+					}
+					params++;
 					len = util_append_str(resp_buff, scratchpad, resp_buff_len);
-					len = util_append_str(resp_buff, "=", resp_buff_len);
-					util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
+					len = util_append_str(resp_buff + len, "=", resp_buff_len);
+					util_word_to_hex(resp_buff + len, 256);
+//					util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
 					len = util_str_len(resp_buff);
+				}
+				else if (util_str_cmp(scratchpad, "swbreak+") == 0)
+				{
+					if (params)
+					{
+						len = util_append_str(resp_buff + len, ";", resp_buff_len);
+					}
+					params++;
+#if 1
+					// don't use until the T05-format is clear
+					len = util_append_str(resp_buff, "swbreak+", resp_buff_len);
+#else
+					len = util_append_str(resp_buff, "swbreak-", resp_buff_len);
+#endif
+					len = util_str_len(resp_buff);
+					gdb_swbreak = 1;
+				}
+				else if (util_str_cmp(scratchpad, "swbreak-") == 0)
+				{
+					if (params)
+					{
+						len = util_append_str(resp_buff + len, ";", resp_buff_len);
+					}
+					params++;
+					len = util_append_str(resp_buff, "swbreak-", resp_buff_len);
+					len = util_str_len(resp_buff);
+					gdb_swbreak = 0;
+				}
+				else if (util_str_cmp(scratchpad, "hwbreak+") == 0)
+				{
+					if (rpi2_use_hw_debug)
+					{
+						if (params)
+						{
+							len = util_append_str(resp_buff + len, ";", resp_buff_len);
+						}
+						params++;
+#if 0
+						// Only use when HW breakpoints are supported
+						len = util_append_str(resp_buff, "hwbreak+", resp_buff_len);
+#else
+						len = util_append_str(resp_buff, "hwbreak-", resp_buff_len);
+#endif
+						len = util_str_len(resp_buff);
+						gdb_hwbreak = 1;
+					}
+					else
+					{
+						if (params)
+						{
+							len = util_append_str(resp_buff + len, ";", resp_buff_len);
+						}
+						params++;
+						len = util_append_str(resp_buff, "hwbreak-", resp_buff_len);
+						len = util_str_len(resp_buff);
+						gdb_hwbreak = 0;
+					}
+				}
+				else if (util_str_cmp(scratchpad, "hwbreak-") == 0)
+				{
+					if (params)
+					{
+						len = util_append_str(resp_buff + len, ";", resp_buff_len);
+					}
+					params++;
+					len = util_append_str(resp_buff, "hwbreak-", resp_buff_len);
+					len = util_str_len(resp_buff);
+					gdb_hwbreak = 0;
 				}
 				else
 				{
 					/* unsupported feature */
-					len = util_append_str(resp_buff, scratchpad, resp_buff_len);
-					len = util_append_str(resp_buff, "-", resp_buff_len);
+					//len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+					//len = util_append_str(resp_buff, "-", resp_buff_len);
 				}
+#endif
+#if 0
 				if (packet_len > 0)
 				{
 					len = util_append_str(resp_buff, ";", resp_buff_len);
 				}
+#endif
 			}
-#ifdef DEBUG_GDB
+			if (packlen == 0) // PacketSize hasn't been given yet
+			{
+				if (params)
+				{
+					len = util_append_str(resp_buff + len, ";", resp_buff_len);
+				}
+				params++;
+				len = util_append_str(resp_buff, "PacketSize=", resp_buff_len);
+				util_word_to_hex(scratchpad, 256); // GDB_MAX_MSG_LEN / 4
+				len = util_append_str(resp_buff, scratchpad, resp_buff_len);
+			}
+//#ifdef DEBUG_GDB
+#if 0
 			gdb_iodev->put_string("resp: ", 8);
 			gdb_iodev->put_string(resp_buff, util_str_len(resp_buff)+1);
 			gdb_iodev->put_string("\r\n", 3);
 #endif
 #else
 
-			len = util_str_copy(resp_buff, "swbreak+;PacketSize=", resp_buff_len);
+			len = util_str_copy(resp_buff, "swbreak+;hwbreak+;PacketSize=", resp_buff_len);
 			util_word_to_hex(scratchpad, 256); // GDB_MAX_MSG_LEN / 4
 			len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 #endif
@@ -2585,7 +2721,7 @@ void gdb_monitor(int reason)
 				case '2':
 				case '3':
 				case '4':
-					if (rpi2_use_debug_mode)
+					if (rpi2_use_hw_debug)
 					{
 						packet_len--;
 						gdb_cmd_add_watchpoint(inpkg, packet_len);
@@ -2626,7 +2762,7 @@ void gdb_monitor(int reason)
 				case '2':
 				case '3':
 				case '4':
-					if (rpi2_use_debug_mode)
+					if (rpi2_use_hw_debug)
 					{
 						packet_len--;
 						gdb_cmd_del_watchpoint(inpkg, packet_len);

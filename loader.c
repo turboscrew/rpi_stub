@@ -112,6 +112,10 @@ void loader_main()
 	serial_io.put_string(msg, util_str_len(msg));
 	util_word_to_hex(scratchpad, rpi2_uart_clock);
 	serial_io.put_string(scratchpad, 9);
+	msg = " rpi2_use_hw_debug ";
+	serial_io.put_string(msg, util_str_len(msg));
+	util_word_to_hex(scratchpad, rpi2_use_hw_debug);
+	serial_io.put_string(scratchpad, 9);
 	
 	serial_io.put_string("\r\n", 3);
 	//serial_io.put_string(cmdline, 1024);
@@ -285,7 +289,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_use_mmu = 0; // default - no mmu
 	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
 	rpi2_uart0_baud = 115200;
-	rpi2_use_debug_mode = 1;
+	rpi2_use_hw_debug = 0;
 	
 	rpi2_get_cmdline(cmdline);
 	
@@ -346,8 +350,8 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 					i += util_str_len("hw_dbg=");
 					// get baud for serial
 					i += util_read_dec(cmdline + i, &tmp);
-					if (tmp == 1) rpi2_use_debug_mode = 1;
-					else if (tmp == 0) rpi2_use_debug_mode = 0;
+					if (tmp == 1) rpi2_use_hw_debug = 1;
+					else if (tmp == 0) rpi2_use_hw_debug = 0;
 					// else ignore
 				}
 			}

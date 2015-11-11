@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // needs to be here to be visible to both rpi2 and serial
 //#define DEBUG_EXCEPTIONS
-//#define DEBUG_GDB_EXC
+#define DEBUG_GDB_EXC
 //#define DEBUG_CTRLC
 
 //#define DEBUG_UNDEF
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DEBUG_DABT
 //#define DEBUG_IRQ
 //#define DEBUG_FIQ
-//#define DEBUG_PABT
+#define DEBUG_PABT
 
 //#define RPI2_DEBUG_TIMER
 
@@ -194,8 +194,8 @@ typedef struct
 
 // for special traps to gdb
 #define RPI2_REASON_SIGINT 2
-#define RPI2_REASON_HW_EXC 10
-#define RPI2_REASON_SW_EXC 12
+#define RPI2_REASON_HW_EXC 30
+#define RPI2_REASON_SW_EXC 31
 
 #define SYNC asm volatile ("dsb\n\tisb\n\t":::"memory")
 
@@ -227,7 +227,7 @@ extern unsigned int rpi2_keep_ctrlc; // ARM ram start address
 extern unsigned int rpi2_uart0_excmode;
 extern unsigned int rpi2_uart0_baud;
 extern unsigned int rpi2_use_mmu;
-extern unsigned int rpi2_use_debug_mode;
+extern unsigned int rpi2_use_hw_debug;
 
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of

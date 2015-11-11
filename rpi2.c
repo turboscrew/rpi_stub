@@ -1183,7 +1183,7 @@ void rpi2_gdb_exception()
 			"pop {r0 - r4, lr}\n\t"
 #endif
 			"push {r0, r1}\n\t"
-			"ldr r0, =rpi2_use_debug_mode\n\t"
+			"ldr r0, =rpi2_use_hw_debug\n\t"
 			"ldr r1, [r0]\n\t"
 			"cmp r1, #0\n\t"
 			"beq 2f\n\t"
@@ -1716,7 +1716,7 @@ void rpi2_dabt_handler()
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
-			"sub lr, #8 @ fix lr - gdb doesn't do it\n\t"
+			"sub lr, #8 @ fix lr - gdb wants fixed address\n\t"
 			"pop {r0 - r12}\n\t"
 );
 
@@ -2363,7 +2363,7 @@ void rpi2_unhandled_pabt()
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
-			"@sub lr, #4 @ for now we skip the instruction\n\t"
+			"sub lr, #4 @ gdb wants fixed address\n\t"
 			"push {r12} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
 	);
@@ -2426,12 +2426,13 @@ void rpi2_unhandled_pabt()
 			"ldr r0, =rpi2_exc_reason\n\t"
 			"mov r1, #10 @ RPI2_REASON_HW_EXC\n\t"
 			"str r1, [r0]\n\t"
+#if 0
 			"@ fix return address\n\t"
+			"ldr r0, =rpi2_pabt_context\n\t"
 			"ldr r1, [r0, #15*4]\n\t"
 			"sub r1, #4 @ fix address to exception address\n\t"
 			"str r1, [r0, #15*4]\n\t"
-			"ldr r0, =rpi2_pabt_context\n\t"
-
+#endif
 			"3: \n\t"
 	);
 #ifdef DEBUG_PABT
