@@ -207,7 +207,7 @@ int gdb_check_watchpoint()
 	uint32_t tmp;
 	int num = -1;
 	int i;
-#if 1
+#if 0
 	char scratch[9];
 #endif
 
@@ -237,7 +237,7 @@ int gdb_check_watchpoint()
 					}
 				}
 			}
-#if 1
+#if 0
 	gdb_iodev->put_string("\r\nwatch! num= ", 15);
 	util_word_to_hex(scratch, num);
 	gdb_iodev->put_string(scratch, 9);
@@ -259,24 +259,6 @@ int gdb_check_watchpoint()
 	}
 	if (i >= GDB_MAX_WATCHPOINTS) return -1; // not found
 
-#if 1
-	gdb_iodev->put_string("\r\nwatch! num= ", 15);
-	util_word_to_hex(scratch, num);
-	gdb_iodev->put_string(scratch, 9);
-	gdb_iodev->put_string(" far= ", 7);
-	util_word_to_hex(scratch, rpi2_dbg_rec.far);
-	gdb_iodev->put_string(scratch, 9);
-	gdb_iodev->put_string("\r\nmask= ", 9);
-	util_word_to_hex(scratch, gdb_usr_watchpoint[num].mask);
-	gdb_iodev->put_string(scratch, 9);
-	gdb_iodev->put_string(" value= ", 4);
-	util_word_to_hex(scratch, gdb_usr_watchpoint[num].value);
-	gdb_iodev->put_string(scratch, 9);
-	gdb_iodev->put_string(" bas= ", 4);
-	util_word_to_hex(scratch, gdb_usr_watchpoint[num].bas);
-	gdb_iodev->put_string(scratch, 9);
-	gdb_iodev->put_string("\r\n", 3);
-#endif
 	return num;
 }
 
@@ -1182,7 +1164,7 @@ void gdb_resp_target_halted(int reason)
 			tmp2 = gdb_check_watchpoint();
 			if (tmp2 < 0)
 			{
-				text = "Watchpoint not found";
+				text = "rpi_stub: Watchpoint not found";
 				gdb_send_text_packet(text, util_str_len(text));
 			}
 			else
@@ -1213,20 +1195,17 @@ void gdb_resp_target_halted(int reason)
 #endif
 				len = util_append_str(resp_buff, ";", resp_buff_len);
 			}
-			text = "Watchpoint";
-			gdb_send_text_packet(text, util_str_len(text));
+			//text = "Watchpoint";
+			//gdb_send_text_packet(text, util_str_len(text));
 		}
 		else
 		{
-			text = "Breakpoint";
-			gdb_send_text_packet(text, util_str_len(text));
-#if 1
-			// don't use until the format is known
+			//text = "Breakpoint";
+			//gdb_send_text_packet(text, util_str_len(text));
 			if (gdb_hwbreak)
 			{
 				len = util_append_str(resp_buff, "swbreak:;", resp_buff_len);
 			}
-#endif
 		}
 
 		// PC value given - current gdb client has a bug - this doesn't work
@@ -2708,7 +2687,6 @@ void gdb_monitor(int reason)
 				break;
 			case 'Z':	// add Z0-breakpoint +
 				// Z1 - Z4 = HW breakpoints/watchpoints
-#if 1
 				switch (*(++inpkg))
 				{
 				case '0': // SW breakpoint
@@ -2735,21 +2713,9 @@ void gdb_monitor(int reason)
 					gdb_response_not_supported();
 					break;
 				}
-#else
-				if (*(++inpkg) == '0') // if Z0
-				{
-					packet_len--;
-					gdb_cmd_add_breakpoint(++inpkg, --packet_len);
-				}
-				else // Z1 - Z4 not supported
-				{
-					gdb_response_not_supported();
-				}
-#endif
 				break;
 			case 'z':	// remove Z0-breakpoint +
 				// z1 - z4 = HW breakpoints/watchpoints
-#if 1
 				switch (*(++inpkg))
 				{
 				case '0': // SW breakpoint
@@ -2776,17 +2742,6 @@ void gdb_monitor(int reason)
 					gdb_response_not_supported();
 					break;
 				}
-#else
-				if (*(++inpkg) == '0') // if z0
-				{
-					packet_len--;
-					gdb_cmd_delete_breakpoint(++inpkg, --packet_len);
-				}
-				else // z1 - z4 not supported
-				{
-					gdb_response_not_supported();
-				}
-#endif
 				break;
 			default:
 				gdb_response_not_supported();

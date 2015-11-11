@@ -289,7 +289,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_use_mmu = 0; // default - no mmu
 	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
 	rpi2_uart0_baud = 115200;
-	rpi2_use_hw_debug = 0;
+	rpi2_use_hw_debug = 1;
 	
 	rpi2_get_cmdline(cmdline);
 	

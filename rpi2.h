@@ -23,16 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // needs to be here to be visible to both rpi2 and serial
 //#define DEBUG_EXCEPTIONS
-#define DEBUG_GDB_EXC
+//#define DEBUG_GDB_EXC
 //#define DEBUG_CTRLC
 
 //#define DEBUG_UNDEF
 //#define DEBUG_SVC
 //#define DEBUG_AUX
-#define DEBUG_DABT
+//#define DEBUG_DABT
 //#define DEBUG_IRQ
 //#define DEBUG_FIQ
-#define DEBUG_PABT
+//#define DEBUG_PABT
 
 //#define RPI2_DEBUG_TIMER
 

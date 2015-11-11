@@ -44,9 +44,13 @@ At the moment the main restrictions are:
 - The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
   reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
-- Continuing from watchpoint requires removal of the watchpoint first.
-  Advancing PC would leave the trapped access undone altogether.
-- Stop reasons look weird because of gdb's strange way of handling signal numbers.
+- Watchpoints work with newer gdb-versions that can do single-stepping,
+  without stub support, using breakpoints, but seems like the untested
+  single-stepping of rpi_stub works too - at least to some extent.
+  Single-stepping is needed for continuing from watchpoint. If single-stepping
+  doesn't work, it's possible to remove watchpoint, set breakpoint for one step,
+  continue ('cont'-command), remove the breakpoint, reinstall the watchpoint and
+  continue. At least newer 'gdb-multiarch'-versions can do single-stepping.
 
 Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
 The pointer to the string needs to be in r0.
@@ -60,7 +64,7 @@ Roughly: rpi_stub supports:
 - loading programs
 - 'cont'
 - SW breakpoints
-- HW watchpoints (not well - see limitations)
+- HW watchpoints (see limitations)
 - reading and writing registers r0 - r15 and cpsr
 - reading and writing memory
 - stopping with ctrl-C
