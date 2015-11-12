@@ -45,12 +45,12 @@ At the moment the main restrictions are:
   reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
 - Watchpoints work with newer gdb-versions that can do single-stepping,
-  without stub support, using breakpoints, but seems like the untested
-  single-stepping of rpi_stub works too - at least to some extent.
+  without stub support, using breakpoints, but seems like the totally untested
+  single-stepping of rpi_stub might work too - at least to some extent.
   Single-stepping is needed for continuing from watchpoint. If single-stepping
   doesn't work, it's possible to remove watchpoint, set breakpoint for one step,
   continue ('cont'-command), remove the breakpoint, reinstall the watchpoint and
-  continue. At least newer 'gdb-multiarch'-versions can do single-stepping.
+  continue. 
 
 Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
 The pointer to the string needs to be in r0.
@@ -71,7 +71,8 @@ Roughly: rpi_stub supports:
 - through-gdb logging
 
 Also, gdb can do single stepping without single-stepping support just
-by using breakpoints.
+by using breakpoints. At least newer 'gdb-multiarch'-versions (like 7.7.1)
+can do single-stepping. Seems like arm-none-eabi-gdb 7.7.1 doesn't.
 
 
 
