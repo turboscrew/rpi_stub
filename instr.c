@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr.h"
 #include "rpi2.h"
 #include "ARM_decode_table.h"
+#include "log.h"
 
 
 // handle thumb instructions
@@ -54,6 +55,8 @@ instr_next_addr_t next_address_arm(unsigned int address)
 	retval = set_undef_addr();
 
 	instr = *((unsigned int *) address);
+	LOG_PR_VAL("curr addr: ", address);
+	LOG_NEWLINE();
 	retval = ARM_decoder_dispatch(instr);
 
 	// if execution is linear, address = 0xffffffff is returned

@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "gdb.h"
 #include "io_dev.h"
 #include "util.h"
+#include "log.h"
 
 // put the SW into 'echo-mode' instead of starting gdb-stub
 // #define SERIAL_TEST
@@ -64,7 +65,7 @@ void loader_main()
 
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
-
+	log_init(&serial_io);
 #if 0
 	rpi2_led_blink(2000, 300, 5);
 	rpi2_delay_loop(2000);

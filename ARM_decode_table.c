@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rpi2.h"
 #include "ARM_decode_table.h"
 #include "instr_util.h"
+#include "log.h"
 
 // Extra info to help in decoding.
 // Especially useful for decoding multiplexed instructions
@@ -112,12 +113,18 @@ instr_next_addr_t ARM_decoder_dispatch(unsigned int instr)
 	instr_next_addr_t retval;
 	int i;
 
+	instr_count /= sizeof(ARM_dec_tbl_entry_t);
 	retval = set_undef_addr();
 
 	for (i=0; i<instr_count; i++)
 	{
 		if ((instr & ARM_decode_table[i].mask) == ARM_decode_table[i].data)
 		{
+			LOG_PR_VAL("Decode table hit, i: ", (unsigned int)i);
+			LOG_PR_VAL_CONT(" instr: ", instr);
+			LOG_PR_VAL_CONT(" mask: ", ARM_decode_table[i].mask);
+			LOG_PR_VAL_CONT(" data: ", ARM_decode_table[i].data);
+			LOG_NEWLINE();
 			retval = ARM_decode_table[i].decoder(instr, ARM_decode_table[i].extra);
 			break;
 		}

@@ -10,6 +10,7 @@ C_SRCS += \
 ../instr_comm.c \
 ../instr_util.c \
 ../loader.c \
+../log.c \
 ../rpi2.c \
 ../serial.c \
 ../start1.c \
@@ -25,6 +26,7 @@ OBJS += \
 ./instr_comm.o \
 ./instr_util.o \
 ./loader.o \
+./log.o \
 ./rpi2.o \
 ./serial.o \
 ./start.o \
@@ -41,6 +43,7 @@ C_DEPS += \
 ./instr_comm.d \
 ./instr_util.d \
 ./loader.d \
+./log.d \
 ./rpi2.d \
 ./serial.d \
 ./start1.d \

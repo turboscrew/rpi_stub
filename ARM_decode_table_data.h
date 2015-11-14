@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x00800090,0x0FE000F0,arm_cmac_umull,arm_core_data_macd}, // UMULL{S}<c> <RdLo>, <RdHi>, <Rn>, <Rm>
 {0x07400010,0x0FF000D0,arm_cmac_smlald,arm_core_data_macd}, // SMLALD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm>
 {0x07400050,0x0FF000D0,arm_cmac_smlsld,arm_core_data_macd}, // SMLSLD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm>
-{0x01600010,0x0FF000F0,arm_cmisc_movw,arm_core_data_misc}, // CLZ<c> <Rd>, <Rm>
-{0x03000000,0x0FF00000,arm_cmisc_clz,arm_core_data_misc}, // MOVW<c> <Rd>, #<imm12>
+{0x01600010,0x0FF000F0,arm_cmisc_clz,arm_core_data_misc}, // CLZ<c> <Rd>, <Rm>
+{0x03000000,0x0FF00000,arm_cmisc_movw,arm_core_data_misc}, // MOVW<c> <Rd>, #<imm12>
 {0x03400000,0x0FF00000,arm_cmisc_movt,arm_core_data_misc}, // MOVT<c> <Rd>, #<imm12>
 {0x07C0001E,0x0FE0007E,arm_cmisc_bfc,arm_core_data_misc}, // BFC<c> <Rd>, #<lsb>, #<width>
 {0x07C00010,0x0FE00070,arm_cmisc_bfi,arm_core_data_misc}, // BFI<c> <Rd>, <Rn>, #<lsb>, #<width>

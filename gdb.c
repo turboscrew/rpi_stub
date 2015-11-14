@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "util.h"
 #include "gdb.h"
 #include "instr.h"
+#include "log.h"
 
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
@@ -32,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // SIG_BUS = abort
 // SIG_USR1 = unhandled HW interrupt
 // SIG_USR2 = unhandled SW interrupt
-// Any reason without defined reason
-// => 'O'-packet?
+// SIG_STOP = Any reason without defined reason
 
 // 'reasons' for target halt
 #define SIG_INT  RPI2_REASON_SIGINT
@@ -292,7 +292,8 @@ void gdb_trap_handler()
 	int break_char = 0;
 	int reason = 0;
 
-#ifdef DEBUG_GDB
+//#ifdef DEBUG_GDB
+#if 1
 	char *msg;
 	static char scratchpad[16];
 #endif
@@ -1202,7 +1203,7 @@ void gdb_resp_target_halted(int reason)
 		{
 			//text = "Breakpoint";
 			//gdb_send_text_packet(text, util_str_len(text));
-			if (gdb_hwbreak)
+			if (gdb_swbreak)
 			{
 				len = util_append_str(resp_buff, "swbreak:;", resp_buff_len);
 			}
@@ -1963,8 +1964,9 @@ void gdb_do_single_step(void)
 			gdb_single_stepping = 0; // just to be sure
 			gdb_single_stepping_address = 0xffffffff;
 			// send response
-			len = util_str_copy(resp_buff, "OTarget address reached", resp_buff_len);
-			gdb_send_packet((char *)resp_buff, len);
+			LOG_PR_STR("Target address reached\r\n");
+			//len = util_str_copy(resp_buff, "OTarget address reached", resp_buff_len);
+			//gdb_send_packet((char *)resp_buff, len);
 			gdb_send_packet(okresp, util_str_len(okresp)); // response
 			gdb_monitor_running = 1;
 			return;
@@ -1974,25 +1976,31 @@ void gdb_do_single_step(void)
 	next_addr = next_address(curr_addr);
 	if (next_addr.flag & (~INSTR_ADDR_UNPRED) == INSTR_ADDR_UNDEF)
 	{
+		LOG_PR_VAL("Next instr undef: ", *((uint32_t *)next_addr.address));
+		LOG_PR_VAL_CONT(" addr: ", next_addr.address);
+		LOG_NEWLINE();
 		// stop single stepping
 		gdb_single_stepping = 0; // just to be sure
 		gdb_single_stepping_address = 0xffffffff;
 		// send response
-		len = util_str_copy(resp_buff, "ONext instruction is UNDEFINED", resp_buff_len);
-		gdb_send_packet((char *)resp_buff, len); // response
+		//len = util_str_copy(resp_buff, "ONext instruction is UNDEFINED", resp_buff_len);
+		//gdb_send_packet((char *)resp_buff, len); // response
 		gdb_send_packet(err, util_str_len(err));
 		gdb_monitor_running = 1;
 		return;
 	}
 	else if (next_addr.flag & INSTR_ADDR_UNPRED)
 	{
+		LOG_PR_VAL("Next instr unpred: ", *((uint32_t *)next_addr.address));
+		LOG_PR_VAL_CONT(" addr: ", next_addr.address);
+		LOG_NEWLINE();
 		// TODO: configuration - allow unpredictables
 		// stop single stepping
 		gdb_single_stepping = 0; // just to be sure
 		gdb_single_stepping_address = 0xffffffff;
 		// send response
-		len = util_str_copy(resp_buff, "ONext instruction is UNPREDICTABLE", resp_buff_len);
-		gdb_send_packet((char *)resp_buff, len);
+		//len = util_str_copy(resp_buff, "ONext instruction is UNPREDICTABLE", resp_buff_len);
+		//gdb_send_packet((char *)resp_buff, len);
 		gdb_send_packet(err, util_str_len(err)); // response
 		gdb_monitor_running = 1;
 		return;
@@ -2005,6 +2013,8 @@ void gdb_do_single_step(void)
 	gdb_step_bkpt.valid = 1;
 	// patch single stepping breakpoint
 	rpi2_set_trap(gdb_step_bkpt.trap_address, RPI2_TRAP_ARM);
+	LOG_PR_VAL("Next address: ", next_addr.address);
+	LOG_NEWLINE();
 	gdb_monitor_running = 0;
 	// Delayed response - sent when stepping is done
 }
@@ -2030,13 +2040,17 @@ void gdb_cmd_single_step(volatile uint8_t *gdb_in_packet, int packet_len)
 		else
 		{
 			// single stepping in progress already (shouldn't happen)
-			len = util_str_copy(resp_buff, "OAlready single stepping", resp_buff_len);
-			gdb_send_packet((char *)resp_buff, len);
+			LOG_PR_STR("Already single stepping\r\n");
+			//len = util_str_copy(resp_buff, "OAlready single stepping", resp_buff_len);
+			//gdb_send_packet((char *)resp_buff, len);
 			gdb_send_packet(err, util_str_len(err));
 			return;
 		}
 	}
-	gdb_single_stepping_address = 0xffffffff; // just one single step
+	else
+	{
+		gdb_single_stepping_address = 0xffffffff; // just one single step
+	}
 	gdb_do_single_step();
 }
 
@@ -2334,8 +2348,10 @@ void gdb_restore_breakpoint(volatile gdb_trap_rec *bkpt)
 	else
 	{
 		*((uint16_t *)(bkpt->trap_address)) = bkpt->instruction.thumb;
-		return; // only ARM supported for now
 	}
+	rpi2_flush_address((unsigned int)(bkpt->trap_address));
+	asm volatile("dsb\n\tisb\n\t");
+
 }
 
 // handle stuff left pending until exception
