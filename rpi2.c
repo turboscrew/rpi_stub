@@ -2809,6 +2809,54 @@ void rpi2_check_debug()
 	uint32_t *ptmp1, *ptmp2;
 	static char scratchpad[16]; // scratchpad
 
+	// check floatingpoint and vector usability
+	// VMRS <Rt>, FPEXC ; Read Floating-point Exception Control Register
+	asm volatile (
+			"mrc p15, 0, %[retreg], c1, c1, 2 @ get NSACR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp1)::
+	);
+	asm volatile (
+			"mrc p15, 0, %[retreg], c1, c0, 2 @ get CPACR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp2)::
+	);
+	serial_raw_puts("\r\nNSACR: ");
+	util_word_to_hex(scratchpad, tmp1);
+	serial_raw_puts(scratchpad);
+	serial_raw_puts(" CPACR: ");
+	util_word_to_hex(scratchpad, tmp2);
+	serial_raw_puts(scratchpad);
+	if (((tmp1 >> 10) & 3) == 3) // unsecure cp10 and cp11 access enabled
+	{
+		if (((tmp2 >> 20) & 5) == 5) // PL1 access to cp10 and cp11 enabled
+		{
+			asm volatile (
+					"VMRS %[retreg], FPEXC @ get FPEXC\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp3)::
+			);
+			serial_raw_puts(" FPEXC: ");
+			util_word_to_hex(scratchpad, tmp3);
+			serial_raw_puts(scratchpad);
+			if (tmp3 & (1 << 30))
+			{
+				serial_raw_puts("\r\nFP and SIMD");
+				serial_raw_puts(" enabled!");
+			}
+		}
+		else
+		{
+			serial_raw_puts("\r\nCp10/11: ");
+			serial_raw_puts("No non-secure ");
+			serial_raw_puts("access!");
+		}
+	}
+	else
+	{
+		serial_raw_puts("\r\nCp10/11 disabled");
+	}
+
 	asm volatile (
 			"mrc p14, 0, %[retreg], c1, c0, 0 @ get DBGDRAR\n\t"
 			"dsb\n\t"
@@ -2834,7 +2882,11 @@ void rpi2_check_debug()
 	serial_raw_puts(" DBGAUTH: ");
 	util_word_to_hex(scratchpad, tmp3);
 	serial_raw_puts(scratchpad);
-
+	if ((tmp3 & 1) == 0)
+	{
+		serial_raw_puts("\r\nDBGEN not set!");
+		serial_raw_puts(" Get newer FW.");
+	}
 	tmp1 &= 0xfffff000; // masked DBGDRAR (ROM table address)
 	rom_addr = tmp1;
 	tmp2 &= 0xfffff000;
@@ -3434,6 +3486,44 @@ void rpi2_init()
 				:: [retreg] "r" (0):
 		);
 		SYNC;
+	}
+
+	// enable fp & vectors (if possible)
+	asm volatile (
+			"mrc p15, 0, %[retreg], c1, c1, 2 @ get NSACR\n\t"
+			"dsb\n\t"
+			: [retreg] "=r" (tmp1)::
+	);
+	if (((tmp1 >> 10) & 3) == 3) // unsecure cp10 and cp11 access enabled
+	{
+		// make sure cp10 and cp11 are accessible
+		asm volatile (
+				"mrc p15, 0, %[retreg], c1, c0, 2 @ get CPACR\n\t"
+				"dsb\n\t"
+				: [retreg] "=r" (tmp1)::
+		);
+		tmp1 &=  ~(0xf0000000); // all fp/vect instructions allowed
+		tmp1 |= (0xf << 20); // set cp10/11 access conf bits
+		asm volatile (
+				"mcr p15, 0, %[retreg], c1, c0, 2 @ set CPACR\n\t"
+				"dsb\n\t"
+				"isb\n\t"
+				:: [retreg] "r" (tmp1):
+		);
+		// enable fp & vectors
+		asm volatile (
+				"vmrs %[retreg], FPEXC @ get FPEXC\n\t"
+				"dsb\n\t"
+				: [retreg] "=r" (tmp1)::
+		);
+		tmp1 &= ~(1 << 29); // clear exception flag
+		tmp1 |= (1 << 30); // enable fp & vectors
+		// VMSR FPEXC, <Rt>
+		asm volatile (
+				"vmsr FPEXC, %[retreg] @ set FPEXC\n\t"
+				"dsb\n\t"
+				:: [retreg] "r" (tmp1):
+		);
 	}
 
 	cpsr_store = rpi2_disable_save_ints();

@@ -84,47 +84,47 @@ void loader_main()
 	serial_io.put_string(dbg_buff, dbg_buff_len);
 #endif
 
-#if 0
-	msg = "\r\nrpi2_use_mmu = ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_use_mmu);
-	serial_io.put_string(scratchpad, 9);
-	msg = " rpi2_uart0_excmode = ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_uart0_excmode);
-	serial_io.put_string(scratchpad, 9);
-	msg = "\r\nrpi2_arm_ramsize = ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_arm_ramsize);
-	serial_io.put_string(scratchpad, 9);
-	msg = " rpi2_arm_ramstart = ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_arm_ramstart);
-	serial_io.put_string(scratchpad, 9);
-	msg = " rpi2_keep_ctrlc ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_keep_ctrlc);
-	serial_io.put_string(scratchpad, 9);
-	msg = "\r\nrpi2_uart0_baud ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_uart0_baud);
-	serial_io.put_string(scratchpad, 9);
-	msg = " rpi2_uart_clock ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_uart_clock);
-	serial_io.put_string(scratchpad, 9);
-	msg = " rpi2_use_hw_debug ";
-	serial_io.put_string(msg, util_str_len(msg));
-	util_word_to_hex(scratchpad, rpi2_use_hw_debug);
-	serial_io.put_string(scratchpad, 9);
-	
-	serial_io.put_string("\r\n", 3);
-	//serial_io.put_string(cmdline, 1024);
-	//serial_io.put_string("\r\n", 3);
-	
-	rpi2_check_debug();
-	
-#endif
+	if (rpi2_print_dbg_info)
+	{
+		msg = "\r\nrpi2_use_mmu = ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_use_mmu);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_uart0_excmode = ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_uart0_excmode);
+		serial_io.put_string(scratchpad, 9);
+		msg = "\r\nrpi2_arm_ramsize = ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_arm_ramsize);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_arm_ramstart = ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_arm_ramstart);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_keep_ctrlc ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_keep_ctrlc);
+		serial_io.put_string(scratchpad, 9);
+		msg = "\r\nrpi2_uart0_baud ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_uart0_baud);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_uart_clock ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_uart_clock);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_use_hw_debug ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_use_hw_debug);
+		serial_io.put_string(scratchpad, 9);
+		
+		serial_io.put_string("\r\n", 3);
+		//serial_io.put_string(cmdline, 1024);
+		//serial_io.put_string("\r\n", 3);
+		
+		rpi2_check_debug();
+	}
 
 #if 0
 	// debug-line
@@ -291,6 +291,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_keep_ctrlc = 0; // no forced ctrl-c enabling
 	rpi2_uart0_baud = 115200;
 	rpi2_use_hw_debug = 1;
+	rpi2_print_dbg_info = 0;
 	
 	rpi2_get_cmdline(cmdline);
 	
@@ -353,6 +354,13 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 					i += util_read_dec(cmdline + i, &tmp);
 					if (tmp == 1) rpi2_use_hw_debug = 1;
 					else if (tmp == 0) rpi2_use_hw_debug = 0;
+					// else ignore
+				}
+				else if (util_cmp_substr("dbg_info", cmdline + i) >= util_str_len("dbg_info"))
+				{
+					// rpi_stub_dbg_info
+					i += util_str_len("dbg_info");
+					rpi2_print_dbg_info = 1;
 					// else ignore
 				}
 			}

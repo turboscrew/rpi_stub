@@ -38,11 +38,12 @@ void log_init(io_device *device)
 void log_pr_head(const char *file, int line)
 {
 	char scratch[9];
+	logdev->put_string("\r\n", 3);
 	logdev->put_string((char *)file, util_str_len((char *)file));
 	logdev->put_string(" ", 2);
 	util_word_to_hex(scratch, (unsigned int)line);
 	logdev->put_string(scratch, util_str_len(scratch));
-	logdev->put_string(":\r\n", 3);
+	logdev->put_string("\r\n", 3);
 }
 
 void log_pr_str( char *str)

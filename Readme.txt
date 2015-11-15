@@ -34,6 +34,10 @@ ibrd and fbrd for UART0. The sensibility of the parameters are not checked.
 breaks makes the debuggee to run in debug monitor mode, and in some cases it
 may be harmful. If <n> = 1 the HW watchpoints are enabled, if <n> = 0. the HW
 watchpoints are disabled. Default is 1.
+'rpi_stub_dbg_info', if present, causes rpi_stub to print out some info about
+the debug HW present, and some settings, like whether or not FP and SIMD are enabled.
+To use this parameter, start with serial terminal instead of gdb, and after
+the info is printed, close the serial terminal and start gdb normally.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported

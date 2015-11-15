@@ -1302,11 +1302,13 @@ instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 		case arm_bra_b_lbl:
 		case arm_bra_bl_lbl:
 			baddr = (int) rpi2_reg_context.reg.r15; // PC
+			baddr += 8; // PC runs 2 words ahead
 			baddr += (sx32(instr, 23, 0) << 2);
 			retval = set_arm_addr((unsigned int) baddr);
 			break;
 		case arm_bra_blx_lbl:
 			baddr = (int) rpi2_reg_context.reg.r15; // PC
+			baddr += 8; // PC runs 2 words ahead
 			baddr += (sx32(instr, 23, 0) << 2) | (bit(instr, 24) << 1);
 			retval = set_thumb_addr((unsigned int) baddr);
 			break;
@@ -1458,7 +1460,7 @@ instr_next_addr_t arm_coproc(unsigned int instr, ARM_decode_extra_t extra)
 instr_next_addr_t arm_core_data_div(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	unsigned int tmp1, tmp2, tmp3;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int stmp1, stmp2, stmp3;
 	retval = set_undef_addr();
 
@@ -1471,6 +1473,8 @@ instr_next_addr_t arm_core_data_div(unsigned int instr, ARM_decode_extra_t extra
 		{
 			stmp2 = (int)rpi2_reg_context.storage[tmp2];
 			stmp3 = (int)rpi2_reg_context.storage[tmp3];
+			if (tmp2 == 15) stmp2 += 8; // PC runs 2 words ahead
+			if (tmp3 == 15) stmp3 += 8; // PC runs 2 words ahead
 			if (stmp2 == 0) // zero divisor
 			{
 				// division by zero
@@ -1498,9 +1502,19 @@ instr_next_addr_t arm_core_data_div(unsigned int instr, ARM_decode_extra_t extra
 		}
 		else
 		{
+			tmp4 = 0;
 			// arm_div_udiv
-			tmp2 = rpi2_reg_context.storage[tmp2];
-			tmp3 = rpi2_reg_context.storage[tmp3];
+			if (tmp2 == 15)
+			{
+				tmp4 += 8; // PC runs 2 words ahead
+			}
+			tmp2 = rpi2_reg_context.storage[tmp2] + tmp4;
+			if (tmp3 == 15)
+			{
+				tmp4 += 8; // PC runs 2 words ahead
+			}
+			tmp3 = rpi2_reg_context.storage[tmp3]+ tmp4;
+
 			if (tmp2 == 0) // zero divisor
 			{
 				// division by zero
@@ -1542,8 +1556,12 @@ instr_next_addr_t arm_core_data_mac(unsigned int instr, ARM_decode_extra_t extra
 	{
 		tmp1 = bitrng(instr, 11, 8); // Rm
 		tmp2 = bitrng(instr, 3, 0); // Rn
-		tmp1 = rpi2_reg_context.storage[tmp1];
-		tmp2 = rpi2_reg_context.storage[tmp2];
+		tmp4 = 0;
+		if (tmp1 == 15) tmp4 = 8; // PC runs 4 words ahead
+		tmp1 = rpi2_reg_context.storage[tmp1] + tmp4;
+		tmp4 = 0;
+		if (tmp2 == 15) tmp4 = 8; // PC runs 4 words ahead
+		tmp2 = rpi2_reg_context.storage[tmp2] + tmp4;
 		switch (extra)
 		{
 		case arm_cmac_mul:
@@ -1701,7 +1719,7 @@ instr_next_addr_t arm_core_data_macd(unsigned int instr, ARM_decode_extra_t extr
 	// if dLo == 15 || dHi == 15 || n == 15 || m == 15 then UNPREDICTABLE;
 	// if dHi == dLo then UNPREDICTABLE;
 	instr_next_addr_t retval;
-	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int tmp1, tmp2, tmp3, tmp4, tmp5;
 	int stmp1, stmp2, stmp3;
 	long long int ltmp;
 	long long utmp;
@@ -1715,8 +1733,12 @@ instr_next_addr_t arm_core_data_macd(unsigned int instr, ARM_decode_extra_t extr
 	{
 		tmp1 = bitrng(instr, 11, 8); // Rm
 		tmp2 = bitrng(instr, 3, 0); // Rn
-		tmp1 = rpi2_reg_context.storage[tmp1];
-		tmp2 = rpi2_reg_context.storage[tmp2];
+		tmp5 = 0;
+		if (tmp1 == 15) tmp5 = 8; // PC runs 2 words ahead
+		tmp1 = rpi2_reg_context.storage[tmp1] + tmp5;
+		tmp5 = 0;
+		if (tmp2 == 15) tmp5 = 8; // PC runs 2 words ahead
+		tmp2 = rpi2_reg_context.storage[tmp2] + tmp5;
 		switch (extra)
 		{
 		case arm_cmac_smlal16:
@@ -1888,7 +1910,9 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		if (tmp1 == 15) // Rd = PC
 		{
 			tmp2 = bitrng(instr, 3, 0); // Rm
-			tmp2 = rpi2_reg_context.storage[tmp2];
+			tmp3 = 0;
+			if (tmp2 == 15) tmp3 = 8; // PC runs 2 words ahead
+			tmp2 = rpi2_reg_context.storage[tmp2] + tmp3;
 			// this could be optimized
 			for (tmp3=0; tmp3 < 32; tmp3++)
 			{
@@ -1918,6 +1942,7 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 			tmp4 = ~tmp4;
 			// clear bits
 			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 += 8; // PC runs 2 words ahead
 			tmp1 &= tmp4;
 			retval = set_arm_addr(tmp1);
 			retval = set_unpred_addr(retval);
@@ -1942,10 +1967,19 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 			tmp4 = (~tmp4) << tmp3;
 			// clear bits in Rd
 			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 += 8; // PC runs 2 words ahead
 			tmp1 &= (~tmp4);
 			// get bits from Rm
 			tmp2 = bitrng(instr, 3, 0); // Rm
-			tmp2 = rpi2_reg_context.storage[tmp2];
+			if (tmp2 == 15)
+			{
+				tmp2 = rpi2_reg_context.storage[tmp2];
+				tmp2 += 8; // PC runs 2 words ahead
+			}
+			else
+			{
+				tmp2 = rpi2_reg_context.storage[tmp2];
+			}
 			tmp2 &= tmp4;
 			// insert bits
 			tmp1 |= tmp2;
@@ -1963,7 +1997,16 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[tmp1];
+			tmp1 = bitrng(instr, 3, 0); // Rm
+			if (tmp1 == 15)
+			{
+				tmp1 = rpi2_reg_context.storage[tmp1];
+				tmp1 += 8;  // PC runs 2 words ahead
+			}
+			else
+			{
+				tmp1 = rpi2_reg_context.storage[tmp1];
+			}
 			// swap odd and even bits
 			tmp1 = ((tmp1 & 0xaaaaaaaa) >> 1) | ((tmp1 & 0x55555555) << 1);
 			// swap bit pairs
@@ -1989,8 +2032,9 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[tmp1];
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp1 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp1]; // (Rm)
+			if (tmp1 == 15) tmp2 += 8; // PC runs 2 words ahead
 			tmp1 = (tmp2 & 0xff000000)  >> 24; // result lowest
 			tmp1 |= (tmp2 & 0x00ff0000) >> 8;
 			tmp1 |= (tmp2 & 0x0000ff00) << 8;
@@ -2009,8 +2053,9 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[tmp1];
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp1 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp1]; // (Rm)
+			if (tmp1 == 15) tmp2 += 8; // PC runs 2 words ahead
 			tmp1 = (tmp2 & 0xff000000)  >> 8;
 			tmp1 |= (tmp2 & 0x00ff0000) << 8; // result highest
 			tmp1 |= (tmp2 & 0x0000ff00) >> 8; // result lowest
@@ -2028,7 +2073,9 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp1 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp1]; // (Rm)
+			if (tmp1 == 15) tmp2 += 8; // PC runs 2 words ahead
 			if (bit(tmp2, 7)) // the result will be negative
 				tmp3 = (~0) << 16;
 			else
@@ -2059,7 +2106,15 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 			tmp4 = (~tmp4) << tmp3;
 			// get bits from Rm
 			tmp1 = bitrng(instr, 3, 0); // Rn
-			tmp1 = rpi2_reg_context.storage[tmp1];
+			if (tmp1 == 15)
+			{
+				tmp1 = rpi2_reg_context.storage[tmp1];
+				tmp1 += 8; // PC runs 2 words ahead
+			}
+			else
+			{
+				tmp1 = rpi2_reg_context.storage[tmp1];
+			}
 			tmp1 &= tmp4;
 			// make it an unsigned number
 			tmp1 >>= tmp3;
@@ -2086,8 +2141,12 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // (Rn)
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			tmp3 = bitrng(instr, 19, 16); // Rn
+			tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+			if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			tmp3 = rpi2_reg_context.reg.cpsr;
 			tmp4 = 0;
 			// select Rn or Rm by the GE-bits
@@ -2110,8 +2169,12 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 		tmp1 = bitrng(instr, 15, 12); // Rd
 		if (tmp1 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // (Rm)
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rn)
+			tmp3 = bitrng(instr, 11, 8); // Rm
+			tmp1 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
+			tmp3 = bitrng(instr, 3, 0); // Rn
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rn)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			// sum of absolute differences
 			tmp3 = 0;
 			for (tmp4 = 0; tmp4 < 4; tmp4++) // for each byte
@@ -2146,7 +2209,7 @@ instr_next_addr_t arm_core_data_misc(unsigned int instr, ARM_decode_extra_t extr
 instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int tmp1, tmp2, tmp3, tmp4, tmp5;
 	unsigned short htmp1, htmp2;
 	int stmp1, stmp2;
 
@@ -2162,10 +2225,14 @@ instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extr
 		tmp4 = bitrng(instr, 15, 12); // Rd
 		if (tmp4 == 15) // Rd = PC
 		{
-			// operand2
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // (Rm)
+			// operands
+			tmp5 = bitrng(instr, 3, 0); // Rm
+			tmp1 = rpi2_reg_context.storage[tmp5]; // (Rm)
+			if (tmp5 == 15) tmp1 += 8;  // PC runs 2 words ahead
 			tmp2 = bitrng(instr, 11, 7); // imm5
-			tmp3 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // (Rn)
+			tmp5 = bitrng(instr, 19, 16); // Rn
+			tmp3 = rpi2_reg_context.storage[tmp5]; // (Rn)
+			if (tmp5 == 15) tmp3 += 8;  // PC runs 2 words ahead
 			if (bit(instr, 6)) // tb: 1=top from Rn, bottom from operand2
 			{
 				// PKHTB: shift=ASR (sign extended shift)
@@ -2227,7 +2294,9 @@ instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extr
 		tmp4 = bitrng(instr, 15, 12); // Rd
 		if (tmp4 == 15) // Rd = PC
 		{
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+			tmp5 = bitrng(instr, 3, 0); // Rm
+			tmp1 = rpi2_reg_context.storage[tmp5]; // (Rm)
+			if (tmp5 == 15) tmp1 += 8; // PC runs 2 words ahead
 			// Rotate Rm
 			tmp1 = instr_util_rorb(tmp1, (int)bitrng(instr, 3, 0));
 
@@ -2343,8 +2412,12 @@ instr_next_addr_t arm_core_data_par(unsigned int instr, ARM_decode_extra_t extra
 	// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
 	if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
-		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+		tmp3 = bitrng(instr, 19, 16); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+		if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
+		tmp3 = bitrng(instr, 3, 0); // Rm
+		tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 		switch (extra)
 		{
 		case arm_par_qadd16:
@@ -2671,8 +2744,12 @@ instr_next_addr_t arm_core_data_sat(unsigned int instr, ARM_decode_extra_t extra
 			// QADD/QDADD/QSUB/QDSUB
 			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE
 			// Rn = bits 19-16, Rm = bits 3-0, Rd = bits 15-12
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+			tmp3 = bitrng(instr, 19, 16); // Rn
+			tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+			if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
+			tmp3 = bitrng(instr, 3, 0); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			switch(extra)
 			{
 			case arm_sat_qadd:
@@ -2706,8 +2783,9 @@ instr_next_addr_t arm_core_data_sat(unsigned int instr, ARM_decode_extra_t extra
 			// if d == 15 || n == 15 then UNPREDICTABLE;
 			// Rn = bits 3-0, Rd = bits 15-12, imm = bits 11-6
 			// sat_imm = bits 20/19 - 16, shift = bit 6
-			tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rn
-
+			tmp3 = bitrng(instr, 3, 0); // Rn
+			tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+			if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
 			switch (extra)
 			{
 			case arm_sat_ssat:
@@ -2789,23 +2867,25 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 	retval = set_undef_addr();
 	if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-		tmp1 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rn / Rm if imm
+		tmp3 = bitrng(instr, 3, 0); // Rn / Rm if imm
+		tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+		if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
 		switch (extra)
 		{
 		case arm_ret_asr_imm:
 		case arm_cdata_asr_imm:
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp2 = bitrng(instr, 11, 7); // imm
 			stmp1 = (int) tmp1; // for '>>' to act as ASR instead of LSR
 			tmp3 = (unsigned int) (stmp1 >> tmp2);
 			break;
 		case arm_ret_lsr_imm:
 		case arm_cdata_lsr_imm:
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp2 = bitrng(instr, 11, 7); // imm
 			tmp3 = tmp1 >> tmp2;
 			break;
 		case arm_ret_lsl_imm:
 		case arm_cdata_lsl_imm:
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp2 = bitrng(instr, 11, 7); // imm
 			tmp3 = tmp1 << tmp2;
 			break;
 		case arm_ret_mov_pc:
@@ -2814,7 +2894,7 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 			break;
 		case arm_ret_ror_imm:
 		case arm_cdata_ror_imm:
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 7)]; // imm
+			tmp2 = bitrng(instr, 11, 7); // imm
 			tmp4 = bitrng(tmp1, tmp2, 0); // catch the dropping bits
 			tmp4 <<= (32 - tmp2); // prepare for putting back in the top
 			tmp3 = tmp1 >> tmp2;
@@ -2828,14 +2908,18 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 			break;
 		case arm_cdata_asr_r:
 			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp3 = bitrng(instr, 11, 8); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			tmp2 &= 0x1f; // we don't need shifts more than 31 bits
 			stmp1 = (int) tmp1; // for '>>' to act as ASR instead of LSR
 			tmp3 = (unsigned int) (stmp1 >> tmp2);
 			break;
 		case arm_cdata_lsl_r:
 			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp3 = bitrng(instr, 11, 8); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			if (tmp2 > 31) // to get rid of warning about too long shift
 			{
 				tmp3 = 0;
@@ -2848,7 +2932,9 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 			break;
 		case arm_cdata_lsr_r:
 			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp3 = bitrng(instr, 11, 8); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			if (tmp2 > 31) // to get rid of warning about too long shift
 			{
 				tmp3 = 0;
@@ -2861,7 +2947,9 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 			break;
 		case arm_cdata_ror_r:
 			// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
-			tmp2 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rm
+			tmp3 = bitrng(instr, 11, 8); // Rm
+			tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+			if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 			tmp2 &= 0x1f; // we don't need shifts more than 31 bits
 			if (tmp2 == 0) // to get rid of warning about too long shift
 			{
@@ -2955,10 +3043,13 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 	}
 	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
-
+		tmp3 = bitrng(instr, 19, 16); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp3]; // (Rn)
+		if (tmp3 == 15) tmp1 += 8; // PC runs 2 words ahead
 		// calculate operand2
-		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
+		tmp3 = bitrng(instr, 3, 0); // Rm
+		tmp2 = rpi2_reg_context.storage[tmp3]; // (Rm)
+		if (tmp3 == 15) tmp2 += 8; // PC runs 2 words ahead
 		tmp3 = bitrng(instr, 11, 7); // shift-immediate
 		switch (bitrng(instr, 6, 5))
 		{
@@ -3116,12 +3207,19 @@ instr_next_addr_t arm_core_data_std_sh(unsigned int instr, ARM_decode_extra_t ex
 	}
 	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+		tmp4 = bitrng(instr, 19, 16); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp4]; // (Rn)
+		if (tmp4 == 15) tmp1 += 8; // PC runs 2 words ahead
 
 		// calculate operand2
-		tmp2 = rpi2_reg_context.storage[bitrng(instr, 3, 0)]; // Rm
-		tmp3 = rpi2_reg_context.storage[bitrng(instr, 11, 8)]; // Rs
+		tmp4 = bitrng(instr, 3, 0); // Rm
+		tmp2 = rpi2_reg_context.storage[tmp4]; // (Rm)
+		if (tmp4 == 15) tmp2 += 8; // PC runs 2 words ahead
+		tmp4 = bitrng(instr, 11, 8); // Rs
+		tmp3 = rpi2_reg_context.storage[tmp4]; // (Rs)
+		if (tmp4 == 15) tmp3 += 8; // PC runs 2 words ahead
 		tmp3 &= 0x1f; // we don't need any longer shifts here
+
 		if (tmp3 != 0) // with zero shift count there's nothing to do
 		{
 			switch (bitrng(instr, 6, 5))
@@ -3221,7 +3319,9 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 	}
 	else if (bitrng(instr, 15, 12) == 15) // Rd = PC
 	{
-		tmp1 = rpi2_reg_context.storage[bitrng(instr, 19, 16)]; // Rn
+		tmp4 = bitrng(instr, 19, 16); // Rn
+		tmp1 = rpi2_reg_context.storage[tmp4]; // (Rn)
+		if (tmp4 == 15) tmp1 += 8; // PC runs 2 words ahead
 
 		// calculate operand2
 		// imm12: bits 11-8 = half of ror amount, bits 7-0 = immediate value
@@ -3352,6 +3452,7 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 // here we take some shortcuts. We assume ARM or Thumb instruction set
 // and we don't go further into more complicated modes, like hyp, debug
 // or secure monitor
+// TODO: check what the PC value could be
 instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;

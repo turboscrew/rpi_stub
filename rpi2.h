@@ -228,6 +228,7 @@ extern unsigned int rpi2_uart0_excmode;
 extern unsigned int rpi2_uart0_baud;
 extern unsigned int rpi2_use_mmu;
 extern unsigned int rpi2_use_hw_debug;
+extern unsigned int rpi2_print_dbg_info;
 
 // register context
 // for lr in exception, see pages B1-1172 and B1-1173 of
