@@ -11,6 +11,7 @@ WORK IN PROGRESS!
 The rpi_stub is a bare metal standalone gdb server/stub to aid in remote debugging
 of bare metal programs using gdb via serial cable. It boots from the SD-card and
 runs there without any additional programs.
+Firmware (boot files) of Oct 11 2015 or later is recommended.
 
 The bare metal program to be debugged is loaded on Raspberry Pi 2B using
 gdb's 'load'-command (see the INSTRUCTIONS.txt), and then run with gdb's
@@ -41,20 +42,16 @@ the info is printed, close the serial terminal and start gdb normally.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported
-- Floating point and vector HW are not supported
-- No single stepping (yet, but gdb seems to be able to single-step using breakpoint).
+- Floating point and vector registers not supported, but instructions should work.
+  (If not, try parameter 'rpi_stub_dbg_info' to find out why.)
 - Only single core supported
 - UART0 (the full UART) is reserved exclusively for the rpi_stub.
-- The breakpoints bkpt #0x7fff, bkpt #0x7ffe and bkpt 0x7ffd are
-  reserved exclusively for the stub.
+- The breakpoints bkpt #0x7ffb to 0x7fff are reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
 - Watchpoints work with newer gdb-versions that can do single-stepping,
-  without stub support, using breakpoints, but seems like the totally untested
-  single-stepping of rpi_stub might work too - at least to some extent.
-  Single-stepping is needed for continuing from watchpoint. If single-stepping
-  doesn't work, it's possible to remove watchpoint, set breakpoint for one step,
-  continue ('cont'-command), remove the breakpoint, reinstall the watchpoint and
-  continue. 
+  without stub support, using breakpoints, but rpi_stub single-stepping support
+  works too, at least to some extent (mostly untested).
+  (If watchpoints don't work, try parameter 'rpi_stub_dbg_info' to find out why.)
 
 Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
 The pointer to the string needs to be in r0.
@@ -69,14 +66,20 @@ Roughly: rpi_stub supports:
 - 'cont'
 - SW breakpoints
 - HW watchpoints (see limitations)
+- single-stepping (see limitations)
 - reading and writing registers r0 - r15 and cpsr
 - reading and writing memory
 - stopping with ctrl-C
 - through-gdb logging
 
+About mmu, caches and UART0 configuration (including interrupt), check
+the command line parameters.
+
 Also, gdb can do single stepping without single-stepping support just
 by using breakpoints. At least newer 'gdb-multiarch'-versions (like 7.7.1)
-can do single-stepping. Seems like arm-none-eabi-gdb 7.7.1 doesn't.
+can do single-stepping. Also arm-linux-gnueabihf-gdb 7.6.1 seems to work.
+Seems like arm-none-eabi-gdb 7.7.1 doesn't support single-stepping, but
+works - at least to some extent - with rpi_stub singe-stepping support.
 
 
 
