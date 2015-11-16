@@ -124,6 +124,8 @@ instr_next_addr_t ARM_decoder_dispatch(unsigned int instr)
 			LOG_PR_VAL_CONT(" instr: ", instr);
 			LOG_PR_VAL_CONT(" mask: ", ARM_decode_table[i].mask);
 			LOG_PR_VAL_CONT(" data: ", ARM_decode_table[i].data);
+			LOG_PR_VAL_CONT(" call: ", (unsigned int)(ARM_decode_table[i].decoder));
+			LOG_PR_VAL_CONT(" extra: ", (unsigned int)(ARM_decode_table[i].extra));
 			LOG_NEWLINE();
 			retval = ARM_decode_table[i].decoder(instr, ARM_decode_table[i].extra);
 			break;
@@ -1292,9 +1294,7 @@ instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 	int baddr = 0;
-
 	retval = set_undef_addr();
-
 	if (will_branch(instr))
 	{
 		switch (extra)
@@ -1336,6 +1336,7 @@ instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 		// No condition match - NOP
 		retval = set_addr_lin();
 	}
+	LOG_NEWLINE();
 	return retval;
 }
 

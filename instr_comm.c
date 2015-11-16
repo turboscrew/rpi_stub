@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "instr_comm.h"
 #include "rpi2.h"
 #include <stdint.h>
+#include "log.h"
 // places for opcodes that we need to actually execute
 // extern uint32_t mrs_regb;
 extern uint32_t executed_instruction;
