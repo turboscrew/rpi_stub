@@ -391,7 +391,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 		// if mask (bits 19-16) == 0 then UNPREDICTABLE;
 		// if n == 15 then UNPREDICTABLE
 		// R = bit 22
-
+		// TODO: add check for T-bit, return thumb address if set (CPSR)
 		if (bitrng(rpi2_reg_context.reg.cpsr, 4, 0) == 16) // user mode
 		{
 			retval = set_addr_lin();
@@ -1321,8 +1321,13 @@ instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 			retval.address = rpi2_reg_context.storage[bitrng(instr, 3, 0)];
 			if (bit(retval.address, 0))
 				retval = set_thumb_addr(retval.address & ((~0) << 1));
-			else
+			else if (bit(retval.address, 1) == 0)
 				retval = set_arm_addr(retval.address & ((~0) << 2));
+			else
+			{
+				retval = set_addr_lin();
+				retval = set_unpred_addr(retval);
+			}
 			if (bitrng(instr, 3, 0) == 15) // PC
 				retval = set_unpred_addr(retval);
 			break;
@@ -1336,7 +1341,6 @@ instr_next_addr_t arm_branch(unsigned int instr, ARM_decode_extra_t extra)
 		// No condition match - NOP
 		retval = set_addr_lin();
 	}
-	LOG_NEWLINE();
 	return retval;
 }
 
@@ -2860,7 +2864,7 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 	// shift type = bits 6-5: 0=LSL, 1=LSR, 2=ASR, 3=ROR/RRX
 	// exception returning:
 	// find out operation result, set cpsr = spsr, pc = result (jump)
-
+	// TODO: add check for T-bit, return thumb address if set (SPSR)
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int stmp1;
@@ -2980,13 +2984,26 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 	case arm_ret_ror_imm:
 	case arm_ret_rrx_pc:
 	case arm_ret_mov_pc:
+		tmp1 = rpi2_reg_context.reg.cpsr;
+		if (!bit(instr, 20)) // is not 's' (= return from exception)
+		{
+			// normal jump
+			if (tmp3 & 1) retval = set_thumb_addr(tmp3);
+			else if (!(tmp3 & 3)) retval = set_arm_addr(tmp3);
+			else
+			{
+				retval = set_thumb_addr(tmp3);
+				retval = set_unpred_addr(retval);
+			}
+			break;
+		}
+		// return from exception
 		// if CurrentModeIsHyp() then UNDEFINED;
 		// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
 		// if executed in Debug state then UNPREDICTABLE
 		// TODO: check other state restrictions too
 		// UNPREDICTABLE due to privilege violation might cause
 		// UNDEFINED or SVC exception. Let's guess SVC for now.
-		tmp1 = bit(rpi2_reg_context.reg.cpsr, 29); // carry-flag
 		switch (tmp1 & 0x1f) // current mode
 		{
 		case 0x10: // usr
@@ -2998,11 +3015,16 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 			retval = set_undef_addr();
 			break;
 		default:
-			retval = set_arm_addr(tmp3);
+			// retval = set_arm_addr(tmp3);
+			tmp1 = rpi2_reg_context.reg.spsr;
+			if (bit(tmp1, 5)) // 'T'-bit in SPSR
+			{
+				retval = set_thumb_addr(tmp3);
+			}
 			break;
 		}
 		break;
-	// here Rd may be PC
+	// here Rd may be PC, but no return from exception
 	case arm_cdata_asr_r:
 	case arm_cdata_lsl_r:
 	case arm_cdata_lsr_r:
@@ -3010,7 +3032,12 @@ instr_next_addr_t arm_core_data_bit(unsigned int instr, ARM_decode_extra_t extra
 		// if d == 15 || n == 15 || m == 15 then UNPREDICTABLE;
 		if (bitrng(instr, 15, 12) == 15) // Rd = PC
 		{
-			retval = set_arm_addr(tmp3);
+			if (tmp3 & 1) retval = set_thumb_addr(tmp3);
+			else if (!(tmp3 & 3)) retval = set_arm_addr(tmp3);
+			else
+			{
+				retval = set_thumb_addr(tmp3);
+			}
 			retval = set_unpred_addr(retval);
 		}
 		else
@@ -3029,6 +3056,7 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 {
 	// Rd = bits 15-12, Rn = bits 19-16, Rm = bits 3-0
 	// imm = bits 11-7, shift = bits 6-5
+	// TODO: add check for T-bit, return thumb address if set (CPSR)
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int stmp1;
@@ -3159,6 +3187,20 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 		case arm_ret_rsc_r:
 		case arm_ret_sbc_r:
 		case arm_ret_sub_r:
+			tmp1 = rpi2_reg_context.reg.cpsr;
+			if (!(bit(instr, 20)))
+			{
+				// not return from exception
+				tmp3 = retval.address;
+				if (tmp3 & 1) retval = set_thumb_addr(tmp3);
+				else if (!(tmp3 & 3)) retval = set_arm_addr(tmp3);
+				else
+				{
+					retval = set_thumb_addr(tmp3);
+					retval = set_unpred_addr(retval);
+				}
+				break;
+			}
 			// if CurrentModeIsHyp() then UNDEFINED;
 			// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
 			// if executed in Debug state then UNPREDICTABLE
@@ -3176,7 +3218,12 @@ instr_next_addr_t arm_core_data_std_r(unsigned int instr, ARM_decode_extra_t ext
 				retval = set_undef_addr();
 				break;
 			default:
-				// Nothing to do
+				tmp1 = rpi2_reg_context.reg.spsr;
+				if (bit(tmp1, 5)) // 'T'-bit in SPSR
+				{
+					tmp3 = retval.address;
+					retval = set_thumb_addr(tmp3);
+				}
 				break;
 			}
 		}
@@ -3305,6 +3352,7 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 	// if d == 15 || n == 15 || m == 15 || s == 15 then UNPREDICTABLE
 	// Rd = bits 15-12, Rn = bits 19-16, imm = bits 11-0
 	// Rs = bits 11-8, shift = bits 6-5
+	// TODO: add check for T-bit, return thumb address if set (CPSR)
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int stmp1;
@@ -3421,6 +3469,20 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 		case arm_ret_rsc_imm:
 		case arm_ret_sbc_imm:
 		case arm_ret_sub_imm:
+			tmp1 = rpi2_reg_context.reg.cpsr;
+			if (!(bit(instr, 20)))
+			{
+				// not return from exception
+				tmp3 = retval.address;
+				if (tmp3 & 1) retval = set_thumb_addr(tmp3);
+				else if (!(tmp3 & 3)) retval = set_arm_addr(tmp3);
+				else
+				{
+					retval = set_thumb_addr(tmp3);
+					retval = set_unpred_addr(retval);
+				}
+				break;
+			}
 			// if CurrentModeIsHyp() then UNDEFINED;
 			// if CurrentModeIsUserOrSystem() then UNPREDICTABLE;
 			// if executed in Debug state then UNPREDICTABLE
@@ -3438,7 +3500,12 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 				retval = set_undef_addr();
 				break;
 			default:
-				// Nothing to do
+				tmp1 = rpi2_reg_context.reg.spsr;
+				if (bit(tmp1, 5)) // 'T'-bit in SPSR
+				{
+					tmp3 = retval.address;
+					retval = set_thumb_addr(tmp3);
+				}
 				break;
 			}
 		}
@@ -3454,6 +3521,9 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 // and we don't go further into more complicated modes, like hyp, debug
 // or secure monitor
 // TODO: check what the PC value could be
+// TODO: add check for T-bit, return thumb address if set (CPSR/SPSR)
+// See execution of exception handler as the functionality of SW exception
+// instruction - consider the program flow as linear
 instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
@@ -3479,9 +3549,13 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 		}
 		break;
 	case arm_exc_bkpt:
-		// if user code contains bkpt, unpredictable
-		retval = set_arm_addr(0x0c); // PABT
-		retval = set_unpred_addr(retval); // also used by the debuger
+		// if user code contains bkpt, address from low vector?
+		// maybe not - single-stepping and suddenly ending a debugging session
+		// might leave breakpoints in rpi_stub code
+		// better play linear...
+		// retval = set_arm_addr(0x0c); // PABT
+		//retval = set_unpred_addr(retval); // may cause oddities
+		retval = set_addr_lin();
 		break;
 	case arm_exc_hvc:
 		// UNPREDICTABLE in Debug state.
@@ -3499,14 +3573,18 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 			{
 				if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
 				{
-					retval = set_arm_addr(0x14); // HVC-vector
-					retval = set_unpred_addr(retval);
+					//retval = set_arm_addr(0x14); // HVC-vector
+					//retval = set_unpred_addr(retval);
+					retval = set_addr_lin();
 				}
 				else
 					retval = set_undef_addr();
 			}
 			else
-				retval = set_arm_addr(0x14); // HVC-vector
+			{
+				//retval = set_arm_addr(0x14); // HVC-vector
+				retval = set_addr_lin();
+			}
 		}
 		break;
 	case arm_exc_smc:
@@ -3516,8 +3594,9 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 		}
 		else if ((get_HCR() & (1 << 19)) && (!get_security_state())) // HCR.TSC
 		{
-				retval = set_arm_addr(0x14); // hyp trap
-				retval = set_unpred_addr(retval); // we don't support hyp
+				//retval = set_arm_addr(0x14); // hyp trap
+				//retval = set_unpred_addr(retval); // we don't support hyp
+				retval = set_addr_lin();
 		}
 		else if (get_SCR() & (1 << 7)) // SCR.SCD
 		{
@@ -3527,13 +3606,15 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 			}
 			else
 			{
-				retval = set_arm_addr(0x08); // smc-vector?
-				retval = set_unpred_addr(retval);
+				//retval = set_arm_addr(0x08); // smc-vector?
+				//retval = set_unpred_addr(retval);
+				retval = set_addr_lin();
 			}
 		}
 		else
 		{
-			retval = set_arm_addr(0x08); // smc-vector?
+			//retval = set_arm_addr(0x08); // smc-vector?
+			retval = set_addr_lin();
 		}
 		break;
 	case arm_exc_svc:
@@ -3542,14 +3623,21 @@ instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 			if ((!get_security_state()) // non-secure
 					&& check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
 			{
-				retval = set_arm_addr(0x14); // hyp trap
-				retval = set_unpred_addr(retval); // we don't support hyp
+				//retval = set_arm_addr(0x14); // hyp trap
+				//retval = set_unpred_addr(retval); // we don't support hyp
+				retval = set_addr_lin();
 			}
 			else
-				retval = set_arm_addr(0x08); // svc-vector
+			{
+				//retval = set_arm_addr(0x08); // svc-vector
+				retval = set_addr_lin();
+			}
 		}
 		else
-			retval = set_arm_addr(0x08); // svc-vector
+		{
+			//retval = set_arm_addr(0x08); // svc-vector
+			retval = set_addr_lin();
+		}
 		break;
 	case arm_exc_udf:
 		retval = set_undef_addr();
@@ -3879,6 +3967,17 @@ instr_next_addr_t arm_core_ldst(unsigned int instr, ARM_decode_extra_t extra)
 	{
 		retval = set_addr_lin();
 	}
+	if (retval.address != 0xffffffff) // not lin
+	{
+		tmp1 = retval.address;
+		if (bit(tmp1,0)) retval = set_thumb_addr(tmp1);
+		else if ((tmp1 & 3) == 0) retval = set_arm_addr(tmp1);
+		else
+		{
+			retval = set_thumb_addr(tmp1);
+			unp++;
+		}
+	}
 	if (unp) retval = set_unpred_addr(retval);
 	return retval;
 }
@@ -3933,7 +4032,7 @@ instr_next_addr_t arm_core_ldstm(unsigned int instr, ARM_decode_extra_t extra)
 		 * W 1=writeback, 0=no writeback
 		 * L 1=load, 0=store
 		 */
-		tmp1 = bitrng(instr, 15, 12); // base register
+		tmp1 = bitrng(instr, 19, 16); // base register
 
 		// bit count in register-list
 		tmp4 = 0;
@@ -3991,6 +4090,7 @@ instr_next_addr_t arm_core_ldstm(unsigned int instr, ARM_decode_extra_t extra)
 			if ((tmp1 == 15) && bit(instr, 21)) // ((n == 15) && W)
 			{
 				// new n - B-bit doesn't make a difference
+				// the writeback overwrites the popped value
 				if (bit(instr, 23)) // I-bit
 				{
 					tmp3 = rpi2_reg_context.reg.r15 + 4 * tmp4;
@@ -4004,7 +4104,7 @@ instr_next_addr_t arm_core_ldstm(unsigned int instr, ARM_decode_extra_t extra)
 			else if (bit(instr, 15)) // bit 15 == 1
 			{
 				// new PC
-				tmp3 = rpi2_reg_context.storage[tmp1];
+				tmp3 = rpi2_reg_context.storage[tmp1]; // base register
 				switch (bitrng(instr, 24, 23)) // B and I
 				{
 				case 0: // decrement after
@@ -4024,7 +4124,34 @@ instr_next_addr_t arm_core_ldstm(unsigned int instr, ARM_decode_extra_t extra)
 					break;
 				}
 				tmp3 = *((unsigned int *) tmp3);
-				retval = set_arm_addr(tmp3);
+				if (tmp3 & 1)
+				{
+					retval = set_thumb_addr(tmp3);
+				}
+				else if (!(tmp3 & 3))
+				{
+					retval = set_arm_addr(tmp3);
+				}
+				else
+				{
+					retval = set_thumb_addr(tmp3);
+					retval = set_unpred_addr(retval);
+				}
+				// if L == 1 || M == 1 - ldm exception return
+				if (bit(instr, 20) || bit(instr, 22))
+				{
+					tmp1 = rpi2_reg_context.reg.spsr;
+					if (bit(tmp1, 5))
+					{
+						tmp3 = retval.address;
+						retval = set_thumb_addr(tmp3);
+					}
+					else
+					{
+						tmp3 = (retval.address) & (~3);
+						retval = set_arm_addr(tmp3);
+					}
+				}
 			}
 			else
 			{

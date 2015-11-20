@@ -1956,6 +1956,8 @@ void gdb_do_single_step(void)
 
 	curr_addr = rpi2_reg_context.reg.r15; // stored PC
 
+	LOG_PR_VAL("Current address: ", curr_addr);
+	LOG_NEWLINE();
 	if (gdb_single_stepping_address != 0xffffffff)
 	{
 		if (gdb_single_stepping_address == (uint32_t)curr_addr)
@@ -2007,6 +2009,12 @@ void gdb_do_single_step(void)
 	}
 	// store original instruction (only ARM instruction set supported yet)
 	// TODO: add thumb-mode
+	if ((next_addr.flag & 3) == INSTR_ADDR_THUMB)
+	{
+		// thumb mode not supported (yet)
+		gdb_send_packet("E02", util_str_len("E02"));
+		return;
+	}
 	gdb_step_bkpt.trap_address = (void *) next_addr.address;
 	gdb_step_bkpt.instruction.arm = *((uint32_t *)next_addr.address);
 	gdb_step_bkpt.trap_kind = RPI2_TRAP_ARM;
@@ -2257,6 +2265,8 @@ void gdb_cmd_add_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 	//rpi2_unset_watchpoint(0);
 	if (kind == 2) // 16-bit THUMB
 	{
+		gdb_response_not_supported(); // for now
+#if 0
 		if (dgb_set_trap((void *)addr, RPI2_TRAP_THUMB))
 		{
 			gdb_send_packet(err, util_str_len(err));
@@ -2265,6 +2275,7 @@ void gdb_cmd_add_breakpoint(volatile uint8_t *gdb_in_packet, int packet_len)
 		{
 			gdb_send_packet(okresp, util_str_len(okresp));
 		}
+#endif
 	}
 	else if (kind == 4) // 32-bit ARM
 	{

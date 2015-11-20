@@ -1,22 +1,3 @@
-/*
-ARM_decode_table_data.h
-
-Copyright (C) 2015 Juha Aaltonen
-
-This file is part of standalone gdb stub for Raspberry Pi 2B.
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
 {0x049D0004,0x0FFF0FFE,arm_cldstm_pop_r,arm_core_ldstm}, // POP<c> <registers>, <Rt>
 {0x052D0004,0x0FFF0FFE,arm_cldstm_push_r,arm_core_ldstm}, // PUSH<c> <registers>, <Rt>
 {0x01B0F060,0x0FF0FFF0,arm_ret_rrx_pc,arm_core_data_bit}, // RRXS<c> PC, <Rm>
@@ -221,9 +202,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x01200020,0x0FF000F0,arm_bra_bxj_r,arm_branch}, // BXJ<c> <Rm>
 {0x01200010,0x0FF000F0,arm_bra_bx_r,arm_branch}, // BX<c> <Rm>
 {0x01200030,0x0FF000F0,arm_bra_blx_r,arm_branch}, // BLX<c> <Rm>
-{0xFC400000,0xFFF00000,arm_cop_mcr2,arm_coproc}, // MCRR2<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>
-{0xFC1F0000,0xFE1F0000,arm_cop_mcrr,arm_coproc}, // LDC2{L}<c> <coproc>, <CRd>, <label> LDC2{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC2{L}<c> <coproc>, <CRd>, [PC], <option>
-{0xFC500000,0xFFF00000,arm_cop_mrc2,arm_coproc}, // MRRC2<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>
+{0xFC400000,0xFFF00000,arm_cop_mcrr2,arm_coproc}, // MCRR2<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>
+{0xFC1F0000,0xFE1F0000,arm_cop_ldc2_pc,arm_coproc}, // LDC2{L}<c> <coproc>, <CRd>, <label> LDC2{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC2{L}<c> <coproc>, <CRd>, [PC], <option>
+{0xFC500000,0xFFF00000,arm_cop_mrrc2,arm_coproc}, // MRRC2<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>
 {0x07100010,0x0FF000F0,arm_div_sdiv,arm_core_data_div}, // SDIV<c> <Rd>, <Rn>, <Rm>
 {0x07300010,0x0FF000F0,arm_div_udiv,arm_core_data_div}, // UDIV<c> <Rd>, <Rn>, <Rm>
 {0x00600090,0x0FF000F0,arm_cmac_mls,arm_core_data_mac}, // MLS<c> <Rd>, <Rn>, <Rm>, <Ra>
@@ -382,8 +363,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x0EA00A00,0x0FB00E10,arm_vmac_vfm_f64,arm_v_mac}, // VFM<y><c>.F64 <Dd>, <Dn>, <Dm> VFM<y><c>.F32 <Sd>, <Sn>, <Sm>
 {0x0E100A00,0x0FB00E10,arm_vmac_vnmlas_f64,arm_v_mac}, // VNMLA<c>.F64 <Dd>, <Dn>, <Dm> VNMLA<c>.F32 <Sd>, <Sn>, <Sm> VNMLS<c>.F64 <Dd>, <Dn>, <Dm> VNMLS<c>.F32 <Sd>, <Sn>, <Sm>
 {0x0E000B10,0x0F900F10,arm_vfpxfer_vmov_dx,arm_vfp_xfer_reg}, // VMOV<c>.<size> <Dd[x]>, <Rt>
-{0xFE000010,0xFF100010,arm_cop_cdp,arm_coproc}, // MCR2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
-{0xFE100010,0xFF100010,arm_cop_mcr,arm_coproc}, // MRC2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+{0xFE000010,0xFF100010,arm_cop_mcr2,arm_coproc}, // MCR2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+{0xFE100010,0xFF100010,arm_cop_mrc2,arm_coproc}, // MRC2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
 {0x01A00040,0x0FE00070,arm_cdata_asr_imm,arm_core_data_bit}, // ASR{S}<c> <Rd>, <Rm>, #<imm>
 {0x01A00020,0x0FE00070,arm_cdata_lsr_imm,arm_core_data_bit}, // LSR{S}<c> <Rd>, <Rm>, #<imm>
 {0x01000080,0x0FF00090,arm_cmac_smla,arm_core_data_mac}, // SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra>
@@ -406,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x0D000B00,0x0F300F00,arm_vldstx_vstr_d_imm,arm_vfp_ldst_ext}, // VSTR<c> <Dd>, [<Rn>{, #+/-<imm>}]
 {0x0D000A00,0x0F300F00,arm_vldstx_vstr_s_imm,arm_vfp_ldst_ext}, // VSTR<c> <Sd>, [<Rn>{, #+/-<imm>}]
 {0x0E100B10,0x0F100F10,arm_vfpxfer_vmov_dt_dx,arm_vfp_xfer_reg}, // VMOV<c>.<dt> <Rt>, <Dn[x]>
-{0xFE000000,0xFF000010,arm_cop_mrc,arm_coproc}, // CDP2<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>
+{0xFE000000,0xFF000010,arm_cop_cdp2,arm_coproc}, // CDP2<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>
 {0x06A00010,0x0FE00030,arm_sat_ssat,arm_core_data_sat}, // SSAT<c> <Rd>, #<imm>, <Rn>{, <shift>}
 {0x06E00010,0x0FE00030,arm_sat_usat,arm_core_data_sat}, // USAT<c> <Rd>, #<imm5>, <Rn>{, <shift>}
 {0x01700000,0x0FF00010,arm_cdata_cmn_r,arm_core_data_std_r}, // CMN<c> <Rn>, <Rm>{, <shift>}
@@ -440,11 +421,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x001000D0,0x0E5000F0,arm_cldstx_ldrsb_r,arm_core_ldstrsb}, // LDRSB<c> <Rt>, [<Rn>,+/-<Rm>]{!} LDRSB<c> <Rt>, [<Rn>],+/-<Rm>
 {0x005000F0,0x0E5000F0,arm_cldstx_ldrsh_imm,arm_core_ldstsh}, // LDRSH<c> <Rt>, [<Rn>{, #+/-<imm8>}] LDRSH<c> <Rt>, [<Rn>], #+/-<imm8> LDRSH<c> <Rt>, [<Rn>, #+/-<imm8>]!
 {0x001000F0,0x0E5000F0,arm_cldstx_ldrsh_r,arm_core_ldstsh}, // LDRSH<c> <Rt>, [<Rn>,+/-<Rm>]{!} LDRSH<c> <Rt>, [<Rn>],+/-<Rm>
-{0x0C400000,0x0FF00000,arm_cop_mcrr2,arm_coproc}, // MCRR<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>
-{0x0C500000,0x0FF00000,arm_cop_mrrc2,arm_coproc}, // MRRC<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>
-{0x0C1F0000,0x0E1F0000,arm_cop_ldc2_pc,arm_coproc}, // LDC{L}<c> <coproc>, <CRd>, <label> LDC{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC{L}<c> <coproc>, <CRd>, [PC], <option>
-{0xFC000000,0xFE100000,arm_cop_cdp2,arm_coproc}, // STC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>
-{0xFC100000,0xFE100000,arm_cop_mrrc,arm_coproc}, // LDC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>
+{0x0C400000,0x0FF00000,arm_cop_mcrr,arm_coproc}, // MCRR<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>
+{0x0C500000,0x0FF00000,arm_cop_mrrc,arm_coproc}, // MRRC<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>
+{0x0C1F0000,0x0E1F0000,arm_cop_ldc_pc,arm_coproc}, // LDC{L}<c> <coproc>, <CRd>, <label> LDC{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC{L}<c> <coproc>, <CRd>, [PC], <option>
+{0xFC000000,0xFE100000,arm_cop_stc2,arm_coproc}, // STC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>
+{0xFC100000,0xFE100000,arm_cop_ldc2,arm_coproc}, // LDC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>
 {0x03000000,0x0FF00000,arm_cmisc_movw,arm_core_data_misc}, // MOVW<c> <Rd>, #<imm12>
 {0x03400000,0x0FF00000,arm_cmisc_movt,arm_core_data_misc}, // MOVT<c> <Rd>, #<imm12>
 {0x03700000,0x0FF00000,arm_cdata_cmn_imm,arm_core_data_std_i}, // CMN<c> <Rn>, #<const>
@@ -496,15 +477,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x09000000,0x0FD00000,arm_cldstm_stmdb,arm_core_ldstm}, // STMDB<c> <Rn>{!}, <registers>
 {0x09800000,0x0FD00000,arm_cldstm_stmib,arm_core_ldstm}, // STMIB<c> <Rn>{!}, <registers>
 {0x03200000,0x0FB00000,arm_mux_msr_i_pr_hints,arm_mux}, // MSR<c> <spec reg>, #<const>
-{0x0E100010,0x0F100010,arm_cop_ldc,arm_coproc}, // MRC<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
-{0x0E000010,0x0F100010,arm_cop_ldc_pc,arm_coproc}, // MCR<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+{0x0E100010,0x0F100010,arm_cop_mrc,arm_coproc}, // MRC<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+{0x0E000010,0x0F100010,arm_cop_mcr,arm_coproc}, // MCR<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
 {0x06100000,0x0E500010,arm_cldst_ldr_r,arm_core_ldst}, // LDR<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!} LDR<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>}
 {0x06500000,0x0E500010,arm_cldst_ldrb_r,arm_core_ldst}, // LDRB<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!} LDRB<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>}
 {0x06000000,0x0E500010,arm_cldst_str_r,arm_core_ldst}, // STR<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!} STR<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>}
 {0x06400000,0x0E500010,arm_cldst_strb_r,arm_core_ldst}, // STRB<c> <Rt>, [<Rn>,+/-<Rm>{, <shift>}]{!} STRB<c> <Rt>, [<Rn>],+/-<Rm>{, <shift>}
 {0x08508000,0x0E508000,arm_cldstm_ldm_pc,arm_core_ldstm}, // LDM{<amode>}<c> <Rn>{!}, <registers with pc>
 {0x08500000,0x0E508000,arm_cldstm_ldm_usr,arm_core_ldstm}, // LDM{<amode>}<c> <Rn>, <registers without pc>
-{0x0E000000,0x0F000010,arm_cop_stc,arm_coproc}, // CDP<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>
+{0x0E000000,0x0F000010,arm_cop_cdp,arm_coproc}, // CDP<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>
 {0x04100000,0x0E500000,arm_cldst_ldr_imm,arm_core_ldst}, // LDR<c> <Rt>, [<Rn>{, #+/-<imm12>}] LDR<c> <Rt>, [<Rn>], #+/-<imm12> LDR<c> <Rt>, [<Rn>, #+/-<imm12>]!
 {0x04500000,0x0E500000,arm_cldst_ldrb_imm,arm_core_ldst}, // LDRB<c> <Rt>, [<Rn>{, #+/-<imm12>}] LDRB<c> <Rt>, [<Rn>], #+/-<imm12> LDRB<c> <Rt>, [<Rn>, #+/-<imm12>]!
 {0x04000000,0x0E500000,arm_cldst_str_imm,arm_core_ldst}, // STR<c> <Rt>, [<Rn>{, #+/-<imm12>}] STR<c> <Rt>, [<Rn>], #+/-<imm12> STR<c> <Rt>, [<Rn>, #+/-<imm12>]!
@@ -512,6 +493,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {0x08400000,0x0E500000,arm_cldstm_stm_usr,arm_core_ldstm}, // STM{<amode>}<c> <Rn>, <registers>
 {0x0B000000,0x0F000000,arm_bra_bl_lbl,arm_branch}, // BL<c> <label>
 {0x0A000000,0x0F000000,arm_bra_b_lbl,arm_branch}, // B<c> <label>
-{0x0C100000,0x0E100000,arm_cop_ldc2,arm_coproc}, // LDC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC{L}<c> <coproc>, <CRd>, [<Rn>], <option>
-{0x0C000000,0x0E100000,arm_cop_stc2,arm_coproc}, // STC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC{L}<c> <coproc>, <CRd>, [<Rn>], <option>
+{0x0C100000,0x0E100000,arm_cop_ldc,arm_coproc}, // LDC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC{L}<c> <coproc>, <CRd>, [<Rn>], <option>
+{0x0C000000,0x0E100000,arm_cop_stc,arm_coproc}, // STC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC{L}<c> <coproc>, <CRd>, [<Rn>], <option>
 {0x0F000000,0x0F000000,arm_exc_svc,arm_core_exc} // SVC<c> #<imm24>

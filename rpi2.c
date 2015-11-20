@@ -1546,7 +1546,7 @@ void rpi2_aux_handler()
 	);
 }
 
-#ifdef DEBUG_DABT
+#if defined(DEBUG_DABT) || defined(DEBUG_DABT_UNHANDLED)
 void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	uint32_t exc_cpsr;
@@ -1633,7 +1633,7 @@ void rpi2_unhandled_dabt()
 	);
 
 	// rpi2_dabt_handler() // - No C in naked function
-#ifdef DEBUG_DABT
+#ifdef DEBUG_DABT_UNHANDLED
 	asm volatile (
 			"mov r0, sp\n\t"
 			"mov r1, lr\n\t"
@@ -2163,6 +2163,8 @@ write_context();
 	);
 }
 
+#if defined(DEBUG_PABT) || defined(DEBUG_PABT_UNHANDLED)
+
 // for debugging
 void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
 {
@@ -2184,6 +2186,7 @@ void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
 	serial_raw_puts("\r\n");
 }
 
+
 void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	int i;
@@ -2193,15 +2196,10 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	uint32_t ifsr;
 	uint32_t our_lr;
 	volatile rpi2_reg_context_t *ctx;
-#ifdef DEBUG_PABT
 	uint32_t tmp;
 	char *pp;
 	static char scratchpad[16]; // scratchpad
-#else
-#ifdef DEBUG_REG_CONTEXT
-	static char scratchpad[16]; // scratchpad
-#endif
-#endif
+
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -2229,7 +2227,6 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 			:[var_reg] "=r" (ifsr) ::
 	);
 
-#ifdef DEBUG_PABT
 	// raw puts, because we are here with interrupts disabled
 	pp = "\r\nPABT EXCEPTION\r\n";
 	do {i = serial_raw_puts(pp); pp += i;} while (i);
@@ -2262,7 +2259,6 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(scratchpad);
 	serial_raw_puts("\r\n");
 	rpi2_dump_context(&rpi2_pabt_context);
-#endif
 
 #if 0
 	// if we were in debug-state
@@ -2321,7 +2317,6 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts("\r\n");
 #endif
 
-#ifdef DEBUG_PABT
 	if (ifsr & 0x40f) // BKPT
 	{
 		serial_raw_puts("\r\nBKPT\r\n");
@@ -2335,8 +2330,6 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 		pp = "\r\nPrefetch Abort\r\n";
 		do {i = serial_raw_puts(pp); pp += i;} while (i);
 	}
-#endif
-
 
 #if 0
 	serial_raw_puts("\r\nBKPT\r\n");
@@ -2350,7 +2343,7 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 #endif
 	//rpi2_gdb_exception();
 }
-
+#endif
 
 void rpi2_unhandled_pabt()
 {
@@ -2415,7 +2408,7 @@ void rpi2_unhandled_pabt()
 			"str r1,[r0]\n\t"
 #endif
 			"2: \n\t"
-#ifdef DEBUG_PABT
+#ifdef DEBUG_EXCEPTIONS
 	);
 	naked_debug();
 	asm volatile (
@@ -2435,7 +2428,7 @@ void rpi2_unhandled_pabt()
 #endif
 			"3: \n\t"
 	);
-#ifdef DEBUG_PABT
+#ifdef DEBUG_PABT_UNHANDLED
 	asm volatile (
 			"ldr r0, pabt_sp_store1\n\t"
 			"mov r1, lr\n\t"
@@ -3518,7 +3511,7 @@ void rpi2_init()
 		);
 		tmp1 &= ~(1 << 29); // clear exception flag
 		tmp1 |= (1 << 30); // enable fp & vectors
-		// VMSR FPEXC, <Rt>
+
 		asm volatile (
 				"vmsr FPEXC, %[retreg] @ set FPEXC\n\t"
 				"dsb\n\t"
@@ -3535,14 +3528,14 @@ void rpi2_init()
 	}
 	rpi2_restore_ints(cpsr_store);
 
-#if 1
-	// set debug monitor mode
-	asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (tmp1) ::);
-	tmp1 |= (1 << 15); // MDBGen
-	asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (tmp1) :);
-	SYNC;
-#endif
-
+	if (rpi2_use_hw_debug)
+	{
+		// set debug monitor mode
+		asm volatile ("mrc p14, 0, %[val], c0, c2, 2\n\t" :[val] "=r" (tmp1) ::);
+		tmp1 |= (1 << 15); // MDBGen
+		asm volatile ("mcr p14, 0, %[val], c0, c2, 2\n\t" ::[val] "r" (tmp1) :);
+		SYNC;
+	}
 }
 
 #if 0
