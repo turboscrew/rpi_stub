@@ -81,6 +81,9 @@ can do single-stepping. Also arm-linux-gnueabihf-gdb 7.6.1 seems to work.
 Seems like arm-none-eabi-gdb 7.7.1 doesn't support single-stepping, but
 works - at least to some extent - with rpi_stub singe-stepping support.
 
+If you need to ask something, contact me via the e-mail mentioned in the
+github. You can also send bug reports either via the e-mail or via the
+'issues' on the github page.
 
 
 This is my very first RPi(2) project ever, and first ever project that
