@@ -2,661 +2,525 @@ This list is generated with a simple awk-script, so it may still contain errors.
 The source was ARMv7-A/R ARM, and the corresponding chapter number is in the beginning
 of each description. The listing should contain all encodings (T1, T2, T3 and T4).
 
-A8.8.1  	1 1 1 1 0 i 0 1 0 1 0 S          Rn   0 imm3          Rd          imm8	ADC{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.2  	0 1 0 0 0 0 0 1 0 1        Rm    Rdn	ADCS <Rdn>, <Rm>	         Outside IT block.                         ADC<c> <Rdn>, <Rm>	       Inside IT block. 	T1
-
-A8.8.2  	1 1 1 0 1 0 1 1 0 1 0 S          Rn   (0) imm3        Rd    imm2 type Rm	ADC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.4  	0 0 0 1 1 1 0 imm3          Rn    Rd	ADDS <Rd>, <Rn>, #<imm3>	   Outside IT block.                         ADD<c> <Rd>, <Rn>, #<imm3>	 Inside IT block. 	T1
-
-A8.8.4  	0 0 1 1 0        Rdn        imm8	ADDS <Rdn>, #<imm8>	        Outside IT block.                         ADD<c> <Rdn>, #<imm8>	      Inside IT block. 	T2
-
-A8.8.4  	1 1 1 1 0 i 0 1 0 0 0 S          Rn   0 imm3          Rd          imm8	ADD{S}<c>.W <Rd>, <Rn>, #<const> 	T3
-
-A8.8.4  	1 1 1 1 0 i 1 0 0 0 0 0          Rn   0 imm3          Rd          imm8	ADDW<c> <Rd>, <Rn>, #<imm12> 	T4
-
-A8.8.6  	0 0 0 1 1 0 0        Rm     Rn    Rd	ADDS <Rd>, <Rn>, <Rm>	       Outside IT block.                         ADD<c> <Rd>, <Rn>, <Rm>	     Inside IT block. 	T1
-
-A8.8.6  	0 1 0 0 0 1 0 0           Rm     Rdn	 ARMv4T, ARMv5T*, ARMv6*, ARMv7 otherwise                         ADD<c> <Rdn>, <Rm>                             If <Rdn> is the PC, must be outside or last in IT block. 	T2
-
-A8.8.6  	1 1 1 0 1 0 1 1 0 0 0 S          Rn   (0) imm3        Rd    imm2 type Rm	ADD{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T3
-
-A8.8.9  	1 0 1 0 1        Rd         imm8	ADD<c> <Rd>, SP, #<imm> 	T1
-
-A8.8.9  	 1 0 1 1 0 0 0 0 0           imm7	ADD<c> SP, SP, #<imm> 	T2
-
-A8.8.9  	1 1 1 1 0 i 0 1 0 0 0 S 1 1 0 1 0 imm3                Rd          imm8	ADD{S}<c>.W <Rd>, SP, #<const> 	T3
-
-A8.8.9  	1 1 1 1 0 i 1 0 0 0 0 0 1 1 0 1 0 imm3                Rd          imm8	ADDW<c> <Rd>, SP, #<imm12> 	T4
-
-A8.8.10		0 1 0 0 0 1 0 0         1 1 0 1  Rdm	ADD<c> <Rdm>, SP, <Rdm> 	T1
-
-A8.8.10		0 1 0 0 0 1 0 0 1         Rm    1 0 1	ADD<c> SP, <Rm> 	T2
-
-A8.8.10		1 1 1 0 1 0 1 1 0 0 0 S 1 1 0 1 (0) imm3              Rd    imm2 type Rm	ADD{S}<c>.W <Rd>, SP, <Rm>{, <shift>} 	T3
-
-A8.8.12		1 0 1 0 0        Rd         imm8	ADR<c> <Rd>, <label> 	T1
-
-A8.8.12		1 1 1 1 0 i 1 0 1 0 1 0 1 1 1 1 0 imm3                Rd          imm8	ADR<c>.W <Rd>, <label>	   <label> before current instruction                         SUB <Rd>, PC, #0	         Special case for subtraction of zero 	T2
-
-A8.8.12		1 1 1 1 0 i 1 0 0 0 0 0 1 1 1 1 0 imm3                Rd          imm8	ADR<c>.W <Rd>, <label>	   <label> after current instruction 	T3
-
-A8.8.13		1 1 1 1 0 i 0 0 0 0 0 S          Rn   0 imm3          Rd          imm8	AND{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.14		0 1 0 0 0 0 0 0 0 0        Rm    Rdn	ANDS    <Rdn>, <Rm>	      Outside IT block.                         AND<c> <Rdn>, <Rm>	       Inside IT block. 	T1
-
-A8.8.14		1 1 1 0 1 0 1 0 0 0 0 S          Rn   (0) imm3        Rd    imm2 type Rm	AND{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.16		0 0 0 1 0          imm5    Rm     Rd	ASRS <Rd>, <Rm>, #<imm>	     Outside IT block.                         ASR<c> <Rd>, <Rm>, #<imm>	   Inside IT block. 	T1
-
-A8.8.16		1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) imm3              Rd    imm2 1 0  Rm	ASR{S}<c>.W <Rd>, <Rm>, #<imm> 	T2
-
-A8.8.17		0 1 0 0 0 0 0 1 0 0        Rm    Rdn	ASRS    <Rdn>, <Rm>	        Outside IT block.                         ASR<c> <Rdn>, <Rm>	         Inside IT block. 	T1
-
-A8.8.17		1 1 1 1 1 0 1 0 0 1 0 S          Rn   1 1 1 1         Rd    0 0 0 0   Rm	ASR{S}<c>.W <Rd>, <Rn>, <Rm> 	T2
-
-A8.8.18		1 1 0 1        cond         imm8	B<c> <label>	          Not permitted in IT block. 	T1
-
-A8.8.18 	1 1 1 0 0              imm11	B<c> <label>	          Outside or last in IT block 	T2
-
-A8.8.18		1 1 1 1 0 S         cond      imm6    1 0 J1 0 J2             imm11	B<c>.W <label>	        Not permitted in IT block. 	T3
-
-A8.8.18		1 1 1 1 0 S              imm10        1 0 J1 1 J2             imm11	B<c>.W <label>	        Outside or last in IT block 	T4
-
-A8.8.19		1 1 1 1 0 (0) 1 1 0 1 1 0 1 1 1 1 0 imm3              Rd    imm2 (0) msb	BFC<c> <Rd>, #<lsb>, #<width> 	T1
-
-A8.8.20		1 1 1 1 0 (0) 1 1 0 1 1 0        Rn   0 imm3          Rd    imm2 (0) msb	BFI<c> <Rd>, <Rn>, #<lsb>, #<width> 	T1
-
-A8.8.21		1 1 1 1 0 i 0 0 0 0 1 S          Rn   0 imm3          Rd          imm8	BIC{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.22		0 1 0 0 0 0 1 1 1 0        Rm    Rdn	BICS    <Rdn>, <Rm>	        Outside IT block.                         BIC<c> <Rdn>, <Rm>	         Inside IT block. 	T1
-
-A8.8.22		1 1 1 0 1 0 1 0 0 0 1 S          Rn   (0) imm3        Rd    imm2 type Rm	BIC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.24		1 0 1 1 1 1 1 0             imm8	BKPT #<imm8> 	T1
-
-A8.8.25		1 1 1 1 0 S              imm10        1 1 J1 1 J2             imm11	     ARMv6T2, ARMv7 otherwise                         BL<c> <label>                                          Outside or last in IT block 	T1
-
-A8.8.25		1 1 1 1 0 S              imm10H       1 1 J1 0 J2            imm10L       H	     ARMv6T2, ARMv7 otherwise                         BLX<c> <label>	 Outside or last in IT block 	T2
-
-A8.8.26		0 1 0 0 0 1 1 1 1         Rm    (0) (0) (0)	BLX<c> <Rm>	               Outside or last in IT block 	T1
-
-A8.8.27		0 1 0 0 0 1 1 1 0         Rm    (0) (0) (0)	BX<c> <Rm>	              Outside or last in IT block 	T1
-
-A8.8.28		1 1 1 1 0 0 1 1 1 1 0 0         Rm    1 0 (0) 0 (1) (1) (1) (1) (0) (0) (0) (0) (0) (0) (0) (0)	BXJ<c> <Rm>	              Outside or last in IT block 	T1
-
-A8.8.29		1 0 1 1 op 0 i 1         imm5     Rn	CB{N}Z <Rn>, <label>	  Not permitted in IT block. 	T1
-
-A8.8.32		1 1 1 1 0 0 1 1 1 0 1 1 (1) (1) (1) (1) 1 0 (0) 0 (1) (1) (1) (1) 0 0 1 0 (1) (1) (1) (1)	CLREX<c> 	T1
-
-A8.8.33		1 1 1 1 1 0 1 0 1 0 1 1         Rm    1 1 1 1         Rd    1 0 0 0   Rm	CLZ<c> <Rd>, <Rm> 	T1
-
-A8.8.34		1 1 1 1 0 i 0 1 0 0 0 1          Rn   0 imm3 1 1 1 1              imm8	CMN<c> <Rn>, #<const> 	T1
-
-A8.8.35		0 1 0 0 0 0 1 0 1 1        Rm     Rn	CMN<c> <Rn>, <Rm> 	T1
-
-A8.8.35		1 1 1 0 1 0 1 1 0 0 0 1          Rn   (0) imm3 1 1 1 1 imm2 type      Rm	CMN<c>.W    <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.37		0 0 1 0 1        Rn         imm8	CMP<c> <Rn>, #<imm8> 	T1
-
-A8.8.37		1 1 1 1 0 i 0 1 1 0 1 1          Rn   0 imm3 1 1 1 1              imm8	CMP<c>.W <Rn>, #<const> 	T2
-
-A8.8.38		0 1 0 0 0 0 1 0 1 0        Rm     Rn	CMP<c> <Rn>, <Rm>	          <Rn> and <Rm> both from R0-R7 	T1
-
-A8.8.38		0 1 0 0 0 1 0 1 N         Rm      Rn	CMP<c> <Rn>, <Rm>	          <Rn> and <Rm> not both from R0-R7 	T2
-
-A8.8.38		1 1 1 0 1 0 1 1 1 0 1 1          Rn   (0) imm3 1 1 1 1 imm2 type      Rm	CMP<c>.W <Rn>, <Rm> {, <shift>} 	T3
-
-A8.8.42		1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 1 1 1 1   option	 DBG<c> #<option> 	T1
-
-A8.8.43		1 1 1 1 0 0 1 1 1 0 1 1 (1) (1) (1) (1) 1 0 (0) 0 (1) (1) (1) (1) 0 1 0 1 option	DMB<c> <option> 	T1
-
-A8.8.44		1 1 1 1 0 0 1 1 1 0 1 1 (1) (1) (1) (1) 1 0 (0) 0 (1) (1) (1) (1) 0 1 0 0 option	DSB<c> <option> 	T1
-
-A8.8.46		1 1 1 1 0 i 0 0 1 0 0 S          Rn   0 imm3          Rd          imm8	EOR{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.47		0 1 0 0 0 0 0 0 0 1        Rm    Rdn	EORS <Rdn>, <Rm>	           Outside IT block.                         EOR<c> <Rdn>, <Rm>	         Inside IT block. 	T1
-
-A8.8.47		1 1 1 0 1 0 1 0 1 0 0 S          Rn   (0) imm3        Rd    imm2 type Rm	EOR{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.53		1 1 1 1 0 0 1 1 1 0 1 1 (1) (1) (1) (1) 1 0 (0) 0 (1) (1) (1) (1) 0 1 1 0 option	 ISB<c> <option> 	T1
-
-A8.8.54		1 0 1 1 1 1 1 1 firstcond       mask	IT{<x>{<y>{<z>}}} <firstcond>                                          Not permitted in IT block 	T1
-
-A8.8.57		 1 1 0 0 1       Rn       register_list	LDM<c> <Rn>!, <registers>                             <Rn> not included in <registers>                         LDM<c> <Rn>, <registers>                              <Rn> included in <registers> 	T1
-
-A8.8.57		1 1 1 0 1 0 0 0 1 0 W 1          Rn   P M (0)              register_list	LDM<c>.W <Rn>{!}, <registers> 	T2
-
-A8.8.60		1 1 1 0 1 0 0 1 0 0 W 1          Rn   P M (0)              register_list	LDMDB<c> <Rn>{!}, <registers> 	T1
-
-A8.8.62		0 1 1 0 1          imm5     Rn    Rt	LDR<c> <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.62		 1 0 0 1 1        Rt        imm8	LDR<c> <Rt>, [SP{, #<imm>}] 	T2
-
-A8.8.62		1 1 1 1 1 0 0 0 1 1 0 1          Rn       Rt                 imm12	LDR<c>.W <Rt>, [<Rn>{, #<imm12>}] 	T3
-
-A8.8.62		1 1 1 1 1 0 0 0 0 1 0 1          Rn       Rt       1 P U W        imm8	LDR<c> <Rt>, [<Rn>, #-<imm8>]                         LDR<c> <Rt>, [<Rn>], #+/-<imm8>                         LDR<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T4
-
-A8.8.64		0 1 0 0 1         Rt        imm8	LDR<c> <Rt>, <label> 	T1
-
-A8.8.64		1 1 1 1 1 0 0 0 U 1 0 1 1 1 1 1           Rt                 imm12	LDR<c>.W <Rt>, <label>                         LDR<c>.W <Rt>, [PC, #-0]	Special case 	T2
-
-A8.8.65		0 1 0 1 1 0 0        Rm     Rn    Rt	LDR<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.65		1 1 1 1 1 0 0 0 0 1 0 1          Rn       Rt       0 0 0 0 0 0 imm2   Rm	LDR<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.67		0 1 1 1 1          imm5     Rn    Rt	LDRB<c> <Rt>, [<Rn>{, #<imm5>}] 	T1
-
-A8.8.67		1 1 1 1 1 0 0 0 1 0 0 1          Rn       Rt                 imm12	LDRB<c>.W <Rt>, [<Rn>{, #<imm12>}] 	T2
-
-A8.8.67		1 1 1 1 1 0 0 0 0 0 0 1          Rn       Rt       1 P U W        imm8	LDRB<c> <Rt>, [<Rn>, #-<imm8>]                         LDRB<c> <Rt>, [<Rn>], #+/-<imm8>                         LDRB<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T3
-
-A8.8.69		1 1 1 1 1 0 0 0 U 0 0 1 1 1 1 1           Rt                 imm12	LDRB<c> <Rt>, <label>                         LDRB<c> <Rt>, [PC, #-0]	Special case 	T1
-
-A8.8.70		0 1 0 1 1 1 0        Rm     Rn    Rt	LDRB<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.70		1 1 1 1 1 0 0 0 0 0 0 1          Rn       Rt       0 0 0 0 0 0 imm2   Rm	LDRB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.71		1 1 1 1 1 0 0 0 0 0 0 1          Rn       Rt       1 1 1 0        imm8	LDRBT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.72		1 1 1 0 1 0 0 P U 1 W 1          Rn       Rt          Rt2         imm8	LDRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm>}]                         LDRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm>                         LDRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm>]! 	T1
-
-A8.8.73		1 1 1 0 1 0 0 P U 1 W 1 1 1 1 1           Rt          Rt2         imm8	LDRD<c> <Rt>, <Rt2>, <label>                         LDRD<c> <Rt>, <Rt2>, [PC, #-0]                                     Special case 	T1
-
-A8.8.75		1 1 1 0 1 0 0 0 0 1 0 1          Rn       Rt      (1) (1) (1) (1) imm8	LDREX<c> <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.76		1 1 1 0 1 0 0 0 1 1 0 1          Rn       Rt      (1) (1) (1) (1) 0 1 0 0 (1) (1) (1) (1)	LDREXB<c> <Rt>, [<Rn>] 	T1
-
-A8.8.77		1 1 1 0 1 0 0 0 1 1 0 1          Rn       Rt          Rt2   0 1 1 1 (1) (1) (1) (1)	LDREXD<c> <Rt>, <Rt2>, [<Rn>] 	T1
-
-A8.8.78		1 1 1 0 1 0 0 0 1 1 0 1          Rn       Rt      (1) (1) (1) (1) 0 1 0 1 (1) (1) (1) (1)	LDREXH<c> <Rt>, [<Rn>] 	T1
-
-A8.8.79		1 0 0 0 1          imm5     Rn    Rt	LDRH<c> <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.79		1 1 1 1 1 0 0 0 1 0 1 1          Rn       Rt                 imm12	LDRH<c>.W <Rt>, [<Rn>{, #<imm12>}] 	T2
-
-A8.8.79		1 1 1 1 1 0 0 0 0 0 1 1          Rn       Rt       1 P U W        imm8	LDRH<c> <Rt>, [<Rn>, #-<imm8>]                         LDRH<c> <Rt>, [<Rn>], #+/-<imm8>                         LDRH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T3
-
-A8.8.81		1 1 1 1 1 0 0 0 U 0 1 1 1 1 1 1           Rt                 imm12	LDRH<c> <Rt>, <label>                         LDRH<c> <Rt>, [PC, #-0]	 Special case 	T1
-
-A8.8.82		0 1 0 1 1 0 1        Rm     Rn    Rt	LDRH<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.82		1 1 1 1 1 0 0 0 0 0 1 1          Rn       Rt       0 0 0 0 0 0 imm2   Rm	LDRH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.83		1 1 1 1 1 0 0 0 0 0 1 1          Rn       Rt       1 1 1 0        imm8	LDRHT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.84		1 1 1 1 1 0 0 1 1 0 0 1          Rn       Rt                 imm12	LDRSB<c> <Rt>, [<Rn>, #<imm12>] 	T1
-
-A8.8.84		1 1 1 1 1 0 0 1 0 0 0 1          Rn       Rt       1 P U W        imm8	LDRSB<c> <Rt>, [<Rn>, #-<imm8>]                         LDRSB<c> <Rt>, [<Rn>], #+/-<imm8>                         LDRSB<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T2
-
-A8.8.85		1 1 1 1 1 0 0 1 U 0 0 1 1 1 1 1           Rt                 imm12	LDRSB<c> <Rt>, <label>                         LDRSB<c> <Rt>, [PC, #-0]                                          Special case 	T1
-
-A8.8.86		0 1 0 1 0 1 1        Rm     Rn    Rt	LDRSB<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.86		1 1 1 1 1 0 0 1 0 0 0 1          Rn       Rt       0 0 0 0 0 0 imm2   Rm	LDRSB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.87		1 1 1 1 1 0 0 1 0 0 0 1          Rn       Rt       1 1 1 0        imm8	LDRSBT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.88		1 1 1 1 1 0 0 1 1 0 1 1          Rn       Rt                 imm12	LDRSH<c> <Rt>, [<Rn>, #<imm12>] 	T1
-
-A8.8.88		1 1 1 1 1 0 0 1 0 0 1 1          Rn       Rt       1 P U W        imm8	LDRSH<c> <Rt>, [<Rn>, #-<imm8>]                         LDRSH<c> <Rt>, [<Rn>], #+/-<imm8>                         LDRSH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T2
-
-A8.8.89		1 1 1 1 1 0 0 1 U 0 1 1 1 1 1 1           Rt                 imm12	LDRSH<c> <Rt>, <label>                         LDRSH<c> <Rt>, [PC, #-0]                                          Special case 	T1
-
-A8.8.90		0 1 0 1 1 1 1        Rm     Rn    Rt	LDRSH<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.90		1 1 1 1 1 0 0 1 0 0 1 1          Rn       Rt       0 0 0 0 0 0 imm2   Rm	LDRSH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.91		1 1 1 1 1 0 0 1 0 0 1 1          Rn       Rt       1 1 1 0        imm8	LDRSHT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.92		1 1 1 1 1 0 0 0 0 1 0 1          Rn       Rt       1 1 1 0        imm8	LDRT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.94		0 0 0 0 0          imm5    Rm     Rd	LSLS <Rd>, <Rm>, #<imm5>	 Outside IT block.                         LSL<c> <Rd>, <Rm>, #<imm5>                                          Inside IT block. 	T1
-
-A8.8.94		1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) imm3              Rd    imm2 0 0  Rm	LSL{S}<c>.W <Rd>, <Rm>, #<imm5> 	T2
-
-A8.8.95		0 1 0 0 0 0 0 0 1 0        Rm    Rdn	LSLS    <Rdn>, <Rm>	         Outside IT block.                         LSL<c> <Rdn>, <Rm>	          Inside IT block. 	T1
-
-A8.8.95		1 1 1 1 1 0 1 0 0 0 0 S          Rn   1 1 1 1         Rd    0 0 0 0   Rm	LSL{S}<c>.W <Rd>, <Rn>, <Rm> 	T2
-
-A8.8.96		0 0 0 0 1          imm5    Rm     Rd	LSRS <Rd>, <Rm>, #<imm>	  Outside IT block.                         LSR<c> <Rd>, <Rm>, #<imm>	Inside IT block. 	T1
-
-A8.8.96		1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) imm3              Rd    imm2 0 1  Rm	LSR{S}<c>.W <Rd>, <Rm>, #<imm> 	T2
-
-A8.8.97		0 1 0 0 0 0 0 0 1 1        Rm    Rdn	LSRS    <Rdn>, <Rm>	        Outside IT block.                         LSR<c> <Rdn>, <Rm>	         Inside IT block. 	T1
-
-A8.8.97		1 1 1 1 1 0 1 0 0 0 1 S          Rn   1 1 1 1         Rd    0 0 0 0   Rm	LSR{S}<c>.W <Rd>, <Rn>, <Rm> 	T2
-
-A8.8.100	1 1 1 1 1 0 1 1 0 0 0 0          Rn       Ra          Rd    0 0 0 0   Rm	MLA<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.101	1 1 1 1 1 0 1 1 0 0 0 0          Rn       Ra          Rd    0 0 0 1   Rm	MLS<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.102	0 0 1 0 0        Rd         imm8	MOVS <Rd>, #<imm8>	       Outside IT block.                         MOV<c> <Rd>, #<imm8>	     Inside IT block. 	T1
-
-A8.8.102	1 1 1 1 0 i 0 0 0 1 0 S 1 1 1 1 0 imm3                Rd          imm8	MOV{S}<c>.W <Rd>, #<const> 	T2
-
-A8.8.102	1 1 1 1 0 i 1 0 0 1 0 0         imm4  0 imm3          Rd          imm8	MOVW<c> <Rd>, #<imm16> 	T3
-
-A8.8.103	0 1 0 0 0 1 1 0 D         Rm      Rd	      ARMv4T, ARMv5T*, ARMv6*, ARMv7 otherwise                         MOV<c> <Rd>, <Rm>                                  If <Rd> is the PC, must be outside or last in IT block. 	T1
-
-A8.8.103	0 0 0 0 0 0 0 0 0 0        Rm     Rd	MOVS <Rd>, <Rm>                               Not permitted in IT block 	T2
-
-A8.8.103	1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) 0 0 0             Rd    0 0 0 0   Rm	MOV{S}<c>.W <Rd>, <Rm> 	T3
-
-A8.8.106	1 1 1 1 0 i 1 0 1 1 0 0         imm4  0 imm3          Rd          imm8	 MOVT<c> <Rd>, #<imm16> 	T1
-
-A8.8.109	1 1 1 1 0 0 1 1 1 1 1 0 (1) (1) (1) (1) 1 0 (0) 0     Rd    (0) (0) 0 (0) (0) (0) (0) (0)	MRS<c> <Rd>, <spec_reg> 	T1
-
-A8.8.112	1 1 1 1 0 0 1 1 1 0 0 0          Rn   1 0 (0) 0 mask 0 0 (0) (0) 0 (0) (0) (0) (0) (0)	MSR<c> <spec_reg>, <Rn> 	T1
-
-A8.8.114	0 1 0 0 0 0 1 1 0 1         Rn   Rdm	MULS <Rdm>, <Rn>, <Rdm>	    Outside IT block.                         MUL<c> <Rdm>, <Rn>, <Rdm>	  Inside IT block. 	T1
-
-A8.8.114	1 1 1 1 1 0 1 1 0 0 0 0          Rn   1 1 1 1         Rd    0 0 0 0   Rm	MUL<c> <Rd>, <Rn>, <Rm> 	T2
-
-A8.8.115	1 1 1 1 0 i 0 0 0 1 1 S 1 1 1 1 0 imm3                Rd          imm8	MVN{S}<c> <Rd>, #<const> 	T1
-
-A8.8.116	0 1 0 0 0 0 1 1 1 1        Rm     Rd	MVNS <Rd>, <Rm>	           Outside IT block.                         MVN<c> <Rd>, <Rm>	         Inside IT block. 	T1
-
-A8.8.116	1 1 1 0 1 0 1 0 0 1 1 S 1 1 1 1 (0) imm3              Rd    imm2 type Rm	MVN{S}<c>.W <Rd>, <Rm>{, <shift>} 	T2
-
-A8.8.119	1 0 1 1 1 1 1 1 0 0 0 0 0 0 0 0	NOP<c> 	T1
-
-A8.8.119	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 0 0 0 0 0 0 0 0	NOP<c>.W 	T2
-
-A8.8.120	1 1 1 1 0 i 0 0 0 1 1 S          Rn   0 imm3          Rd          imm8	ORN{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.121	1 1 1 0 1 0 1 0 0 1 1 S          Rn   (0) imm3        Rd    imm2 type Rm	ORN{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	T1
-
-A8.8.122	1 1 1 1 0 i 0 0 0 1 0 S          Rn   0 imm3          Rd          imm8	ORR{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.123	0 1 0 0 0 0 1 1 0 0        Rm    Rdn	ORRS    <Rdn>, <Rm>	      Outside IT block.                         ORR<c> <Rdn>, <Rm>	       Inside IT block. 	T1
-
-A8.8.123	1 1 1 0 1 0 1 0 0 1 0 S          Rn   (0) imm3        Rd    imm2 type Rm	ORR{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.125	1 1 1 0 1 0 1 0 1 1 0 S          Rn   (0) imm3        Rd    imm2 tb T Rm	PKHBT<c> <Rd>, <Rn>, <Rm>{, LSL #<imm>}                         PKHTB<c> <Rd>, <Rn>, <Rm>{, ASR #<imm>} 	T1
-
-A8.8.126	1 1 1 1 1 0 0 0 1 0 W 1          Rn   1 1 1 1                imm12	      ARMv7 with MP Extensions for PLDW                         PLD{W}<c> [<Rn>, #<imm12>] 	T1
-
-A8.8.126	1 1 1 1 1 0 0 0 0 0 W 1          Rn   1 1 1 1 1 1 0 0             imm8	      ARMv7 with MP Extensions for PLDW                         PLD{W}<c> [<Rn>, #-<imm8>] 	T2
-
-A8.8.127	1 1 1 1 1 0 0 0 U 0 (0) 1 1 1 1 1 1 1 1 1                    imm12	PLD<c> <label>                         PLD<c> [PC, #-0]	        Special case 	T1
-
-A8.8.128	1 1 1 1 1 0 0 0 0 0 W 1          Rn   1 1 1 1 0 0 0 0 0 0 imm2        Rm	      ARMv7 with MP Extensions for PLDW                         PLD{W}<c> [<Rn>, <Rm>{, LSL #<imm2>}] 	T1
-
-A8.8.129	1 1 1 1 1 0 0 1 1 0 0 1          Rn   1 1 1 1                imm12	PLI<c> [<Rn>, #<imm12>] 	T1
-
-A8.8.129	1 1 1 1 1 0 0 1 0 0 0 1          Rn   1 1 1 1 1 1 0 0             imm8	PLI<c> [<Rn>, #-<imm8>] 	T2
-
-A8.8.129	1 1 1 1 1 0 0 1 U 0 0 1 1 1 1 1 1 1 1 1                      imm12	PLI<c> <label>                         PLI<c> [PC, #-0]	         Special case 	T3
-
-A8.8.130	1 1 1 1 1 0 0 1 0 0 0 1          Rn   1 1 1 1 0 0 0 0 0 0 imm2        Rm	PLI<c> [<Rn>, <Rm>{, LSL #<imm2>}] 	T1
-
-A8.8.131	1 0 1 1 1 1 0 P           register_list	POP<c> <registers> 	T1
-
-A8.8.131	1 1 1 0 1 0 0 0 1 0 1 1 1 1 0 1 P M (0)                    register_list	POP<c>.W <registers>                                         <registers> contains more than one register 	T2
-
-A8.8.131	1 1 1 1 1 0 0 0 0 1 0 1 1 1 0 1           Rt       1 0 1 1 0 0 0 0 0 1 0 0	POP<c>.W <registers>                                         <registers> contains one register, <Rt> 	T3
-
-A8.8.133	1 0 1 1 0 1 0 M           register_list	PUSH<c> <registers> 	T1
-
-A8.8.133	1 1 1 0 1 0 0 1 0 0 1 0 1 1 0 1 (0) M (0)                  register_list	PUSH<c>.W <registers>                                        <registers> contains more than one register 	T2
-
-A8.8.133	1 1 1 1 1 0 0 0 0 1 0 0 1 1 0 1           Rt       1 1 0 1 0 0 0 0 0 1 0 0	PUSH<c>.W <registers>                                        <registers> contains one register, <Rt> 	T3
-
-A8.8.134	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    1 0 0 0   Rm	QADD<c> <Rd>, <Rm>, <Rn> 	T1
-
-A8.8.135	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.136	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.137	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.138	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    1 0 0 1   Rm	QDADD<c> <Rd>, <Rm>, <Rn> 	T1
-
-A8.8.139	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    1 0 1 1   Rm	QDSUB<c> <Rd>, <Rm>, <Rn> 	T1
-
-A8.8.140	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QSAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.141	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    1 0 1 0   Rm	QSUB<c> <Rd>, <Rm>, <Rn> 	T1
-
-A8.8.142	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QSUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.143	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 0 0 1   Rm	QSUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.144	1 1 1 1 1 0 1 0 1 0 0 1         Rm    1 1 1 1         Rd    1 0 1 0   Rm	RBIT<c> <Rd>, <Rm> 	T1
-
-A8.8.145	1 0 1 1 1 0 1 0 0 0        Rm     Rd	REV<c> <Rd>, <Rm> 	T1
-
-A8.8.145	1 1 1 1 1 0 1 0 1 0 0 1         Rm    1 1 1 1         Rd    1 0 0 0   Rm	REV<c>.W <Rd>, <Rm> 	T2
-
-A8.8.146	1 0 1 1 1 0 1 0 0 1        Rm     Rd	REV16<c> <Rd>, <Rm> 	T1
-
-A8.8.146	1 1 1 1 1 0 1 0 1 0 0 1         Rm    1 1 1 1         Rd    1 0 0 1   Rm	REV16<c>.W <Rd>, <Rm> 	T2
-
-A8.8.147	1 0 1 1 1 0 1 0 1 1        Rm     Rd	REVSH<c> <Rd>, <Rm> 	T1
-
-A8.8.147	1 1 1 1 1 0 1 0 1 0 0 1         Rm    1 1 1 1         Rd    1 0 1 1   Rm	REVSH<c>.W <Rd>, <Rm> 	T2
-
-A8.8.149	1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) imm3              Rd    imm2 1 1  Rm	ROR{S}<c> <Rd>, <Rm>, #<imm> 	T1
-
-A8.8.150	0 1 0 0 0 0 0 1 1 1        Rm    Rdn	RORS <Rdn>, <Rm>	            Outside IT block.                         ROR<c> <Rdn>, <Rm>	          Inside IT block. 	T1
-
-A8.8.150	1 1 1 1 1 0 1 0 0 1 1 S          Rn   1 1 1 1         Rd    0 0 0 0   Rm	ROR{S}<c>.W <Rd>, <Rn>, <Rm> 	T2
-
-A8.8.151	1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 (0) 0 0 0             Rd    0 0 1 1   Rm	RRX{S}<c> <Rd>, <Rm> 	T1
-
-A8.8.152	0 1 0 0 0 0 1 0 0 1         Rn    Rd	RSBS <Rd>, <Rn>, #0	     Outside IT block.                         RSB<c> <Rd>, <Rn>, #0	   Inside IT block. 	T1
-
-A8.8.152	1 1 1 1 0 i 0 1 1 1 0 S          Rn   0 imm3          Rd          imm8	RSB{S}<c>.W <Rd>, <Rn>, #<const> 	T2
-
-A8.8.153	1 1 1 0 1 0 1 1 1 1 0 S          Rn   (0) imm3        Rd    imm2 type Rm	RSB{S}<c> <Rd>, <Rn>, <Rm>{, <shift>} 	T1
-
-A8.8.158	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.159	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.160	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.161	1 1 1 1 0 i 0 1 0 1 1 S          Rn   0 imm3          Rd          imm8	SBC{S}<c> <Rd>, <Rn>, #<const> 	T1
-
-A8.8.162	0 1 0 0 0 0 0 1 1 0        Rm    Rdn	SBCS <Rdn>, <Rm>	           Outside IT block.                         SBC<c> <Rdn>, <Rm>	         Inside IT block. 	T1
-
-A8.8.162	1 1 1 0 1 0 1 1 0 1 1 S          Rn   (0) imm3        Rd    imm2 type Rm	SBC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.164	1 1 1 1 0 (0) 1 1 0 1 0 0        Rn   0 imm3          Rd    imm2 (0) widthm1	SBFX<c> <Rd>, <Rn>, #<lsb>, #<width> 	T1
-
-A8.8.165	1 1 1 1 1 0 1 1 1 0 0 1          Rn   (1) (1) (1) (1) Rd    1 1 1 1   Rm	SDIV<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.166	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    1 0 0 0   Rm	SEL<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.167	1 0 1 1 0 1 1 0 0 1 0 (1) E (0) (0) (0)	SETEND <endian_specifier>                                        Not permitted in IT block 	T1
-
-A8.8.168	1 0 1 1 1 1 1 1 0 1 0 0 0 0 0 0	SEV<c> 	T1
-
-A8.8.168	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 0 0 0 0 0 1 0 0	SEV<c>.W 	T2
-
-A8.8.169	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.170	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.171	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.172	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHSAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.173	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHSUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.174	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 0 1 0   Rm	SHSUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.176	1 1 1 1 1 0 1 1 0 0 0 1          Rn       Ra          Rd    0 0 N M   Rm	SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.177	1 1 1 1 1 0 1 1 0 0 1 0          Rn       Ra          Rd    0 0 0 M   Rm	SMLAD{X}<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.178	1 1 1 1 1 0 1 1 1 1 0 0          Rn      RdLo        RdHi   0 0 0 0   Rm	SMLAL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.179	1 1 1 1 1 0 1 1 1 1 0 0          Rn      RdLo        RdHi   1 0 N M   Rm	SMLAL<x><y><c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.180	1 1 1 1 1 0 1 1 1 1 0 0          Rn      RdLo        RdHi   1 1 0 M   Rm	SMLALD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.181	1 1 1 1 1 0 1 1 0 0 1 1          Rn       Ra          Rd    0 0 0 M   Rm	SMLAW<y><c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.182	1 1 1 1 1 0 1 1 0 1 0 0          Rn       Ra          Rd    0 0 0 M   Rm	SMLSD{X}<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.183	1 1 1 1 1 0 1 1 1 1 0 1          Rn      RdLo        RdHi   1 1 0 M   Rm	SMLSLD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.184	1 1 1 1 1 0 1 1 0 1 0 1          Rn       Ra          Rd    0 0 0 R   Rm	SMMLA{R}<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.185	1 1 1 1 1 0 1 1 0 1 1 0          Rn       Ra          Rd    0 0 0 R   Rm	SMMLS{R}<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.186	1 1 1 1 1 0 1 1 0 1 0 1          Rn   1 1 1 1         Rd    0 0 0 R   Rm	SMMUL{R}<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.187	1 1 1 1 1 0 1 1 0 0 1 0          Rn   1 1 1 1         Rd    0 0 0 M   Rm	SMUAD{X}<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.188	1 1 1 1 1 0 1 1 0 0 0 1          Rn   1 1 1 1         Rd    0 0 N M   Rm	SMUL<x><y><c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.189	1 1 1 1 1 0 1 1 1 0 0 0          Rn      RdLo        RdHi   0 0 0 0   Rm	SMULL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.190	1 1 1 1 1 0 1 1 0 0 1 1          Rn   1 1 1 1         Rd    0 0 0 M   Rm	SMULW<y><c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.191	1 1 1 1 1 0 1 1 0 1 0 0          Rn   1 1 1 1         Rd    0 0 0 M   Rm	SMUSD{X}<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.193	1 1 1 1 0 (0) 1 1 0 0 sh 0       Rn   0 imm3          Rd    imm2 (0) sat_imm	SSAT<c> <Rd>, #<imm>, <Rn>{, <shift>} 	T1
-
-A8.8.194	1 1 1 1 0 (0) 1 1 0 0 1 0        Rn   0 0 0 0         Rd    0 0 (0) (0) sat_imm	SSAT16<c> <Rd>, #<imm>, <Rn> 	T1
-
-A8.8.195	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SSAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.196	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SSUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.197	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 0 0 0   Rm	SSUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.199	1 1 0 0 0        Rn       register_list	STM<c> <Rn>!, <registers> 	T1
-
-A8.8.199	1 1 1 0 1 0 0 0 1 0 W 0          Rn   (0) M (0)            register_list	STM<c>.W <Rn>{!}, <registers> 	T2
-
-A8.8.201	1 1 1 0 1 0 0 1 0 0 W 0          Rn   (0) M (0)            register_list	STMDB<c> <Rn>{!}, <registers> 	T1
-
-A8.8.203	0 1 1 0 0          imm5     Rn    Rt	STR<c> <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.203	1 0 0 1 0         Rt        imm8	STR<c> <Rt>, [SP, #<imm>] 	T2
-
-A8.8.203	1 1 1 1 1 0 0 0 1 1 0 0          Rn       Rt                 imm12	STR<c>.W <Rt>, [<Rn>, #<imm12>] 	T3
-
-A8.8.203	1 1 1 1 1 0 0 0 0 1 0 0          Rn       Rt       1 P U W        imm8	STR<c> <Rt>, [<Rn>, #-<imm8>]                         STR<c> <Rt>, [<Rn>], #+/-<imm8>                         STR<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T4
-
-A8.8.205	0 1 0 1 0 0 0        Rm     Rn    Rt	STR<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.205	1 1 1 1 1 0 0 0 0 1 0 0          Rn       Rt       0 0 0 0 0 0 imm2   Rm	STR<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.206	0 1 1 1 0          imm5     Rn    Rt	STRB<c> <Rt>, [<Rn>, #<imm5>] 	T1
-
-A8.8.206	1 1 1 1 1 0 0 0 1 0 0 0          Rn       Rt                 imm12	STRB<c>.W <Rt>, [<Rn>, #<imm12>] 	T2
-
-A8.8.206	1 1 1 1 1 0 0 0 0 0 0 0          Rn       Rt       1 P U W        imm8	STRB<c> <Rt>, [<Rn>, #-<imm8>]                         STRB<c> <Rt>, [<Rn>], #+/-<imm8>                         STRB<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T3
-
-A8.8.208	0 1 0 1 0 1 0        Rm     Rn    Rt	STRB<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.208	1 1 1 1 1 0 0 0 0 0 0 0          Rn       Rt       0 0 0 0 0 0 imm2   Rm	STRB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.209	1 1 1 1 1 0 0 0 0 0 0 0          Rn       Rt       1 1 1 0        imm8	STRBT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.210	1 1 1 0 1 0 0 P U 1 W 0          Rn       Rt          Rt2         imm8	STRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm>}]                         STRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm>                         STRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm>]! 	T1
-
-A8.8.212	1 1 1 0 1 0 0 0 0 1 0 0          Rn       Rt          Rd          imm8	STREX<c> <Rd>, <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.213	1 1 1 0 1 0 0 0 1 1 0 0          Rn       Rt      (1) (1) (1) (1) 0 1 0 0 Rd	STREXB<c> <Rd>, <Rt>, [<Rn>] 	T1
-
-A8.8.214	1 1 1 0 1 0 0 0 1 1 0 0          Rn       Rt          Rt2   0 1 1 1    Rd	STREXD<c> <Rd>, <Rt>, <Rt2>, [<Rn>] 	T1
-
-A8.8.215	1 1 1 0 1 0 0 0 1 1 0 0          Rn       Rt      (1) (1) (1) (1) 0 1 0 1 Rd	STREXH<c> <Rd>, <Rt>, [<Rn>] 	T1
-
-A8.8.216	1 0 0 0 0          imm5     Rn    Rt	STRH<c> <Rt>, [<Rn>{, #<imm>}] 	T1
-
-A8.8.216	1 1 1 1 1 0 0 0 1 0 1 0          Rn       Rt                 imm12	STRH<c>.W <Rt>, [<Rn>{, #<imm12>}] 	T2
-
-A8.8.216	1 1 1 1 1 0 0 0 0 0 1 0          Rn       Rt       1 P U W        imm8	STRH<c> <Rt>, [<Rn>, #-<imm8>]                         STRH<c> <Rt>, [<Rn>], #+/-<imm8>                         STRH<c> <Rt>, [<Rn>, #+/-<imm8>]! 	T3
-
-A8.8.218	0 1 0 1 0 0 1        Rm     Rn    Rt	STRH<c> <Rt>, [<Rn>, <Rm>] 	T1
-
-A8.8.218	1 1 1 1 1 0 0 0 0 0 1 0          Rn       Rt       0 0 0 0 0 0 imm2   Rm	STRH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}] 	T2
-
-A8.8.219	1 1 1 1 1 0 0 0 0 0 1 0          Rn       Rt       1 1 1 0        imm8	STRHT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.220	1 1 1 1 1 0 0 0 0 1 0 0          Rn       Rt       1 1 1 0        imm8	STRT<c> <Rt>, [<Rn>, #<imm8>] 	T1
-
-A8.8.221	0 0 0 1 1 1 1 imm3          Rn    Rd	SUBS <Rd>, <Rn>, #<imm3>	   Outside IT block.                         SUB<c> <Rd>, <Rn>, #<imm3>	 Inside IT block. 	T1
-
-A8.8.221	0 0 1 1 1        Rdn        imm8	SUBS <Rdn>, #<imm8>	        Outside IT block.                         SUB<c> <Rdn>, #<imm8>	      Inside IT block. 	T2
-
-A8.8.221	1 1 1 1 0 i 0 1 1 0 1 S          Rn   0 imm3          Rd          imm8	SUB{S}<c>.W <Rd>, <Rn>, #<const> 	T3
-
-A8.8.221	1 1 1 1 0 i 1 0 1 0 1 0          Rn   0 imm3          Rd          imm8	SUBW<c> <Rd>, <Rn>, #<imm12> 	T4
-
-A8.8.223	0 0 0 1 1 0 1        Rm     Rn    Rd	SUBS <Rd>, <Rn>, <Rm>	      Outside IT block.                         SUB<c> <Rd>, <Rn>, <Rm>	    Inside IT block. 	T1
-
-A8.8.223	1 1 1 0 1 0 1 1 1 0 1 S          Rn   (0) imm3        Rd    imm2 type Rm	SUB{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.225	 1 0 1 1 0 0 0 0 1           imm7	SUB<c> SP, SP, #<imm> 	T1
-
-A8.8.225	1 1 1 1 0 i 0 1 1 0 1 S 1 1 0 1 0 imm3                Rd          imm8	SUB{S}<c>.W <Rd>, SP, #<const> 	T2
-
-A8.8.225	1 1 1 1 0 i 1 0 1 0 1 0 1 1 0 1 0 imm3                Rd          imm8	SUBW<c> <Rd>, SP, #<imm12> 	T3
-
-A8.8.226	1 1 1 0 1 0 1 1 1 0 1 S 1 1 0 1 (0) imm3              Rd    imm2 type Rm	SUB{S}<c> <Rd>, SP, <Rm>{, <shift>} 	T1
-
-A8.8.228	1 1 0 1 1 1 1 1             imm8	SVC<c> #<imm8> 	T1
-
-A8.8.230	1 1 1 1 1 0 1 0 0 1 0 0          Rn   1 1 1 1         Rd    1 (0) rotate Rm	SXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.231	1 1 1 1 1 0 1 0 0 0 1 0          Rn   1 1 1 1         Rd    1 (0) rotate Rm	SXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.232	1 1 1 1 1 0 1 0 0 0 0 0          Rn   1 1 1 1         Rd    1 (0) rotate Rm	SXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.233	1 0 1 1 0 0 1 0 0 1        Rm     Rd	SXTB<c> <Rd>, <Rm> 	T1
-
-A8.8.233	1 1 1 1 1 0 1 0 0 1 0 0 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	SXTB<c>.W <Rd>, <Rm>{, <rotation>} 	T2
-
-A8.8.234	1 1 1 1 1 0 1 0 0 0 1 0 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	SXTB16<c> <Rd>, <Rm>{, <rotation>} 	T1
-
-A8.8.235	1 0 1 1 0 0 1 0 0 0        Rm     Rd	SXTH<c> <Rd>, <Rm> 	T1
-
-A8.8.235	1 1 1 1 1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	SXTH<c>.W <Rd>, <Rm>{, <rotation>} 	T2
-
-A8.8.236	1 1 1 0 1 0 0 0 1 1 0 1          Rn   (1) (1) (1) (1) (0) (0) (0) (0) 0 0 0 H Rm	TBB<c> [<Rn>, <Rm>]	        Outside or last in IT block                         TBH<c> [<Rn>, <Rm>, LSL #1]	Outside or last in IT block 	T1
-
-A8.8.237	1 1 1 1 0 i 0 0 1 0 0 1          Rn   0 imm3 1 1 1 1              imm8	TEQ<c> <Rn>, #<const> 	T1
-
-A8.8.238	1 1 1 0 1 0 1 0 1 0 0 1          Rn   (0) imm3 1 1 1 1 imm2 type      Rm	TEQ<c> <Rn>, <Rm>{, <shift>} 	T1
-
-A8.8.240	1 1 1 1 0 i 0 0 0 0 0 1          Rn   0 imm3 1 1 1 1              imm8	TST<c> <Rn>, #<const> 	T1
-
-A8.8.241	0 1 0 0 0 0 1 0 0 0        Rm     Rn	TST<c> <Rn>, <Rm> 	T1
-
-A8.8.241	1 1 1 0 1 0 1 0 0 0 0 1          Rn   (0) imm3 1 1 1 1 imm2 type      Rm	TST<c>.W    <Rn>, <Rm>{, <shift>} 	T2
-
-A8.8.243	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 1 0 0   Rm	UADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.244	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 1 0 0   Rm	UADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.245	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 1 0 0   Rm	UASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.246	1 1 1 1 0 (0) 1 1 1 1 0 0        Rn   0 imm3          Rd    imm2 (0) widthm1	UBFX<c> <Rd>, <Rn>, #<lsb>, #<width> 	T1
-
-A8.8.247	 1 1 0 1 1 1 1 0            imm8	UDF<c> #<imm8> 	T1
-
-A8.8.247	1 1 1 1 0 1 1 1 1 1 1 1         imm4  1 0 1 0                imm12	UDF<c>.W #<imm16> 	T2
-
-A8.8.248	1 1 1 1 1 0 1 1 1 0 1 1          Rn   (1) (1) (1) (1) Rd    1 1 1 1   Rm	UDIV<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.249	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.250	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.251	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.252	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHSAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.253	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHSUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.254	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 1 1 0   Rm	UHSUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.255	1 1 1 1 1 0 1 1 1 1 1 0          Rn      RdLo        RdHi   0 1 1 0   Rm	UMAAL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.256	1 1 1 1 1 0 1 1 1 1 1 0          Rn      RdLo        RdHi   0 0 0 0   Rm	UMLAL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.257	1 1 1 1 1 0 1 1 1 0 1 0          Rn      RdLo        RdHi   0 0 0 0   Rm	UMULL<c> <RdLo>, <RdHi>, <Rn>, <Rm> 	T1
-
-A8.8.258	1 1 1 1 1 0 1 0 1 0 0 1          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQADD16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.259	1 1 1 1 1 0 1 0 1 0 0 0          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQADD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.260	1 1 1 1 1 0 1 0 1 0 1 0          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQASX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.261	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQSAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.262	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQSUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.263	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 1 0 1   Rm	UQSUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.264	1 1 1 1 1 0 1 1 0 1 1 1          Rn   1 1 1 1         Rd    0 0 0 0   Rm	USAD8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.265	1 1 1 1 1 0 1 1 0 1 1 1          Rn       Ra          Rd    0 0 0 0   Rm	USADA8<c> <Rd>, <Rn>, <Rm>, <Ra> 	T1
-
-A8.8.266	1 1 1 1 0 (0) 1 1 1 0 sh 0       Rn   0 imm3          Rd    imm2 (0) sat_imm	USAT<c> <Rd>, #<imm5>, <Rn>{, <shift>} 	T1
-
-A8.8.267	1 1 1 1 0 (0) 1 1 1 0 1 0        Rn   0 0 0 0         Rd    0 0 (0) (0) sat_imm	USAT16<c> <Rd>, #<imm4>, <Rn> 	T1
-
-A8.8.268	1 1 1 1 1 0 1 0 1 1 1 0          Rn   1 1 1 1         Rd    0 1 0 0   Rm	USAX<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.269	1 1 1 1 1 0 1 0 1 1 0 1          Rn   1 1 1 1         Rd    0 1 0 0   Rm	USUB16<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.270	1 1 1 1 1 0 1 0 1 1 0 0          Rn   1 1 1 1         Rd    0 1 0 0   Rm	USUB8<c> <Rd>, <Rn>, <Rm> 	T1
-
-A8.8.271	1 1 1 1 1 0 1 0 0 1 0 1          Rn   1 1 1 1         Rd    1 (0) rotate Rm	UXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.272	1 1 1 1 1 0 1 0 0 0 1 1          Rn   1 1 1 1         Rd    1 (0) rotate Rm	UXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.273	1 1 1 1 1 0 1 0 0 0 0 1          Rn   1 1 1 1         Rd    1 (0) rotate Rm	UXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>} 	T1
-
-A8.8.274	1 0 1 1 0 0 1 0 1 1        Rm     Rd	UXTB<c> <Rd>, <Rm> 	T1
-
-A8.8.274	1 1 1 1 1 0 1 0 0 1 0 1 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	UXTB<c>.W <Rd>, <Rm>{, <rotation>} 	T2
-
-A8.8.275	1 1 1 1 1 0 1 0 0 0 1 1 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	UXTB16<c> <Rd>, <Rm>{, <rotation>} 	T1
-
-A8.8.276	1 0 1 1 0 0 1 0 1 0        Rm     Rd	UXTH<c> <Rd>, <Rm> 	T1
-
-A8.8.276	1 1 1 1 1 0 1 0 0 0 0 1 1 1 1 1 1 1 1 1               Rd    1 (0) rotate Rm	UXTH<c>.W <Rd>, <Rm>{, <rotation>} 	T2
-
-A8.8.424	1 0 1 1 1 1 1 1 0 0 1 0 0 0 0 0	WFE<c> 	T1
-
-A8.8.424	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 0 0 0 0 0 0 1 0	WFE<c>.W 	T2
-
-A8.8.425	1 0 1 1 1 1 1 1 0 0 1 1 0 0 0 0	WFI<c> 	T1
-
-A8.8.425	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 0 0 0 0 0 0 1 1	WFI<c>.W 	T2
-
-A8.8.426	1 0 1 1 1 1 1 1 0 0 0 1 0 0 0 0	YIELD<c> 	T1
-
-A8.8.426	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) 0 0 0 0 0 0 0 0 0 0 1	YIELD<c>.W 	T2
-
-A9.3.1	    1 1 1 1 0 0 1 1 1 0 1 1 (1) (1) (1) (1) 1 0 (0) 0 (1) (1) (1) (1) 0 0 0 J (1) (1) (1) (1)	       ENTERX	                 Not permitted in IT block.                                LEAVEX	                 Not permitted in IT block. 	T1
-
-A9.4.1	    0 1 0 1 1 0 0        Rm     Rn    Rt	      LDR<c> <Rt>, [<Rn>, <, <Rm>, LSL #2] 	T1
-
-A9.4.2  	0 1 0 1 1 0 1        Rm     Rn    Rt	   LDRH<c> <Rt>, [<Rn>, <, <Rm>, LSL #1] 	T1
-
-A9.4.3	    0 1 0 1 1 1 1        Rm     Rn    Rt	      LDRSH<c> <Rt>, [<Rn>, <Rm>, LSL #1] 	T1
-
-A9.4.4  	0 1 0 1 0 0 0        Rm     Rn    Rt	   STR<c> <Rt>, [<Rn>, <Rm>, LSL #2] 	T1
-
-A9.4.5	    0 1 0 1 0 0 1        Rm     Rn    Rt	      STRH<c> <Rt>, [<Rn>, <Rm>, LSL #1] 	T1
-
-B9.3.1  	1 0 1 1 0 1 1 0 0 1 1 im (0) A I F	CPS<effect> <iflags>	       Not permitted in IT block. 	T1
-
-B9.3.1  	1 1 1 1 0 0 1 1 1 0 1 0 (1) (1) (1) (1) 1 0 (0) 0 (0) imod M A I F   mode	CPS<effect>.W <iflags>{, #<mode>}                                     Not permitted in IT block.                         CPS #<mode>	                Not permitted in IT block. 	T2
-
-B9.3.3  	1 1 1 1 0 0 1 1 1 1 0 1 (1) (1) (1) (0) 1 0 (0) 0 (1) (1) (1) (1) imm8	SUBS PC, LR, #0        Outside or last in IT block.       ARMv6T2, ARMv7                         ERET<c>                Outside or last in IT block.       ARMv7VE 	T1
-
-B9.3.4	1 1 1 1 0 1 1 1 1 1 1 0         imm4  1 0 0 0                imm12	HVC #<imm> 	T1
-
-B9.3.8	1 1 1 1 0 0 1 1 1 1 1 R (1) (1) (1) (1) 1 0 (0) 0     Rd    (0) (0) 0 (0) (0) (0) (0) (0)	MRS<c> <Rd>, <spec_reg> 	T1
-
-B9.3.9	1 1 1 1 0 0 1 1 1 1 1 R          M1   1 0 (0) 0       Rd    (0) (0) 1 M (0) (0) (0) (0)	MRS<c> <Rd>, <banked_reg> 	T1
-
-B9.3.10	1 1 1 1 0 0 1 1 1 0 0 R          Rn   1 0 (0) 0       M1    (0) (0) 1 M (0) (0) (0) (0)	MSR<c> <banked_reg>, <Rn> 	T1
-
-B9.3.12	1 1 1 1 0 0 1 1 1 0 0 R          Rn   1 0 (0) 0      mask   (0) (0) 0 (0) (0) (0) (0) (0)	MSR<c> <spec_reg>, <Rn> 	T1
-
-B9.3.13	1 1 1 0 1 0 0 0 0 0 W 1          Rn   (1) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0)	RFEDB<c> <Rn>{!}	               Outside or last in IT block 	T1
-
-B9.3.13	1 1 1 0 1 0 0 1 1 0 W 1          Rn   (1) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0)	RFE{IA}<c> <Rn>{!}	             Outside or last in IT block 	T2
-
-B9.3.14	1 1 1 1 0 1 1 1 1 1 1 1         imm4  1 0 0 0 (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0) (0)	SMC<c> #<imm4> 	T1
-
-B9.3.15	1 1 1 0 1 0 0 0 0 0 W 0 (1) (1) (0) (1) (1) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0) mode	SRSDB<c> SP{!}, #<mode> 	T1
-
-B9.3.15	1 1 1 0 1 0 0 1 1 0 W 0 (1) (1) (0) (1) (1) (1) (0) (0) (0) (0) (0) (0) (0) (0) (0) mode	SRS{IA}<c> SP{!}, #<mode> 	T2
-
-B9.3.19	1 1 1 1 0 0 1 1 1 1 0 1 (1) (1) (1) (0) 1 0 (0) 0 (1) (1) (1) (1) imm8	SUBS<c> PC, LR, #<imm8>	 Outside or last in IT block 	T1
-
+1 1 1 1 1 0 0 0 1 1 0 1 n n n n t t t t i i i i i i i i i i i i "LDR<c>.W <Rt>, [<Rn>{, #<imm12>}]" T3(THUMB2) A8.8.62
+1 1 1 1 1 0 0 0 0 1 0 1 n n n n t t t t 1 P U W i i i i i i i i "LDR<c> <Rt>, [<Rn>, #-<imm8>] LDR<c> <Rt>, [<Rn>], #+/-<imm8> LDR<c> <Rt>, [<Rn>, #+/-<imm8>]!" T4(THUMB2) A8.8.62
+1 1 1 1 1 0 0 0 U 1 0 1 1 1 1 1 t t t t i i i i i i i i i i i i "LDR<c>.W <Rt>, <label> LDR<c>.W <Rt>, [PC, #-0] Special case" T2(THUMB2) A8.8.64
+1 1 1 1 1 0 0 0 0 1 0 1 n n n n t t t t 0 0 0 0 0 0 i i m m m m "LDR<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.65
+1 1 1 1 1 0 0 0 1 0 0 1 n n n n t t t t i i i i i i i i i i i i "LDRB<c>.W <Rt>, [<Rn>{, #<imm12>}]" T2(THUMB2) A8.8.67
+1 1 1 1 1 0 0 0 0 0 0 1 n n n n t t t t 1 P U W i i i i i i i i "LDRB<c> <Rt>, [<Rn>, #-<imm8>] LDRB<c> <Rt>, [<Rn>], #+/-<imm8> LDRB<c> <Rt>, [<Rn>, #+/-<imm8>]!" T3(THUMB2) A8.8.67
+1 1 1 1 1 0 0 0 U 0 0 1 1 1 1 1 t t t t i i i i i i i i i i i i "LDRB<c> <Rt>, <label> LDRB<c> <Rt>, [PC, #-0] Special case" T1(THUMB2) A8.8.69
+1 1 1 1 1 0 0 0 0 0 0 1 n n n n t t t t 0 0 0 0 0 0 i i m m m m "LDRB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.70
+1 1 1 1 1 0 0 0 0 0 0 1 n n n n t t t t 1 1 1 0 i i i i i i i i "LDRBT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.71
+1 1 1 0 1 0 0 P U 1 W 1 n n n n t t t t T T T T i i i i i i i i "LDRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm>}] LDRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm> LDRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm>]!" T1(THUMB2) A8.8.72
+1 1 1 0 1 0 0 P U 1 W 1 1 1 1 1 t t t t T T T T i i i i i i i i "LDRD<c> <Rt>, <Rt2>, <label> LDRD<c> <Rt>, <Rt2>, [PC, #-0] Special case" T1(THUMB2) A8.8.73
+1 1 1 0 1 0 0 0 0 1 0 1 n n n n t t t t 1 1 1 1 i i i i i i i i "LDREX<c> <Rt>, [<Rn>{, #<imm>}]" T1(THUMB2) A8.8.75
+1 1 1 0 1 0 0 0 1 1 0 1 n n n n t t t t 1 1 1 1 0 1 0 0 1 1 1 1 "LDREXB<c> <Rt>, [<Rn>]" T1(THUMB2) A8.8.76
+1 1 1 0 1 0 0 0 1 1 0 1 n n n n t t t t T T T T 0 1 1 1 1 1 1 1 "LDREXD<c> <Rt>, <Rt2>, [<Rn>]" T1(THUMB2) A8.8.77
+1 1 1 0 1 0 0 0 1 1 0 1 n n n n t t t t 1 1 1 1 0 1 0 1 1 1 1 1 "LDREXH<c> <Rt>, [<Rn>]" T1(THUMB2) A8.8.78
+1 1 1 1 1 0 0 0 1 0 1 1 n n n n t t t t i i i i i i i i i i i i "LDRH<c>.W <Rt>, [<Rn>{, #<imm12>}]" T2(THUMB2) A8.8.79
+1 1 1 1 1 0 0 0 0 0 1 1 n n n n t t t t 1 P U W i i i i i i i i "LDRH<c> <Rt>, [<Rn>, #-<imm8>] LDRH<c> <Rt>, [<Rn>], #+/-<imm8> LDRH<c> <Rt>, [<Rn>, #+/-<imm8>]!" T3(THUMB2) A8.8.79
+1 1 1 1 1 0 0 0 U 0 1 1 1 1 1 1 t t t t i i i i i i i i i i i i "LDRH<c> <Rt>, <label> LDRH<c> <Rt>, [PC, #-0] Special case" T1(THUMB2) A8.8.81
+1 1 1 1 1 0 0 0 0 0 1 1 n n n n t t t t 0 0 0 0 0 0 i i m m m m "LDRH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.82
+1 1 1 1 1 0 0 0 0 0 1 1 n n n n t t t t 1 1 1 0 i i i i i i i i "LDRHT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.83
+1 1 1 1 1 0 0 1 1 0 0 1 n n n n t t t t i i i i i i i i i i i i "LDRSB<c> <Rt>, [<Rn>, #<imm12>]" T1(THUMB2) A8.8.84
+1 1 1 1 1 0 0 1 0 0 0 1 n n n n t t t t 1 P U W i i i i i i i i "LDRSB<c> <Rt>, [<Rn>, #-<imm8>] LDRSB<c> <Rt>, [<Rn>], #+/-<imm8> LDRSB<c> <Rt>, [<Rn>, #+/-<imm8>]!" T2(THUMB2) A8.8.84
+1 1 1 1 1 0 0 1 U 0 0 1 1 1 1 1 t t t t i i i i i i i i i i i i "LDRSB<c> <Rt>, <label> LDRSB<c> <Rt>, [PC, #-0] Special case" T1(THUMB2) A8.8.85
+1 1 1 1 1 0 0 1 0 0 0 1 n n n n t t t t 0 0 0 0 0 0 i i m m m m "LDRSB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.86
+1 1 1 1 1 0 0 1 0 0 0 1 n n n n t t t t 1 1 1 0 i i i i i i i i "LDRSBT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.87
+1 1 1 1 1 0 0 1 1 0 1 1 n n n n t t t t i i i i i i i i i i i i "LDRSH<c> <Rt>, [<Rn>, #<imm12>]" T1(THUMB2) A8.8.88
+1 1 1 1 1 0 0 1 0 0 1 1 n n n n t t t t 1 P U W i i i i i i i i "LDRSH<c> <Rt>, [<Rn>, #-<imm8>] LDRSH<c> <Rt>, [<Rn>], #+/-<imm8> LDRSH<c> <Rt>, [<Rn>, #+/-<imm8>]!" T2(THUMB2) A8.8.88
+1 1 1 1 1 0 0 1 U 0 1 1 1 1 1 1 t t t t i i i i i i i i i i i i "LDRSH<c> <Rt>, <label> LDRSH<c> <Rt>, [PC, #-0] Special case" T1(THUMB2) A8.8.89
+1 1 1 1 1 0 0 1 0 0 1 1 n n n n t t t t 0 0 0 0 0 0 i i m m m m "LDRSH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.90
+1 1 1 1 1 0 0 1 0 0 1 1 n n n n t t t t 1 1 1 0 i i i i i i i i "LDRSHT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.91
+1 1 1 1 1 0 0 0 0 1 0 1 n n n n t t t t 1 1 1 0 i i i i i i i i "LDRT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.92
+1 1 1 0 1 1 1 0 P P P 0 n n n n t t t t C C C C p p p 1 m m m m "for encoding A1 MCR<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}" T1/A1(THUMB2) A8.8.98
+1 1 1 1 1 1 1 0 P P P 0 n n n n t t t t C C C C p p p 1 m m m m "for encoding A2 MCR2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}" T2/A2(THUMB2) A8.8.98
+1 1 1 0 1 1 0 0 0 1 0 0 T T T T t t t t C C C C P P P P m m m m "for encoding A1 MCRR<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>" T1/A1(THUMB2) A8.8.99
+1 1 1 1 1 1 0 0 0 1 0 0 T T T T t t t t C C C C P P P P m m m m "for encoding A2 MCRR2<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>" T2/A2(THUMB2) A8.8.99
+1 1 1 0 1 1 1 0 P P P 1 n n n n t t t t C C C C p p p 1 m m m m "for encoding A1 MRC<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}" T1/A1(THUMB2) A8.8.107
+1 1 1 1 1 1 1 0 P P P 1 n n n n t t t t C C C C p p p 1 m m m m "for encoding A2 MRC2<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}" T2/A2(THUMB2) A8.8.107
+1 1 1 0 1 1 0 0 0 1 0 1 T T T T t t t t C C C C P P P P m m m m "for encoding A1 MRRC<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>" T1/A1(THUMB2) A8.8.108
+1 1 1 1 1 1 0 0 0 1 0 1 T T T T t t t t C C C C P P P P m m m m "for encoding A2 MRRC2<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>" T2/A2(THUMB2) A8.8.108
+1 1 1 1 1 0 0 0 0 1 0 1 1 1 0 1 t t t t 1 0 1 1 0 0 0 0 0 1 0 0 "POP<c>.W <registers> <registers> contains one register, <Rt>" T3(THUMB2) A8.8.131
+1 1 1 1 1 0 0 0 0 1 0 0 1 1 0 1 t t t t 1 1 0 1 0 0 0 0 0 1 0 0 "PUSH<c>.W <registers> <registers> contains one register, <Rt>" T3(THUMB2) A8.8.133
+1 1 1 1 1 0 0 0 1 1 0 0 n n n n t t t t i i i i i i i i i i i i "STR<c>.W <Rt>, [<Rn>, #<imm12>]" T3(THUMB2) A8.8.203
+1 1 1 1 1 0 0 0 0 1 0 0 n n n n t t t t 1 P U W i i i i i i i i "STR<c> <Rt>, [<Rn>, #-<imm8>] STR<c> <Rt>, [<Rn>], #+/-<imm8> STR<c> <Rt>, [<Rn>, #+/-<imm8>]!" T4(THUMB2) A8.8.203
+1 1 1 1 1 0 0 0 0 1 0 0 n n n n t t t t 0 0 0 0 0 0 i i m m m m "STR<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.205
+1 1 1 1 1 0 0 0 1 0 0 0 n n n n t t t t i i i i i i i i i i i i "STRB<c>.W <Rt>, [<Rn>, #<imm12>]" T2(THUMB2) A8.8.206
+1 1 1 1 1 0 0 0 0 0 0 0 n n n n t t t t 1 P U W i i i i i i i i "STRB<c> <Rt>, [<Rn>, #-<imm8>] STRB<c> <Rt>, [<Rn>], #+/-<imm8> STRB<c> <Rt>, [<Rn>, #+/-<imm8>]!" T3(THUMB2) A8.8.206
+1 1 1 1 1 0 0 0 0 0 0 0 n n n n t t t t 0 0 0 0 0 0 i i m m m m "STRB<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.208
+1 1 1 1 1 0 0 0 0 0 0 0 n n n n t t t t 1 1 1 0 i i i i i i i i "STRBT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.209
+1 1 1 0 1 0 0 P U 1 W 0 n n n n t t t t T T T T i i i i i i i i "STRD<c> <Rt>, <Rt2>, [<Rn>{, #+/-<imm>}] STRD<c> <Rt>, <Rt2>, [<Rn>], #+/-<imm> STRD<c> <Rt>, <Rt2>, [<Rn>, #+/-<imm>]!" T1(THUMB2) A8.8.210
+1 1 1 0 1 0 0 0 0 1 0 0 n n n n t t t t d d d d i i i i i i i i "STREX<c> <Rd>, <Rt>, [<Rn>{, #<imm>}]" T1(THUMB2) A8.8.212
+1 1 1 0 1 0 0 0 1 1 0 0 n n n n t t t t 1 1 1 1 0 1 0 0 d d d d "STREXB<c> <Rd>, <Rt>, [<Rn>]" T1(THUMB2) A8.8.213
+1 1 1 0 1 0 0 0 1 1 0 0 n n n n t t t t T T T T 0 1 1 1 d d d d "STREXD<c> <Rd>, <Rt>, <Rt2>, [<Rn>]" T1(THUMB2) A8.8.214
+1 1 1 0 1 0 0 0 1 1 0 0 n n n n t t t t 1 1 1 1 0 1 0 1 d d d d "STREXH<c> <Rd>, <Rt>, [<Rn>]" T1(THUMB2) A8.8.215
+1 1 1 1 1 0 0 0 1 0 1 0 n n n n t t t t i i i i i i i i i i i i "STRH<c>.W <Rt>, [<Rn>{, #<imm12>}]" T2(THUMB2) A8.8.216
+1 1 1 1 1 0 0 0 0 0 1 0 n n n n t t t t 1 P U W i i i i i i i i "STRH<c> <Rt>, [<Rn>, #-<imm8>] STRH<c> <Rt>, [<Rn>], #+/-<imm8> STRH<c> <Rt>, [<Rn>, #+/-<imm8>]!" T3(THUMB2) A8.8.216
+1 1 1 1 1 0 0 0 0 0 1 0 n n n n t t t t 0 0 0 0 0 0 i i m m m m "STRH<c>.W <Rt>, [<Rn>, <Rm>{, LSL #<imm2>}]" T2(THUMB2) A8.8.218
+1 1 1 1 1 0 0 0 0 0 1 0 n n n n t t t t 1 1 1 0 i i i i i i i i "STRHT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.219
+1 1 1 1 1 0 0 0 0 1 0 0 n n n n t t t t 1 1 1 0 i i i i i i i i "STRT<c> <Rt>, [<Rn>, #<imm8>]" T1(THUMB2) A8.8.220
+1 1 1 0 1 1 1 0 1 B Q 0 d d d d t t t t 1 0 1 1 D 0 E 1 0 0 0 0 "VDUP<c>.<size> <Qd>, <Rt> VDUP<c>.<size> <Dd>, <Rt>" T1/A1(THUMB2) A8.8.314
+1 1 1 0 1 1 1 0 0 P P 0 d d d d t t t t 1 0 1 1 D p p 1 0 0 0 0 "Advanced SIMD otherwise VMOV<c>.<size> <Dd[x]>, <Rt>" T1/A1(THUMB2) A8.8.341
+1 1 1 0 1 1 1 0 U P P 1 n n n n t t t t 1 0 1 1 N p p 1 0 0 0 0 "Advanced SIMD otherwise VMOV<c>.<dt> <Rt>, <Dn[x]>" T1/A1(THUMB2) A8.8.342
+1 1 1 0 1 1 1 0 0 0 0 f n n n n t t t t 1 0 1 0 N 0 0 1 0 0 0 0 "VMOV<c> <Sn>, <Rt> VMOV<c> <Rt>, <Sn>" T1/A1(THUMB2) A8.8.343
+1 1 1 0 1 1 0 0 0 1 0 f T T T T t t t t 1 0 1 0 0 0 M 1 m m m m "VMOV<c> <Sm>, <Sm1>, <Rt>, <Rt2> VMOV<c> <Rt>, <Rt2>, <Sm>, <Sm1>" T1/A1(THUMB2) A8.8.344
+1 1 1 0 1 1 0 0 0 1 0 f T T T T t t t t 1 0 1 1 0 0 M 1 m m m m "VMOV<c> <Dm>, <Rt>, <Rt2> VMOV<c> <Rt>, <Rt2>, <Dm>" T1/A1(THUMB2) A8.8.345
+1 1 1 0 1 1 1 0 1 1 1 1 0 0 0 1 t t t t 1 0 1 0 0 0 0 1 0 0 0 0 "VMRS<c> <Rt>, FPSCR" T1/A1(THUMB2) A8.8.348
+1 1 1 0 1 1 1 0 1 1 1 0 0 0 0 1 t t t t 1 0 1 0 0 0 0 1 0 0 0 0 "VMSR<c> FPSCR, <Rt>" T1/A1(THUMB2) A8.8.349
+1 1 1 0 1 1 1 0 1 1 1 1 r r r r t t t t 1 0 1 0 0 0 0 1 0 0 0 0 "VMRS<c> <Rt>, <specreg>" T1/A1(THUMB2) B9.3.21
+1 1 1 0 1 1 1 0 1 1 1 0 r r r r t t t t 1 0 1 0 0 0 0 1 0 0 0 0 "VMSR<c> <specreg>, <Rt>" T1/A1(THUMB2) B9.3.22
+1 1 1 0 1 0 0 0 1 0 W 1 n n n n P M 0 r r r r r r r r r r r r r "LDM<c>.W <Rn>{!}, <registers>" T2(THUMB2) A8.8.57
+1 1 1 0 1 0 0 1 0 0 W 1 n n n n P M 0 r r r r r r r r r r r r r "LDMDB<c> <Rn>{!}, <registers>" T1(THUMB2) A8.8.60
+1 1 1 0 1 0 0 0 1 0 1 1 1 1 0 1 P M 0 r r r r r r r r r r r r r "POP<c>.W <registers> <registers> contains more than one register" T2(THUMB2) A8.8.131
+1 1 1 0 1 1 1 0 P P P P n n n n d d d d C C C C p p p 0 m m m m "for encoding A1 CDP<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>" T1/A1(THUMB2) A8.8.30
+1 1 1 1 1 1 1 0 P P P P n n n n d d d d C C C C p p p 0 m m m m "for encoding A2 CDP2<c> <coproc>, <opc1>, <CRd>, <CRn>, <CRm>, <opc2>" T2/A2(THUMB2) A8.8.30
+1 1 1 0 1 1 0 P U D W 1 n n n n d d d d C C C C i i i i i i i i "for encoding A1 LDC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC{L}<c> <coproc>, <CRd>, [<Rn>], <option>" T1/A1(THUMB2) A8.8.55
+1 1 1 1 1 1 0 P U D W 1 n n n n d d d d C C C C i i i i i i i i "for encoding A2 LDC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} LDC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> LDC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>" T2/A2(THUMB2) A8.8.55
+1 1 1 0 1 1 0 P U D W 1 1 1 1 1 d d d d C C C C i i i i i i i i "for encoding A1 LDC{L}<c> <coproc>, <CRd>, <label> LDC{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC{L}<c> <coproc>, <CRd>, [PC], <option>" T1/A1(THUMB2) A8.8.56
+1 1 1 1 1 1 0 P U D W 1 1 1 1 1 d d d d C C C C i i i i i i i i "for encoding A2 LDC2{L}<c> <coproc>, <CRd>, <label> LDC2{L}<c> <coproc>, <CRd>, [PC, #-0] Special case LDC2{L}<c> <coproc>, <CRd>, [PC], <option>" T2/A2(THUMB2) A8.8.56
+1 1 1 1 1 0 1 1 1 1 0 0 n n n n d d d d d d d d 0 0 0 0 m m m m "SMLAL<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.178
+1 1 1 1 1 0 1 1 1 1 0 0 n n n n d d d d d d d d 1 0 N M m m m m "SMLAL<x><y><c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.179
+1 1 1 1 1 0 1 1 1 1 0 0 n n n n d d d d d d d d 1 1 0 M m m m m "SMLALD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.180
+1 1 1 1 1 0 1 1 1 1 0 1 n n n n d d d d d d d d 1 1 0 M m m m m "SMLSLD{X}<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.183
+1 1 1 1 1 0 1 1 1 0 0 0 n n n n d d d d d d d d 0 0 0 0 m m m m "SMULL<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.189
+1 1 1 0 1 1 0 P U D W 0 n n n n d d d d C C C C i i i i i i i i "for encoding A1 STC{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC{L}<c> <coproc>, <CRd>, [<Rn>], <option>" T1/A1(THUMB2) A8.8.198
+1 1 1 1 1 1 0 P U D W 0 n n n n d d d d C C C C i i i i i i i i "for encoding A2 STC2{L}<c> <coproc>, <CRd>, [<Rn>, #+/-<imm>]{!} STC2{L}<c> <coproc>, <CRd>, [<Rn>], #+/-<imm> STC2{L}<c> <coproc>, <CRd>, [<Rn>], <option>" T2/A2(THUMB2) A8.8.198
+1 1 1 1 1 0 1 1 1 1 1 0 n n n n d d d d d d d d 0 1 1 0 m m m m "UMAAL<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.255
+1 1 1 1 1 0 1 1 1 1 1 0 n n n n d d d d d d d d 0 0 0 0 m m m m "UMLAL<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.256
+1 1 1 1 1 0 1 1 1 0 1 0 n n n n d d d d d d d d 0 0 0 0 m m m m "UMULL<c> <RdLo>, <RdHi>, <Rn>, <Rm>" T1(THUMB2) A8.8.257
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 1 1 N Q M 1 m m m m "VABA<c>.<dt> <Qd>, <Qn>, <Qm> VABA<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.277
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 0 1 0 1 N 0 M 0 m m m m "VABAL<c>.<dt> <Qd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.277
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 1 1 N Q M 0 m m m m "VABD<c>.<dt> <Qd>, <Qn>, <Qm> VABD<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.278
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 0 1 1 1 N 0 M 0 m m m m "VABDL<c>.<dt> <Qd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.278
+1 1 1 1 1 1 1 1 0 D 1 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m "VABD<c>.F32 <Qd>, <Qn>, <Qm> VABD<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.279
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 1 1 0 Q M 0 m m m m "VABS<c>.<dt> <Qd>, <Qm> VABS<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.280
+1 1 1 0 1 1 1 0 1 D 1 1 0 0 0 0 d d d d 1 0 1 z 1 1 M 0 m m m m "VABS<c>.F64 <Dd>, <Dm> VABS<c>.F32 <Sd>, <Sm>" T2/A2(THUMB2) A8.8.280
+1 1 1 1 1 1 1 1 0 D f z n n n n d d d d 1 1 1 0 N Q M 1 m m m m "V<op><c>.F32 <Qd>, <Qn>, <Qm> V<op><c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.281
+1 1 1 0 1 1 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 0 m m m m "VADD<c>.<dt> <Qd>, <Qn>, <Qm> VADD<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.282
+1 1 1 0 1 1 1 1 0 D 0 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m "VADD<c>.F32 <Qd>, <Qn>, <Qm> VADD<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.283
+1 1 1 0 1 1 1 0 0 D 1 1 n n n n d d d d 1 0 1 z N 0 M 0 m m m m "VADD<c>.F64 <Dd>, <Dn>, <Dm> VADD<c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.283
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 0 1 0 0 N 0 M 0 m m m m "VADDHN<c>.<dt> <Dd>, <Qn>, <Qm>" T1/A1(THUMB2) A8.8.284
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 0 0 0 f N 0 M 0 m m m m "VADDL<c>.<dt> <Qd>, <Dn>, <Dm> VADDW<c>.<dt> <Qd>, <Qn>, <Dm>" T1/A1(THUMB2) A8.8.285
+1 1 1 0 1 1 1 1 0 D 0 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m "VAND<c> <Qd>, <Qn>, <Qm> VAND<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.287
+1 1 1 i 1 1 1 1 1 D 0 0 0 i i i d d d d m m m m 0 Q 1 1 i i i i "VBIC<c>.<dt> <Qd>, #<imm> VBIC<c>.<dt> <Dd>, #<imm>" T1/A1(THUMB2) A8.8.288
+1 1 1 0 1 1 1 1 0 D 0 1 n n n n d d d d 0 0 0 1 N Q M 1 m m m m "VBIC<c> <Qd>, <Qn>, <Qm> VBIC<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.289
+1 1 1 1 1 1 1 1 0 D f f n n n n d d d d 0 0 0 1 N Q M 1 m m m m "V<op><c> <Qd>, <Qn>, <Qm> V<op><c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.290
+1 1 1 1 1 1 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 1 m m m m "VCEQ<c>.<dt> <Qd>, <Qn>, <Qm> <dt> an integer type VCEQ<c>.<dt> <Dd>, <Dn>, <Dm> <dt> an integer type" T1/A1(THUMB2) A8.8.291
+1 1 1 0 1 1 1 1 0 D 0 z n n n n d d d d 1 1 1 0 N Q M 0 m m m m "VCEQ<c>.F32 <Qd>, <Qn>, <Qm> VCEQ<c>.F32 <Dd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.291
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 0 1 0 Q M 0 m m m m "VCEQ<c>.<dt> <Qd>, <Qm>, #0 VCEQ<c>.<dt> <Dd>, <Dm>, #0" T1/A1(THUMB2) A8.8.292
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 1 1 N Q M 1 m m m m "VCGE<c>.<dt> <Qd>, <Qn>, <Qm> <dt> an integer type VCGE<c>.<dt> <Dd>, <Dn>, <Dm> <dt> an integer type" T1/A1(THUMB2) A8.8.293
+1 1 1 1 1 1 1 1 0 D 0 z n n n n d d d d 1 1 1 0 N Q M 0 m m m m "VCGE<c>.F32 <Qd>, <Qn>, <Qm> VCGE<c>.F32 <Dd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.293
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 0 0 1 Q M 0 m m m m "VCGE<c>.<dt> <Qd>, <Qm>, #0 VCGE<c>.<dt> <Dd>, <Dm>, #0" T1/A1(THUMB2) A8.8.294
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 1 1 N Q M 0 m m m m "VCGT<c>.<dt> <Qd>, <Qn>, <Qm> <dt> an integer type VCGT<c>.<dt> <Dd>, <Dn>, <Dm> <dt> an integer type" T1/A1(THUMB2) A8.8.295
+1 1 1 1 1 1 1 1 0 D 1 z n n n n d d d d 1 1 1 0 N Q M 0 m m m m "VCGT<c>.F32 <Qd>, <Qn>, <Qm> VCGT<c>.F32 <Dd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.295
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 0 0 0 Q M 0 m m m m "VCGT<c>.<dt> <Qd>, <Qm>, #0 VCGT<c>.<dt> <Dd>, <Dm>, #0" T1/A1(THUMB2) A8.8.296
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 0 1 1 Q M 0 m m m m "VCLE<c>.<dt> <Qd>, <Qm>, #0 VCLE<c>.<dt> <Dd>, <Dm>, #0" T1/A1(THUMB2) A8.8.298
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 0 0 0 Q M 0 m m m m "VCLS<c>.<dt> <Qd>, <Qm> VCLS<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.299
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 1 0 0 Q M 0 m m m m "VCLT<c>.<dt> <Qd>, <Qm>, #0 VCLT<c>.<dt> <Dd>, <Dm>, #0" T1/A1(THUMB2) A8.8.301
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 0 0 1 Q M 0 m m m m "VCLZ<c>.<dt> <Qd>, <Qm> VCLZ<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.302
+1 1 1 0 1 1 1 0 1 D 1 1 0 1 0 0 d d d d 1 0 1 z E 1 M 0 m m m m "VCMP{E}<c>.F64 <Dd>, <Dm> VCMP{E}<c>.F32 <Sd>, <Sm>" T1/A1(THUMB2) A8.8.303
+1 1 1 0 1 1 1 0 1 D 1 1 0 1 0 1 d d d d 1 0 1 z E 1 0 0 0 0 0 0 "VCMP{E}<c>.F64 <Dd>, #0.0 VCMP{E}<c>.F32 <Sd>, #0.0" T2/A2(THUMB2) A8.8.303
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 0 1 0 Q M 0 m m m m "VCNT<c>.8 <Qd>, <Qm> VCNT<c>.8 <Dd>, <Dm>" T1/A1(THUMB2) A8.8.304
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 1 d d d d 0 1 1 f f Q M 0 m m m m "VCVT<c>.<Td>.<Tm> <Qd>, <Qm> VCVT<c>.<Td>.<Tm> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.305
+1 1 1 0 1 1 1 0 1 D 1 1 1 p p p d d d d 1 0 1 z f 1 M 0 m m m m "VCVT{R}<c>.S32.F64 <Sd>, <Dm> VCVT{R}<c>.S32.F32 <Sd>, <Sm> VCVT{R}<c>.U32.F64 <Sd>, <Dm> VCVT{R}<c>.U32.F32 <Sd>, <Sm> VCVT<c>.F64.<Tm> <Dd>, <Sm> VCVT<c>.F32.<Tm> <Sd>, <Sm>" T1/A1(THUMB2) A8.8.306
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 1 1 1 f 0 Q M 1 m m m m "VCVT<c>.<Td>.<Tm> <Qd>, <Qm>, #<fbits> VCVT<c>.<Td>.<Tm> <Dd>, <Dm>, #<fbits>" T1/A1(THUMB2) A8.8.307
+1 1 1 0 1 1 1 0 1 D 1 1 1 f 1 U d d d d 1 0 1 f x 1 i 0 i i i i "VCVT<c>.<Td>.F64 <Dd>, <Dd>, #<fbits> VCVT<c>.<Td>.F32 <Sd>, <Sd>, #<fbits> VCVT<c>.F64.<Td> <Dd>, <Dd>, #<fbits> VCVT<c>.F32.<Td> <Sd>, <Sd>, #<fbits>" T1/A1(THUMB2) A8.8.308
+1 1 1 0 1 1 1 0 1 D 1 1 0 1 1 1 d d d d 1 0 1 z 1 1 M 0 m m m m "VCVT<c>.F64.F32 <Dd>, <Sm> VCVT<c>.F32.F64 <Sd>, <Dm>" T1/A1(THUMB2) A8.8.309
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 1 1 f 0 0 M 0 m m m m "VCVT<c>.F32.F16 <Qd>, <Dm> VCVT<c>.F16.F32 <Dd>, <Qm>" T1/A1(THUMB2) A8.8.310
+1 1 1 0 1 1 1 0 1 D 1 1 0 0 1 f d d d d 1 0 1 0 T 1 M 0 m m m m "VCVT<y><c>.F32.F16 <Sd>, <Sm> VCVT<y><c>.F16.F32 <Sd>, <Sm>" T1/A1(THUMB2) A8.8.311
+1 1 1 0 1 1 1 0 1 D 0 0 n n n n d d d d 1 0 1 z N 0 M 0 m m m m "VDIV<c>.F64 <Dd>, <Dn>, <Dm> VDIV<c>.F32 <Sd>, <Sn>, <Sm>" T1/A1(THUMB2) A8.8.312
+1 1 1 1 1 1 1 1 1 D 1 1 i i i i d d d d 1 1 0 0 0 Q M 0 m m m m "VDUP<c>.<size> <Qd>, <Dm[x]> VDUP<c>.<size> <Dd>, <Dm[x]>" T1/A1(THUMB2) A8.8.313
+1 1 1 1 1 1 1 1 0 D 0 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m "VEOR<c> <Qd>, <Qn>, <Qm> VEOR<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.315
+1 1 1 0 1 1 1 1 1 D 1 1 n n n n d d d d i i i i N Q M 0 m m m m "VEXT<c>.8 <Qd>, <Qn>, <Qm>, #<imm> VEXT<c>.8 <Dd>, <Dn>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.316
+1 1 1 0 1 1 1 1 0 D f z n n n n d d d d 1 1 0 0 N Q M 1 m m m m "VFM<y><c>.F32 <Qd>, <Qn>, <Qm> VFM<y><c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.317
+1 1 1 0 1 1 1 0 1 D 1 0 n n n n d d d d 1 0 1 z N f M 0 m m m m "VFM<y><c>.F64 <Dd>, <Dn>, <Dm> VFM<y><c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.317
+1 1 1 0 1 1 1 0 1 D 0 1 n n n n d d d d 1 0 1 z N f M 0 m m m m "VFNM<y><c>.F64 <Dd>, <Dn>, <Dm> VFNM<y><c>.F32 <Sd>, <Sn>, <Sm>" T1/A1(THUMB2) A8.8.318
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 f 0 N Q M 0 m m m m "VH<op><c> <Qd>, <Qn>, <Qm> VH<op><c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.319
+1 1 1 1 1 0 0 1 0 D 1 0 n n n n d d d d t t t t z z A A m m m m "VLD1<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD1<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.320
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d z z 0 0 x x x x m m m m "VLD1<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD1<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.321
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d 1 1 0 0 z z T a m m m m "VLD1<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD1<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.322
+1 1 1 1 1 0 0 1 0 D 1 0 n n n n d d d d t t t t z z A A m m m m "VLD2<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD2<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.323
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d z z 0 1 x x x x m m m m "VLD2<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD2<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.324
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d 1 1 0 1 z z T a m m m m "VLD2<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD2<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.325
+1 1 1 1 1 0 0 1 0 D 1 0 n n n n d d d d t t t t z z A A m m m m "VLD3<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD3<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.326
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d z z 1 0 x x x x m m m m "VLD3<c>.<size> <list>, [<Rn>]{!} VLD3<c>.<size> <list>, [<Rn>], <Rm>" T1/A1(THUMB2) A8.8.327
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d 1 1 1 0 z z T a m m m m "VLD3<c>.<size> <list>, [<Rn>]{!} VLD3<c>.<size> <list>, [<Rn>], <Rm>" T1/A1(THUMB2) A8.8.328
+1 1 1 1 1 0 0 1 0 D 1 0 n n n n d d d d t t t t z z A A m m m m "VLD4<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD4<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.329
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d z z 1 1 x x x x m m m m "VLD4<c>.<size> <list>, [<Rn>{:<align>}]{!} VLD4<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.330
+1 1 1 1 1 0 0 1 1 D 1 0 n n n n d d d d 1 1 1 1 z z T a m m m m "VLD4<c>.<size> <list>, [<Rn>{ :<align>}]{!} VLD4<c>.<size> <list>, [<Rn>{ :<align>}], <Rm>" T1/A1(THUMB2) A8.8.331
+1 1 1 0 1 1 0 P U D W 1 n n n n d d d d 1 0 1 1 i i i i i i i i "VLDM{mode}<c> <Rn>{!}, <list> <list> is consecutive 64-bit registers" T1/A1(THUMB2) A8.8.332
+1 1 1 0 1 1 0 P U D W 1 n n n n d d d d 1 0 1 0 i i i i i i i i "VLDM{mode}<c> <Rn>{!}, <list> <list> is consecutive 32-bit registers" T2/A2(THUMB2) A8.8.332
+1 1 1 0 1 1 0 1 U D 0 1 n n n n d d d d 1 0 1 1 i i i i i i i i "VLDR<c> <Dd>, [<Rn>{, #+/-<imm>}] VLDR<c> <Dd>, <label> VLDR<c> <Dd>, [PC, #-0] Special case" T1/A1(THUMB2) A8.8.333
+1 1 1 0 1 1 0 1 U D 0 1 n n n n d d d d 1 0 1 0 i i i i i i i i "VLDR<c> <Sd>, [<Rn>{, #+/-<imm>}] VLDR<c> <Sd>, <label> VLDR<c> <Sd>, [PC, #-0] Special case" T2/A2(THUMB2) A8.8.333
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 1 0 N Q M f m m m m "V<op><c>.<dt> <Qd>, <Qn>, <Qm> V<op><c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.334
+1 1 1 0 1 1 1 1 0 D f z n n n n d d d d 1 1 1 1 N Q M 0 m m m m "V<op><c>.F32 <Qd>, <Qn>, <Qm> V<op><c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.335
+1 1 1 f 1 1 1 1 0 D z z n n n n d d d d 1 0 0 1 N Q M 0 m m m m "V<op><c>.<dt> <Qd>, <Qn>, <Qm> V<op><c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.336
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 1 0 f 0 N 0 M 0 m m m m "V<op>L<c>.<dt> <Qd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.336
+1 1 1 0 1 1 1 1 0 D f z n n n n d d d d 1 1 0 1 N Q M 1 m m m m "V<op><c>.F32 <Qd>, <Qn>, <Qm> V<op><c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.337
+1 1 1 0 1 1 1 0 0 D 0 0 n n n n d d d d 1 0 1 z N f M 0 m m m m "V<op><c>.F64 <Dd>, <Dn>, <Dm> V<op><c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.337
+1 1 1 Q 1 1 1 1 1 D z z n n n n d d d d 0 f 0 F N 1 M 0 m m m m "V<op><c>.<dt> <Qd>, <Qn>, <Dm[x]> V<op><c>.<dt> <Dd>, <Dn>, <Dm[x]>" T1/A1(THUMB2) A8.8.338
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 0 f 1 0 N 1 M 0 m m m m "V<op>L<c>.<dt> <Qd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.338
+1 1 1 i 1 1 1 1 1 D 0 0 0 i i i d d d d m m m m 0 Q f 1 i i i i "VMOV<c>.<dt> <Qd>, #<imm> VMOV<c>.<dt> <Dd>, #<imm>" T1/A1(THUMB2) A8.8.339
+1 1 1 0 1 1 1 0 1 D 1 1 i i i i d d d d 1 0 1 z 0 0 0 0 i i i i "VMOV<c>.F64 <Dd>, #<imm> VMOV<c>.F32 <Sd>, #<imm>" T2/A2(THUMB2) A8.8.339
+1 1 1 0 1 1 1 1 0 D 1 0 m m m m d d d d 0 0 0 1 M Q M 1 m m m m "VMOV<c> <Qd>, <Qm> VMOV<c> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.340
+1 1 1 0 1 1 1 0 1 D 1 1 0 0 0 0 d d d d 1 0 1 z 0 1 M 0 m m m m "VMOV<c>.F64 <Dd>, <Dm> VMOV<c>.F32 <Sd>, <Sm>" T2/A2(THUMB2) A8.8.340
+1 1 1 U 1 1 1 1 1 D i i i 0 0 0 d d d d 1 0 1 0 0 0 M 1 m m m m "VMOVL<c>.<dt> <Qd>, <Dm>" T1/A1(THUMB2) A8.8.346
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 1 0 0 0 M 0 m m m m "VMOVN<c>.<dt> <Dd>, <Qm>" T1/A1(THUMB2) A8.8.347
+1 1 1 f 1 1 1 1 0 D z z n n n n d d d d 1 0 0 1 N Q M 1 m m m m "VMUL<c>.<dt> <Qd>, <Qn>, <Qm> VMUL<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.350
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 1 1 f 0 N 0 M 0 m m m m "VMULL<c>.<dt> <Qd>, <Dn>, <Dm>" T2/A2(THUMB2) A8.8.350
+1 1 1 1 1 1 1 1 0 D 0 z n n n n d d d d 1 1 0 1 N Q M 1 m m m m "VMUL<c>.F32 <Qd>, <Qn>, <Qm> VMUL<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.351
+1 1 1 0 1 1 1 0 0 D 1 0 n n n n d d d d 1 0 1 z N 0 M 0 m m m m "VMUL<c>.F64 <Dd>, <Dn>, <Dm> VMUL<c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.351
+1 1 1 Q 1 1 1 1 1 D z z n n n n d d d d 1 0 0 F N 1 M 0 m m m m "VMUL<c>.<dt> <Qd>, <Qn>, <Dm[x]> VMUL<c>.<dt> <Dd>, <Dn>, <Dm[x]>" T1/A1(THUMB2) A8.8.352
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 1 0 1 0 N 1 M 0 m m m m "VMULL<c>.<dt> <Qd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.352
+1 1 1 i 1 1 1 1 1 D 0 0 0 i i i d d d d m m m m 0 Q 1 1 i i i i "VMVN<c>.<dt> <Qd>, #<imm> VMVN<c>.<dt> <Dd>, #<imm>" T1/A1(THUMB2) A8.8.353
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 0 1 1 Q M 0 m m m m "VMVN<c> <Qd>, <Qm> VMVN<c> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.354
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 1 d d d d 0 F 1 1 1 Q M 0 m m m m "VNEG<c>.<dt> <Qd>, <Qm> VNEG<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.355
+1 1 1 0 1 1 1 0 1 D 1 1 0 0 0 1 d d d d 1 0 1 z 0 1 M 0 m m m m "VNEG<c>.F64 <Dd>, <Dm> VNEG<c>.F32 <Sd>, <Sm>" T2/A2(THUMB2) A8.8.355
+1 1 1 0 1 1 1 0 0 D 0 1 n n n n d d d d 1 0 1 z N f M 0 m m m m "VNMLA<c>.F64 <Dd>, <Dn>, <Dm> VNMLA<c>.F32 <Sd>, <Sn>, <Sm> VNMLS<c>.F64 <Dd>, <Dn>, <Dm> VNMLS<c>.F32 <Sd>, <Sn>, <Sm>" T1/A1(THUMB2) A8.8.356
+1 1 1 0 1 1 1 0 0 D 1 0 n n n n d d d d 1 0 1 z N 1 M 0 m m m m "VNMUL<c>.F64 <Dd>, <Dn>, <Dm> VNMUL<c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.356
+1 1 1 0 1 1 1 1 0 D 1 1 n n n n d d d d 0 0 0 1 N Q M 1 m m m m "VORN<c> <Qd>, <Qn>, <Qm> VORN<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.358
+1 1 1 i 1 1 1 1 1 D 0 0 0 i i i d d d d m m m m 0 Q 0 1 i i i i "VORR<c>.<dt> <Qd>, #<imm> VORR<c>.<dt> <Dd>, #<imm>" T1/A1(THUMB2) A8.8.359
+1 1 1 0 1 1 1 1 0 D 1 0 n n n n d d d d 0 0 0 1 N Q M 1 m m m m "VORR<c> <Qd>, <Qn>, <Qm> VORR<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.360
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 1 0 f Q M 0 m m m m "VPADAL<c>.<dt> <Qd>, <Qm> VPADAL<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.361
+1 1 1 0 1 1 1 1 0 D z z n n n n d d d d 1 0 1 1 N Q M 1 m m m m "VPADD<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.362
+1 1 1 1 1 1 1 1 0 D 0 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m "VPADD<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.363
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 0 1 0 f Q M 0 m m m m "VPADDL<c>.<dt> <Qd>, <Qm> VPADDL<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.364
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 1 0 1 0 N Q M f m m m m "VP<op><c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.365
+1 1 1 1 1 1 1 1 0 D f z n n n n d d d d 1 1 1 1 N Q M 0 m m m m "VP<op><c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.366
+1 1 1 0 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 1 i i i i i i i i "VPOP <list> <list> is consecutive 64-bit registers" T1/A1(THUMB2) A8.8.367
+1 1 1 0 1 1 0 0 1 D 1 1 1 1 0 1 d d d d 1 0 1 0 i i i i i i i i "VPOP <list> <list> is consecutive 32-bit registers" T2/A2(THUMB2) A8.8.367
+1 1 1 0 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 1 i i i i i i i i "VPUSH<c> <list> <list> is consecutive 64-bit registers" T1/A1(THUMB2) A8.8.368
+1 1 1 0 1 1 0 1 0 D 1 0 1 1 0 1 d d d d 1 0 1 0 i i i i i i i i "VPUSH<c> <list> <list> is consecutive 32-bit registers" T2/A2(THUMB2) A8.8.368
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 1 1 0 Q M 0 m m m m "VQABS<c>.<dt> <Qd>, <Qm> VQABS<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.369
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 0 0 N Q M 1 m m m m "VQADD<c>.<dt> <Qd>, <Qn>, <Qm> VQADD<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.370
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 1 0 f 1 N 0 M 0 m m m m "VQD<op><c>.<dt> <Qd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.371
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 0 f 1 1 N 1 M 0 m m m m "VQD<op><c>.<dt> <Qd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.371
+1 1 1 0 1 1 1 1 0 D z z n n n n d d d d 1 0 1 1 N Q M 0 m m m m "VQDMULH<c>.<dt> <Qd>, <Qn>, <Qm> VQDMULH<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.372
+1 1 1 Q 1 1 1 1 1 D z z n n n n d d d d 1 1 0 0 N 1 M 0 m m m m "VQDMULH<c>.<dt> <Qd>, <Qn>, <Dm[x]> VQDMULH<c>.<dt> <Dd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.372
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 1 1 0 1 N 0 M 0 m m m m "VQDMULL<c>.<dt> <Qd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.373
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 1 0 1 1 N 1 M 0 m m m m "VQDMULL<c>.<dt> <Qd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.373
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 1 0 f f M 0 m m m m "VQMOV{U}N<c>.<type><size> <Dd>, <Qm>" T1/A1(THUMB2) A8.8.374
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 1 1 1 1 Q M 0 m m m m "VQNEG<c>.<dt> <Qd>, <Qm> VQNEG<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.375
+1 1 1 1 1 1 1 1 0 D z z n n n n d d d d 1 0 1 1 N Q M 0 m m m m "VQRDMULH<c>.<dt> <Qd>, <Qn>, <Qm> VQRDMULH<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.376
+1 1 1 Q 1 1 1 1 1 D z z n n n n d d d d 1 1 0 1 N 1 M 0 m m m m "VQRDMULH<c>.<dt> <Qd>, <Qn>, <Dm[x]> VQRDMULH<c>.<dt> <Dd>, <Dn>, <Dm[x]>" T2/A2(THUMB2) A8.8.376
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 0 1 N Q M 1 m m m m "VQRSHL<c>.<type><size> <Qd>, <Qm>, <Qn> VQRSHL<c>.<type><size> <Dd>, <Dm>, <Dn>" T1/A1(THUMB2) A8.8.377
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 1 0 0 f 0 1 M 1 m m m m "VQRSHR{U}N<c>.<type><size> <Dd>, <Qm>, #<imm>" T1/A1(THUMB2) A8.8.378
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 0 0 N Q M 1 m m m m "VQSHL<c>.<type><size> <Qd>, <Qm>, <Qn> VQSHL<c>.<type><size> <Dd>, <Dm>, <Dn>" T1/A1(THUMB2) A8.8.379
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 0 1 1 f L Q M 1 m m m m "VQSHL{U}<c>.<type><size> <Qd>, <Qm>, #<imm> VQSHL{U}<c>.<type><size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.380
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 1 0 0 f 0 0 M 1 m m m m "VQSHR{U}N<c>.<type><size> <Dd>, <Qm>, #<imm>" T1/A1(THUMB2) A8.8.381
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 1 0 N Q M 1 m m m m "VQSUB<c>.<type><size> <Qd>, <Qn>, <Qm> VQSUB<c>.<type><size> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.382
+1 1 1 1 1 1 1 1 1 D z z n n n n d d d d 0 1 0 0 N 0 M 0 m m m m "VRADDHN<c>.<dt> <Dd>, <Qn>, <Qm>" T1/A1(THUMB2) A8.8.383
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 1 d d d d 0 1 0 F 0 Q M 0 m m m m "VRECPE<c>.<dt> <Qd>, <Qm> VRECPE<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.384
+1 1 1 0 1 1 1 1 0 D 0 z n n n n d d d d 1 1 1 1 N Q M 1 m m m m "VRECPS<c>.F32 <Qd>, <Qn>, <Qm> VRECPS<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.385
+1 1 1 1 1 1 1 1 1 D 1 1 z z 0 0 d d d d 0 0 0 f f Q M 0 m m m m "VREV<n><c>.<size> <Qd>, <Qm> VREV<n><c>.<size> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.386
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 0 0 1 N Q M 0 m m m m "VRHADD<c> <Qd>, <Qn>, <Qm> VRHADD<c> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.387
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 0 1 N Q M 0 m m m m "VRSHL<c>.<type><size> <Qd>, <Qm>, <Qn> VRSHL<c>.<type><size> <Dd>, <Dm>, <Dn>" T1/A1(THUMB2) A8.8.388
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 0 0 1 0 L Q M 1 m m m m "VRSHR<c>.<type><size> <Qd>, <Qm>, #<imm> VRSHR<c>.<type><size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.389
+1 1 1 0 1 1 1 1 1 D i i i i i i d d d d 1 0 0 0 0 1 M 1 m m m m "VRSHRN<c>.I<size> <Dd>, <Qm>, #<imm>" T1/A1(THUMB2) A8.8.390
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 1 d d d d 0 1 0 F 1 Q M 0 m m m m "VRSQRTE<c>.<dt> <Qd>, <Qm> VRSQRTE<c>.<dt> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.391
+1 1 1 0 1 1 1 1 0 D 1 z n n n n d d d d 1 1 1 1 N Q M 1 m m m m "VRSQRTS<c>.F32 <Qd>, <Qn>, <Qm> VRSQRTS<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.392
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 0 0 1 1 L Q M 1 m m m m "VRSRA<c>.<type><size> <Qd>, <Qm>, #<imm> VRSRA<c>.<type><size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.393
+1 1 1 1 1 1 1 1 1 D z z n n n n d d d d 0 1 1 0 N 0 M 0 m m m m "VRSUBHN<c>.<dt> <Dd>, <Qn>, <Qm>" T1/A1(THUMB2) A8.8.394
+1 1 1 0 1 1 1 1 1 D i i i i i i d d d d 0 1 0 1 L Q M 1 m m m m "VSHL<c>.I<size> <Qd>, <Qm>, #<imm> VSHL<c>.I<size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.395
+1 1 1 U 1 1 1 1 0 D z z n n n n d d d d 0 1 0 0 N Q M 0 m m m m "VSHL<c>.<type><size> <Qd>, <Qm>, <Qn> VSHL<c>.<type><size> <Dd>, <Dm>, <Dn>" T1/A1(THUMB2) A8.8.396
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 1 0 1 0 0 0 M 1 m m m m "VSHLL<c>.<type><size> <Qd>, <Dm>, #<imm> (0 < <imm> < <size>)" T1/A1(THUMB2) A8.8.397
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 1 1 0 0 M 0 m m m m "VSHLL<c>.<type><size> <Qd>, <Dm>, #<imm> (<imm> == <size>)" T2/A2(THUMB2) A8.8.397
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 0 0 0 0 L Q M 1 m m m m "VSHR<c>.<type><size> <Qd>, <Qm>, #<imm> VSHR<c>.<type><size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.398
+1 1 1 0 1 1 1 1 1 D i i i i i i d d d d 1 0 0 0 0 0 M 1 m m m m "VSHRN<c>.I<size> <Dd>, <Qm>, #<imm>" T1/A1(THUMB2) A8.8.399
+1 1 1 1 1 1 1 1 1 D i i i i i i d d d d 0 1 0 1 L Q M 1 m m m m "VSLI<c>.<size> <Qd>, <Qm>, #<imm> VSLI<c>.<size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.400
+1 1 1 0 1 1 1 0 1 D 1 1 0 0 0 1 d d d d 1 0 1 z 1 1 M 0 m m m m "VSQRT<c>.F64 <Dd>, <Dm> VSQRT<c>.F32 <Sd>, <Sm>" T1/A1(THUMB2) A8.8.401
+1 1 1 U 1 1 1 1 1 D i i i i i i d d d d 0 0 0 1 L Q M 1 m m m m "VSRA<c>.<type><size> <Qd>, <Qm>, #<imm> VSRA<c>.<type><size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.402
+1 1 1 1 1 1 1 1 1 D i i i i i i d d d d 0 1 0 0 L Q M 1 m m m m "VSRI<c>.<size> <Qd>, <Qm>, #<imm> VSRI<c>.<size> <Dd>, <Dm>, #<imm>" T1/A1(THUMB2) A8.8.403
+1 1 1 1 1 0 0 1 0 D 0 0 n n n n d d d d t t t t z z A A m m m m "VST1<c>.<size> <list>, [<Rn>{:<align>}]{!} VST1<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.404
+1 1 1 1 1 0 0 1 1 D 0 0 n n n n d d d d z z 0 0 x x x x m m m m "VST1<c>.<size> <list>, [<Rn>{:<align>}]{!} VST1<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.405
+1 1 1 1 1 0 0 1 0 D 0 0 n n n n d d d d t t t t z z A A m m m m "VST2<c>.<size> <list>, [<Rn>{:<align>}]{!} VST2<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.406
+1 1 1 1 1 0 0 1 1 D 0 0 n n n n d d d d z z 0 1 x x x x m m m m "VST2<c>.<size> <list>, [<Rn>{:<align>}]{!} VST2<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.407
+1 1 1 1 1 0 0 1 0 D 0 0 n n n n d d d d t t t t z z A A m m m m "VST3<c>.<size> <list>, [<Rn>{:<align>}]{!} VST3<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.408
+1 1 1 1 1 0 0 1 1 D 0 0 n n n n d d d d z z 1 0 x x x x m m m m "VST3<c>.<size> <list>, [<Rn>]{!} VST3<c>.<size> <list>, [<Rn>], <Rm>" T1/A1(THUMB2) A8.8.409
+1 1 1 1 1 0 0 1 0 D 0 0 n n n n d d d d t t t t z z A A m m m m "VST4<c>.<size> <list>, [<Rn>{:<align>}]{!} VST4<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.410
+1 1 1 1 1 0 0 1 1 D 0 0 n n n n d d d d z z 1 1 x x x x m m m m "VST4<c>.<size> <list>, [<Rn>{:<align>}]{!} VST4<c>.<size> <list>, [<Rn>{:<align>}], <Rm>" T1/A1(THUMB2) A8.8.411
+1 1 1 0 1 1 0 P U D W 0 n n n n d d d d 1 0 1 1 i i i i i i i i "VSTM{mode}<c> <Rn>{!}, <list> <list> is consecutive 64-bit registers" T1/A1(THUMB2) A8.8.412
+1 1 1 0 1 1 0 P U D W 0 n n n n d d d d 1 0 1 0 i i i i i i i i "VSTM{mode}<c> <Rn>{!}, <list> <list> is consecutive 32-bit registers" T2/A2(THUMB2) A8.8.412
+1 1 1 0 1 1 0 1 U D 0 0 n n n n d d d d 1 0 1 1 i i i i i i i i "VSTR<c> <Dd>, [<Rn>{, #+/-<imm>}]" T1/A1(THUMB2) A8.8.413
+1 1 1 0 1 1 0 1 U D 0 0 n n n n d d d d 1 0 1 0 i i i i i i i i "VSTR<c> <Sd>, [<Rn>{, #+/-<imm>}]" T2/A2(THUMB2) A8.8.413
+1 1 1 1 1 1 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 0 m m m m "VSUB<c>.<dt> <Qd>, <Qn>, <Qm> VSUB<c>.<dt> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.414
+1 1 1 0 1 1 1 1 0 D 1 z n n n n d d d d 1 1 0 1 N Q M 0 m m m m "VSUB<c>.F32 <Qd>, <Qn>, <Qm> VSUB<c>.F32 <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.415
+1 1 1 0 1 1 1 0 0 D 1 1 n n n n d d d d 1 0 1 z N 1 M 0 m m m m "VSUB<c>.F64 <Dd>, <Dn>, <Dm> VSUB<c>.F32 <Sd>, <Sn>, <Sm>" T2/A2(THUMB2) A8.8.415
+1 1 1 0 1 1 1 1 1 D z z n n n n d d d d 0 1 1 0 N 0 M 0 m m m m "VSUBHN<c>.<dt> <Dd>, <Qn>, <Qm>" T1/A1(THUMB2) A8.8.416
+1 1 1 U 1 1 1 1 1 D z z n n n n d d d d 0 0 1 f N 0 M 0 m m m m "VSUBL<c>.<dt> <Qd>, <Dn>, <Dm> VSUBW<c>.<dt> <Qd>, <Qn>, <Dm>" T1/A1(THUMB2) A8.8.417
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 0 0 0 Q M 0 m m m m "VSWP<c> <Qd>, <Qm> VSWP<c> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.418
+1 1 1 1 1 1 1 1 1 D 1 1 n n n n d d d d 1 0 l l N f M 0 m m m m "V<op><c>.8 <Dd>, <list>, <Dm>" T1/A1(THUMB2) A8.8.419
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 0 0 1 Q M 0 m m m m "VTRN<c>.<size> <Qd>, <Qm> VTRN<c>.<size> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.420
+1 1 1 0 1 1 1 1 0 D z z n n n n d d d d 1 0 0 0 N Q M 1 m m m m "VTST<c>.<size> <Qd>, <Qn>, <Qm> VTST<c>.<size> <Dd>, <Dn>, <Dm>" T1/A1(THUMB2) A8.8.421
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 0 1 0 Q M 0 m m m m "VUZP<c>.<size> <Qd>, <Qm> VUZP<c>.<size> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.422
+1 1 1 1 1 1 1 1 1 D 1 1 z z 1 0 d d d d 0 0 0 1 1 Q M 0 m m m m "VZIP<c>.<size> <Qd>, <Qm> VZIP<c>.<size> <Dd>, <Dm>" T1/A1(THUMB2) A8.8.423
+a a a a a a a a b b b b b b b b a a a a a a a a b b b b b b b b   
+1 1 1 1 1 0 1 1 0 0 0 0 n n n n a a a a d d d d 0 0 0 0 m m m m "MLA<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.100
+1 1 1 1 1 0 1 1 0 0 0 0 n n n n a a a a d d d d 0 0 0 1 m m m m "MLS<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.101
+1 1 1 1 1 0 1 1 0 0 0 1 n n n n a a a a d d d d 0 0 N M m m m m "SMLA<x><y><c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.176
+1 1 1 1 1 0 1 1 0 0 1 0 n n n n a a a a d d d d 0 0 0 M m m m m "SMLAD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.177
+1 1 1 1 1 0 1 1 0 0 1 1 n n n n a a a a d d d d 0 0 0 M m m m m "SMLAW<y><c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.181
+1 1 1 1 1 0 1 1 0 1 0 0 n n n n a a a a d d d d 0 0 0 M m m m m "SMLSD{X}<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.182
+1 1 1 1 1 0 1 1 0 1 0 1 n n n n a a a a d d d d 0 0 0 R m m m m "SMMLA{R}<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.184
+1 1 1 1 1 0 1 1 0 1 1 0 n n n n a a a a d d d d 0 0 0 R m m m m "SMMLS{R}<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.185
+1 1 1 1 1 0 1 1 0 1 1 1 n n n n a a a a d d d d 0 0 0 0 m m m m "USADA8<c> <Rd>, <Rn>, <Rm>, <Ra>" T1(THUMB2) A8.8.265
+1 1 1 1 1 0 1 0 0 1 0 S n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "ASR{S}<c>.W <Rd>, <Rn>, <Rm>" T2(THUMB2) A8.8.17
+1 1 1 1 0 S c c c c i i i i i i 1 0 j 0 J i i i i i i i i i i i "B<c>.W <label> Not permitted in IT block." T3(THUMB2) A8.8.18
+1 1 1 1 0 S i i i i i i i i i i 1 0 j 1 J i i i i i i i i i i i "B<c>.W <label> Outside or last in IT block" T4(THUMB2) A8.8.18
+1 1 1 1 0 S i i i i i i i i i i 1 1 j 1 J i i i i i i i i i i i "otherwise BL<c> <label> Outside or last in IT block" T1(THUMB2) A8.8.25
+1 1 1 1 0 S i i i i i i i i i i 1 1 j 0 J i i i i i i i i i i H "otherwise BLX<c> <label> Outside or last in IT block" T2(THUMB2) A8.8.25
+1 1 1 1 0 0 1 1 1 1 0 0 m m m m 1 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 "BXJ<c> <Rm> Outside or last in IT block" T1(THUMB2) A8.8.28
+1 1 1 1 0 0 1 1 1 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 0 1 0 1 1 1 1 CLREX<c> T1(THUMB2) A8.8.32
+1 1 1 1 1 0 1 0 1 0 1 1 m m m m 1 1 1 1 d d d d 1 0 0 0 m m m m "CLZ<c> <Rd>, <Rm>" T1(THUMB2) A8.8.33
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 1 1 1 1 o o o o "DBG<c> #<option>" T1(THUMB2) A8.8.42
+1 1 1 1 0 0 1 1 1 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 1 o o o o "DMB<c> <option>" T1(THUMB2) A8.8.43
+1 1 1 1 0 0 1 1 1 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 1 0 0 o o o o "DSB<c> <option>" T1(THUMB2) A8.8.44
+1 1 1 1 0 0 1 1 1 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 1 1 0 o o o o "ISB<c> <option>" T1(THUMB2) A8.8.53
+1 1 1 1 1 0 1 0 0 0 0 S n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "LSL{S}<c>.W <Rd>, <Rn>, <Rm>" T2(THUMB2) A8.8.95
+1 1 1 1 1 0 1 0 0 0 1 S n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "LSR{S}<c>.W <Rd>, <Rn>, <Rm>" T2(THUMB2) A8.8.97
+1 1 1 1 0 0 1 1 1 1 1 0 1 1 1 1 1 0 0 0 d d d d 0 0 0 0 0 0 0 0 "MRS<c> <Rd>, <specreg>" T1(THUMB2) A8.8.109
+1 1 1 1 0 0 1 1 1 0 0 0 n n n n 1 0 0 0 M M 0 0 0 0 0 0 0 0 0 0 "MSR<c> <specreg>, <Rn>" T1(THUMB2) A8.8.112
+1 1 1 1 1 0 1 1 0 0 0 0 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "MUL<c> <Rd>, <Rn>, <Rm>" T2(THUMB2) A8.8.114
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 NOP<c>.W T2(THUMB2) A8.8.119
+1 1 1 1 1 0 0 0 1 0 W 1 n n n n 1 1 1 1 i i i i i i i i i i i i "with MP Extensions for PLDW PLD{W}<c> [<Rn>, #<imm12>]" T1(THUMB2) A8.8.126
+1 1 1 1 1 0 0 0 0 0 W 1 n n n n 1 1 1 1 1 1 0 0 i i i i i i i i "with MP Extensions for PLDW PLD{W}<c> [<Rn>, #-<imm8>]" T2(THUMB2) A8.8.126
+1 1 1 1 1 0 0 0 U 0 0 1 1 1 1 1 1 1 1 1 i i i i i i i i i i i i "PLD<c> <label> PLD<c> [PC, #-0] Special case" T1(THUMB2) A8.8.127
+1 1 1 1 1 0 0 0 0 0 W 1 n n n n 1 1 1 1 0 0 0 0 0 0 i i m m m m "with MP Extensions for PLDW PLD{W}<c> [<Rn>, <Rm>{, LSL #<imm2>}]" T1(THUMB2) A8.8.128
+1 1 1 1 1 0 0 1 1 0 0 1 n n n n 1 1 1 1 i i i i i i i i i i i i "PLI<c> [<Rn>, #<imm12>]" T1(THUMB2) A8.8.129
+1 1 1 1 1 0 0 1 0 0 0 1 n n n n 1 1 1 1 1 1 0 0 i i i i i i i i "PLI<c> [<Rn>, #-<imm8>]" T2(THUMB2) A8.8.129
+1 1 1 1 1 0 0 1 U 0 0 1 1 1 1 1 1 1 1 1 i i i i i i i i i i i i "PLI<c> <label> PLI<c> [PC, #-0] Special case" T3(THUMB2) A8.8.129
+1 1 1 1 1 0 0 1 0 0 0 1 n n n n 1 1 1 1 0 0 0 0 0 0 i i m m m m "PLI<c> [<Rn>, <Rm>{, LSL #<imm2>}]" T1(THUMB2) A8.8.130
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 1 0 0 0 m m m m "QADD<c> <Rd>, <Rm>, <Rn>" T1(THUMB2) A8.8.134
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.135
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.136
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.137
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 1 0 0 1 m m m m "QDADD<c> <Rd>, <Rm>, <Rn>" T1(THUMB2) A8.8.138
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 1 0 1 1 m m m m "QDSUB<c> <Rd>, <Rm>, <Rn>" T1(THUMB2) A8.8.139
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QSAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.140
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 1 0 1 0 m m m m "QSUB<c> <Rd>, <Rm>, <Rn>" T1(THUMB2) A8.8.141
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QSUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.142
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 0 0 1 m m m m "QSUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.143
+1 1 1 1 1 0 1 0 1 0 0 1 m m m m 1 1 1 1 d d d d 1 0 1 0 m m m m "RBIT<c> <Rd>, <Rm>" T1(THUMB2) A8.8.144
+1 1 1 1 1 0 1 0 1 0 0 1 m m m m 1 1 1 1 d d d d 1 0 0 0 m m m m "REV<c>.W <Rd>, <Rm>" T2(THUMB2) A8.8.145
+1 1 1 1 1 0 1 0 1 0 0 1 m m m m 1 1 1 1 d d d d 1 0 0 1 m m m m "REV16<c>.W <Rd>, <Rm>" T2(THUMB2) A8.8.146
+1 1 1 1 1 0 1 0 1 0 0 1 m m m m 1 1 1 1 d d d d 1 0 1 1 m m m m "REVSH<c>.W <Rd>, <Rm>" T2(THUMB2) A8.8.147
+1 1 1 1 1 0 1 0 0 1 1 S n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "ROR{S}<c>.W <Rd>, <Rn>, <Rm>" T2(THUMB2) A8.8.150
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.158
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.159
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.160
+1 1 1 1 1 0 1 1 1 0 0 1 n n n n 1 1 1 1 d d d d 1 1 1 1 m m m m "SDIV<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.165
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 1 0 0 0 m m m m "SEL<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.166
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 SEV<c>.W T2(THUMB2) A8.8.168
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.169
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.170
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.171
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHSAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.172
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHSUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.173
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 0 1 0 m m m m "SHSUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.174
+1 1 1 1 1 0 1 1 0 1 0 1 n n n n 1 1 1 1 d d d d 0 0 0 R m m m m "SMMUL{R}<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.186
+1 1 1 1 1 0 1 1 0 0 1 0 n n n n 1 1 1 1 d d d d 0 0 0 M m m m m "SMUAD{X}<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.187
+1 1 1 1 1 0 1 1 0 0 0 1 n n n n 1 1 1 1 d d d d 0 0 N M m m m m "SMUL<x><y><c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.188
+1 1 1 1 1 0 1 1 0 0 1 1 n n n n 1 1 1 1 d d d d 0 0 0 M m m m m "SMULW<y><c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.190
+1 1 1 1 1 0 1 1 0 1 0 0 n n n n 1 1 1 1 d d d d 0 0 0 M m m m m "SMUSD{X}<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.191
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SSAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.195
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SSUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.196
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "SSUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.197
+1 1 1 1 1 0 1 0 0 1 0 0 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "SXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.230
+1 1 1 1 1 0 1 0 0 0 1 0 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "SXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.231
+1 1 1 1 1 0 1 0 0 0 0 0 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "SXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.232
+1 1 1 1 1 0 1 0 0 1 0 0 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "SXTB<c>.W <Rd>, <Rm>{, <rotation>}" T2(THUMB2) A8.8.233
+1 1 1 1 1 0 1 0 0 0 1 0 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "SXTB16<c> <Rd>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.234
+1 1 1 1 1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "SXTH<c>.W <Rd>, <Rm>{, <rotation>}" T2(THUMB2) A8.8.235
+1 1 1 0 1 0 0 0 1 1 0 1 n n n n 1 1 1 1 0 0 0 0 0 0 0 H m m m m "TBB<c> [<Rn>, <Rm>] Outside or last in IT block TBH<c> [<Rn>, <Rm>, LSL #1] Outside or last in IT block" T1(THUMB2) A8.8.236
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "UADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.243
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "UADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.244
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "UASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.245
+1 1 1 1 0 1 1 1 1 1 1 1 i i i i 1 0 1 0 i i i i i i i i i i i i "UDF<c>.W #<imm16>" T2(THUMB2) A8.8.247
+1 1 1 1 1 0 1 1 1 0 1 1 n n n n 1 1 1 1 d d d d 1 1 1 1 m m m m "UDIV<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.248
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.249
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.250
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.251
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHSAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.252
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHSUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.253
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 1 1 0 m m m m "UHSUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.254
+1 1 1 1 1 0 1 0 1 0 0 1 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQADD16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.258
+1 1 1 1 1 0 1 0 1 0 0 0 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQADD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.259
+1 1 1 1 1 0 1 0 1 0 1 0 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQASX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.260
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQSAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.261
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQSUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.262
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 1 0 1 m m m m "UQSUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.263
+1 1 1 1 1 0 1 1 0 1 1 1 n n n n 1 1 1 1 d d d d 0 0 0 0 m m m m "USAD8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.264
+1 1 1 1 1 0 1 0 1 1 1 0 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "USAX<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.268
+1 1 1 1 1 0 1 0 1 1 0 1 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "USUB16<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.269
+1 1 1 1 1 0 1 0 1 1 0 0 n n n n 1 1 1 1 d d d d 0 1 0 0 m m m m "USUB8<c> <Rd>, <Rn>, <Rm>" T1(THUMB2) A8.8.270
+1 1 1 1 1 0 1 0 0 1 0 1 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "UXTAB<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.271
+1 1 1 1 1 0 1 0 0 0 1 1 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "UXTAB16<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.272
+1 1 1 1 1 0 1 0 0 0 0 1 n n n n 1 1 1 1 d d d d 1 0 R R m m m m "UXTAH<c> <Rd>, <Rn>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.273
+1 1 1 1 1 0 1 0 0 1 0 1 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "UXTB<c>.W <Rd>, <Rm>{, <rotation>}" T2(THUMB2) A8.8.274
+1 1 1 1 1 0 1 0 0 0 1 1 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "UXTB16<c> <Rd>, <Rm>{, <rotation>}" T1(THUMB2) A8.8.275
+1 1 1 1 1 0 1 0 0 0 0 1 1 1 1 1 1 1 1 1 d d d d 1 0 R R m m m m "UXTH<c>.W <Rd>, <Rm>{, <rotation>}" T2(THUMB2) A8.8.276
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 WFE<c>.W T2(THUMB2) A8.8.424
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 WFI<c>.W T2(THUMB2) A8.8.425
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 YIELD<c>.W T2(THUMB2) A8.8.426
+1 1 1 1 0 0 1 1 1 0 1 1 1 1 1 1 1 0 0 0 1 1 1 1 0 0 0 J 1 1 1 1 "ENTERX Not permitted in IT block. LEAVEX Not permitted in IT block." T1(THUMB2) A9.3.1
+1 1 1 1 0 0 1 1 1 0 1 0 1 1 1 1 1 0 0 0 0 M M M A I F m m m m m "CPS<effect>.W <iflags>{, #<mode>} Not permitted in IT block. CPS #<mode> Not permitted in IT block." T2(THUMB2) B9.3.1
+1 1 1 1 0 0 1 1 1 1 0 1 1 1 1 0 1 0 0 0 1 1 1 1 i i i i i i i i "SUBS PC, LR, #0 Outside or last in IT block. ARMv6T2, ARMv7 ERET<c> Outside or last in IT block. ARMv7VE" T1(THUMB2) B9.3.3
+1 1 1 1 0 1 1 1 1 1 1 0 i i i i 1 0 0 0 i i i i i i i i i i i i "HVC #<imm>" T1(THUMB2) B9.3.4
+1 1 1 1 0 0 1 1 1 1 1 R 1 1 1 1 1 0 0 0 d d d d 0 0 0 0 0 0 0 0 "MRS<c> <Rd>, <specreg>" T1(THUMB2) B9.3.8
+1 1 1 1 0 0 1 1 1 1 1 R M M M M 1 0 0 0 d d d d 0 0 1 M 0 0 0 0 "MRS<c> <Rd>, <bankedreg>" T1(THUMB2) B9.3.9
+1 1 1 1 0 0 1 1 1 0 0 R n n n n 1 0 0 0 M M M M 0 0 1 M 0 0 0 0 "MSR<c> <bankedreg>, <Rn>" T1(THUMB2) B9.3.10
+1 1 1 1 0 0 1 1 1 0 0 R n n n n 1 0 0 0 M M M M 0 0 0 0 0 0 0 0 "MSR<c> <specreg>, <Rn>" T1(THUMB2) B9.3.12
+1 1 1 0 1 0 0 0 0 0 W 1 n n n n 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "RFEDB<c> <Rn>{!} Outside or last in IT block" T1(THUMB2) B9.3.13
+1 1 1 0 1 0 0 1 1 0 W 1 n n n n 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "RFE{IA}<c> <Rn>{!} Outside or last in IT block" T2(THUMB2) B9.3.13
+1 1 1 1 0 1 1 1 1 1 1 1 i i i i 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "SMC<c> #<imm4>" T1(THUMB2) B9.3.14
+1 1 1 0 1 0 0 0 0 0 W 0 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 m m m m m "SRSDB<c> SP{!}, #<mode>" T1(THUMB2) B9.3.15
+1 1 1 0 1 0 0 1 1 0 W 0 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 m m m m m "SRS{IA}<c> SP{!}, #<mode>" T2(THUMB2) B9.3.15
+1 1 1 1 0 0 1 1 1 1 0 1 1 1 1 0 1 0 0 0 1 1 1 1 i i i i i i i i "SUBS<c> PC, LR, #<imm8> Outside or last in IT block" T1(THUMB2) B9.3.19
+1 1 1 1 0 i 0 1 0 1 0 S n n n n 0 i i i d d d d i i i i i i i i "ADC{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.1
+1 1 1 0 1 0 1 1 0 1 0 S n n n n 0 i i i d d d d i i t t m m m m "ADC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.2
+1 1 1 1 0 i 0 1 0 0 0 S n n n n 0 i i i d d d d i i i i i i i i "ADD{S}<c>.W <Rd>, <Rn>, #<const>" T3(THUMB2) A8.8.4
+1 1 1 1 0 i 1 0 0 0 0 0 n n n n 0 i i i d d d d i i i i i i i i "ADDW<c> <Rd>, <Rn>, #<imm12>" T4(THUMB2) A8.8.4
+1 1 1 0 1 0 1 1 0 0 0 S n n n n 0 i i i d d d d i i t t m m m m "ADD{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T3(THUMB2) A8.8.6
+1 1 1 1 0 i 0 1 0 0 0 S 1 1 0 1 0 i i i d d d d i i i i i i i i "ADD{S}<c>.W <Rd>, SP, #<const>" T3(THUMB2) A8.8.9
+1 1 1 1 0 i 1 0 0 0 0 0 1 1 0 1 0 i i i d d d d i i i i i i i i "ADDW<c> <Rd>, SP, #<imm12>" T4(THUMB2) A8.8.9
+1 1 1 0 1 0 1 1 0 0 0 S 1 1 0 1 0 i i i d d d d i i t t m m m m "ADD{S}<c>.W <Rd>, SP, <Rm>{, <shift>}" T3(THUMB2) A8.8.10
+1 1 1 1 0 i 1 0 1 0 1 0 1 1 1 1 0 i i i d d d d i i i i i i i i "ADR<c>.W <Rd>, <label> <label> before current instruction SUB <Rd>, PC, #0 Special case for subtraction of zero" T2(THUMB2) A8.8.12
+1 1 1 1 0 i 1 0 0 0 0 0 1 1 1 1 0 i i i d d d d i i i i i i i i "ADR<c>.W <Rd>, <label> <label> after current instruction" T3(THUMB2) A8.8.12
+1 1 1 1 0 i 0 0 0 0 0 S n n n n 0 i i i d d d d i i i i i i i i "AND{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.13
+1 1 1 0 1 0 1 0 0 0 0 S n n n n 0 i i i d d d d i i t t m m m m "AND{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.14
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 i i i d d d d i i 1 0 m m m m "ASR{S}<c>.W <Rd>, <Rm>, #<imm>" T2(THUMB2) A8.8.16
+1 1 1 1 0 0 1 1 0 1 1 0 1 1 1 1 0 i i i d d d d i i 0 B B B B B "BFC<c> <Rd>, #<lsb>, #<width>" T1(THUMB2) A8.8.19
+1 1 1 1 0 0 1 1 0 1 1 0 n n n n 0 i i i d d d d i i 0 B B B B B "BFI<c> <Rd>, <Rn>, #<lsb>, #<width>" T1(THUMB2) A8.8.20
+1 1 1 1 0 i 0 0 0 0 1 S n n n n 0 i i i d d d d i i i i i i i i "BIC{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.21
+1 1 1 0 1 0 1 0 0 0 1 S n n n n 0 i i i d d d d i i t t m m m m "BIC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.22
+1 1 1 1 0 i 0 1 0 0 0 1 n n n n 0 i i i 1 1 1 1 i i i i i i i i "CMN<c> <Rn>, #<const>" T1(THUMB2) A8.8.34
+1 1 1 0 1 0 1 1 0 0 0 1 n n n n 0 i i i 1 1 1 1 i i t t m m m m "CMN<c>.W <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.35
+1 1 1 1 0 i 0 1 1 0 1 1 n n n n 0 i i i 1 1 1 1 i i i i i i i i "CMP<c>.W <Rn>, #<const>" T2(THUMB2) A8.8.37
+1 1 1 0 1 0 1 1 1 0 1 1 n n n n 0 i i i 1 1 1 1 i i t t m m m m "CMP<c>.W <Rn>, <Rm> {, <shift>}" T3(THUMB2) A8.8.38
+1 1 1 1 0 i 0 0 1 0 0 S n n n n 0 i i i d d d d i i i i i i i i "EOR{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.46
+1 1 1 0 1 0 1 0 1 0 0 S n n n n 0 i i i d d d d i i t t m m m m "EOR{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.47
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 i i i d d d d i i 0 0 m m m m "LSL{S}<c>.W <Rd>, <Rm>, #<imm5>" T2(THUMB2) A8.8.94
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 i i i d d d d i i 0 1 m m m m "LSR{S}<c>.W <Rd>, <Rm>, #<imm>" T2(THUMB2) A8.8.96
+1 1 1 1 0 i 0 0 0 1 0 S 1 1 1 1 0 i i i d d d d i i i i i i i i "MOV{S}<c>.W <Rd>, #<const>" T2(THUMB2) A8.8.102
+1 1 1 1 0 i 1 0 0 1 0 0 i i i i 0 i i i d d d d i i i i i i i i "MOVW<c> <Rd>, #<imm16>" T3(THUMB2) A8.8.102
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 0 0 0 d d d d 0 0 0 0 m m m m "MOV{S}<c>.W <Rd>, <Rm>" T3(THUMB2) A8.8.103
+1 1 1 1 0 i 1 0 1 1 0 0 i i i i 0 i i i d d d d i i i i i i i i "MOVT<c> <Rd>, #<imm16>" T1(THUMB2) A8.8.106
+1 1 1 1 0 i 0 0 0 1 1 S 1 1 1 1 0 i i i d d d d i i i i i i i i "MVN{S}<c> <Rd>, #<const>" T1(THUMB2) A8.8.115
+1 1 1 0 1 0 1 0 0 1 1 S 1 1 1 1 0 i i i d d d d i i t t m m m m "MVN{S}<c>.W <Rd>, <Rm>{, <shift>}" T2(THUMB2) A8.8.116
+1 1 1 1 0 i 0 0 0 1 1 S n n n n 0 i i i d d d d i i i i i i i i "ORN{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.120
+1 1 1 0 1 0 1 0 0 1 1 S n n n n 0 i i i d d d d i i t t m m m m "ORN{S}<c> <Rd>, <Rn>, <Rm>{, <shift>}" T1(THUMB2) A8.8.121
+1 1 1 1 0 i 0 0 0 1 0 S n n n n 0 i i i d d d d i i i i i i i i "ORR{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.122
+1 1 1 0 1 0 1 0 0 1 0 S n n n n 0 i i i d d d d i i t t m m m m "ORR{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.123
+1 1 1 0 1 0 1 0 1 1 0 S n n n n 0 i i i d d d d i i x T m m m m "PKHBT<c> <Rd>, <Rn>, <Rm>{, LSL #<imm>} PKHTB<c> <Rd>, <Rn>, <Rm>{, ASR #<imm>}" T1(THUMB2) A8.8.125
+1 1 1 0 1 0 0 1 0 0 1 0 1 1 0 1 0 M 0 r r r r r r r r r r r r r "PUSH<c>.W <registers> <registers> contains more than one register" T2(THUMB2) A8.8.133
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 i i i d d d d i i 1 1 m m m m "ROR{S}<c> <Rd>, <Rm>, #<imm>" T1(THUMB2) A8.8.149
+1 1 1 0 1 0 1 0 0 1 0 S 1 1 1 1 0 0 0 0 d d d d 0 0 1 1 m m m m "RRX{S}<c> <Rd>, <Rm>" T1(THUMB2) A8.8.151
+1 1 1 1 0 i 0 1 1 1 0 S n n n n 0 i i i d d d d i i i i i i i i "RSB{S}<c>.W <Rd>, <Rn>, #<const>" T2(THUMB2) A8.8.152
+1 1 1 0 1 0 1 1 1 1 0 S n n n n 0 i i i d d d d i i t t m m m m "RSB{S}<c> <Rd>, <Rn>, <Rm>{, <shift>}" T1(THUMB2) A8.8.153
+1 1 1 1 0 i 0 1 0 1 1 S n n n n 0 i i i d d d d i i i i i i i i "SBC{S}<c> <Rd>, <Rn>, #<const>" T1(THUMB2) A8.8.161
+1 1 1 0 1 0 1 1 0 1 1 S n n n n 0 i i i d d d d i i t t m m m m "SBC{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.162
+1 1 1 1 0 0 1 1 0 1 0 0 n n n n 0 i i i d d d d i i 0 w w w w w "SBFX<c> <Rd>, <Rn>, #<lsb>, #<width>" T1(THUMB2) A8.8.164
+1 1 1 1 0 0 1 1 0 0 s 0 n n n n 0 i i i d d d d i i 0 i i i i i "SSAT<c> <Rd>, #<imm>, <Rn>{, <shift>}" T1(THUMB2) A8.8.193
+1 1 1 1 0 0 1 1 0 0 1 0 n n n n 0 0 0 0 d d d d 0 0 0 0 i i i i "SSAT16<c> <Rd>, #<imm>, <Rn>" T1(THUMB2) A8.8.194
+1 1 1 0 1 0 0 0 1 0 W 0 n n n n 0 M 0 r r r r r r r r r r r r r "STM<c>.W <Rn>{!}, <registers>" T2(THUMB2) A8.8.199
+1 1 1 0 1 0 0 1 0 0 W 0 n n n n 0 M 0 r r r r r r r r r r r r r "STMDB<c> <Rn>{!}, <registers>" T1(THUMB2) A8.8.201
+1 1 1 1 0 i 0 1 1 0 1 S n n n n 0 i i i d d d d i i i i i i i i "SUB{S}<c>.W <Rd>, <Rn>, #<const>" T3(THUMB2) A8.8.221
+1 1 1 1 0 i 1 0 1 0 1 0 n n n n 0 i i i d d d d i i i i i i i i "SUBW<c> <Rd>, <Rn>, #<imm12>" T4(THUMB2) A8.8.221
+1 1 1 0 1 0 1 1 1 0 1 S n n n n 0 i i i d d d d i i t t m m m m "SUB{S}<c>.W <Rd>, <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.223
+1 1 1 1 0 i 0 1 1 0 1 S 1 1 0 1 0 i i i d d d d i i i i i i i i "SUB{S}<c>.W <Rd>, SP, #<const>" T2(THUMB2) A8.8.225
+1 1 1 1 0 i 1 0 1 0 1 0 1 1 0 1 0 i i i d d d d i i i i i i i i "SUBW<c> <Rd>, SP, #<imm12>" T3(THUMB2) A8.8.225
+1 1 1 0 1 0 1 1 1 0 1 S 1 1 0 1 0 i i i d d d d i i t t m m m m "SUB{S}<c> <Rd>, SP, <Rm>{, <shift>}" T1(THUMB2) A8.8.226
+1 1 1 1 0 i 0 0 1 0 0 1 n n n n 0 i i i 1 1 1 1 i i i i i i i i "TEQ<c> <Rn>, #<const>" T1(THUMB2) A8.8.237
+1 1 1 0 1 0 1 0 1 0 0 1 n n n n 0 i i i 1 1 1 1 i i t t m m m m "TEQ<c> <Rn>, <Rm>{, <shift>}" T1(THUMB2) A8.8.238
+1 1 1 1 0 i 0 0 0 0 0 1 n n n n 0 i i i 1 1 1 1 i i i i i i i i "TST<c> <Rn>, #<const>" T1(THUMB2) A8.8.240
+1 1 1 0 1 0 1 0 0 0 0 1 n n n n 0 i i i 1 1 1 1 i i t t m m m m "TST<c>.W <Rn>, <Rm>{, <shift>}" T2(THUMB2) A8.8.241
+1 1 1 1 0 0 1 1 1 1 0 0 n n n n 0 i i i d d d d i i 0 w w w w w "UBFX<c> <Rd>, <Rn>, #<lsb>, #<width>" T1(THUMB2) A8.8.246
+1 1 1 1 0 0 1 1 1 0 s 0 n n n n 0 i i i d d d d i i 0 i i i i i "USAT<c> <Rd>, #<imm5>, <Rn>{, <shift>}" T1(THUMB2) A8.8.266
+1 1 1 1 0 0 1 1 1 0 1 0 n n n n 0 0 0 0 d d d d 0 0 0 0 i i i i "USAT16<c> <Rd>, #<imm4>, <Rn>" T1(THUMB2) A8.8.267
+0 1 0 0 0 0 0 1 0 1 m m m d d d                 "ADCS <Rdn>, <Rm> Outside IT block. ADC<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.2
+0 0 0 1 1 1 0 i i i n n n d d d                 "ADDS <Rd>, <Rn>, #<imm3> Outside IT block. ADD<c> <Rd>, <Rn>, #<imm3> Inside IT block." T1(THUMB1) A8.8.4
+0 0 1 1 0 d d d i i i i i i i i                 "ADDS <Rdn>, #<imm8> Outside IT block. ADD<c> <Rdn>, #<imm8> Inside IT block." T2(THUMB1) A8.8.4
+0 0 0 1 1 0 0 m m m n n n d d d                 "ADDS <Rd>, <Rn>, <Rm> Outside IT block. ADD<c> <Rd>, <Rn>, <Rm> Inside IT block." T1(THUMB1) A8.8.6
+0 1 0 0 0 1 0 0 D m m m m d d d                 "otherwise ADD<c> <Rdn>, <Rm> If <Rdn> is the PC, must be outside or last in IT block." T2(THUMB1) A8.8.6
+1 0 1 0 1 d d d i i i i i i i i                 "ADD<c> <Rd>, SP, #<imm>" T1(THUMB1) A8.8.9
+1 0 1 1 0 0 0 0 0 i i i i i i i                 "ADD<c> SP, SP, #<imm>" T2(THUMB1) A8.8.9
+0 1 0 0 0 1 0 0 D 1 1 0 1 d d d                 "ADD<c> <Rdm>, SP, <Rdm>" T1(THUMB1) A8.8.10
+0 1 0 0 0 1 0 0 1 m m m m 1 0 1                 "ADD<c> SP, <Rm>" T2(THUMB1) A8.8.10
+1 0 1 0 0 d d d i i i i i i i i                 "ADR<c> <Rd>, <label>" T1(THUMB1) A8.8.12
+0 1 0 0 0 0 0 0 0 0 m m m d d d                 "ANDS <Rdn>, <Rm> Outside IT block. AND<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.14
+0 0 0 1 0 i i i i i m m m d d d                 "ASRS <Rd>, <Rm>, #<imm> Outside IT block. ASR<c> <Rd>, <Rm>, #<imm> Inside IT block." T1(THUMB1) A8.8.16
+0 1 0 0 0 0 0 1 0 0 m m m d d d                 "ASRS <Rdn>, <Rm> Outside IT block. ASR<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.17
+1 1 0 1 c c c c i i i i i i i i                 "B<c> <label> Not permitted in IT block." T1(THUMB1) A8.8.18
+1 1 1 0 0 i i i i i i i i i i i                 "B<c> <label> Outside or last in IT block" T2(THUMB1) A8.8.18
+0 1 0 0 0 0 1 1 1 0 m m m d d d                 "BICS <Rdn>, <Rm> Outside IT block. BIC<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.22
+1 0 1 1 1 1 1 0 i i i i i i i i                 "BKPT #<imm8>" T1(THUMB1) A8.8.24
+0 1 0 0 0 1 1 1 1 m m m m 0 0 0                 "BLX<c> <Rm> Outside or last in IT block" T1(THUMB1) A8.8.26
+0 1 0 0 0 1 1 1 0 m m m m 0 0 0                 "BX<c> <Rm> Outside or last in IT block" T1(THUMB1) A8.8.27
+1 0 1 1 f 0 i 1 i i i i i n n n                 "CB{N}Z <Rn>, <label> Not permitted in IT block." T1(THUMB1) A8.8.29
+0 1 0 0 0 0 1 0 1 1 m m m n n n                 "CMN<c> <Rn>, <Rm>" T1(THUMB1) A8.8.35
+0 0 1 0 1 n n n i i i i i i i i                 "CMP<c> <Rn>, #<imm8>" T1(THUMB1) A8.8.37
+0 1 0 0 0 0 1 0 1 0 m m m n n n                 "CMP<c> <Rn>, <Rm> <Rn> and <Rm> both from R0-R7" T1(THUMB1) A8.8.38
+0 1 0 0 0 1 0 1 N m m m m n n n                 "CMP<c> <Rn>, <Rm> <Rn> and <Rm> not both from R0-R7" T2(THUMB1) A8.8.38
+0 1 0 0 0 0 0 0 0 1 m m m d d d                 "EORS <Rdn>, <Rm> Outside IT block. EOR<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.47
+1 0 1 1 1 1 1 1 c c c c M M M M                 "IT{<x>{<y>{<z>}}} <firstcond> Not permitted in IT block" T1(THUMB1) A8.8.54
+1 1 0 0 1 n n n r r r r r r r r                 "LDM<c> <Rn>!, <registers> <Rn> not included in <registers> LDM<c> <Rn>, <registers> <Rn> included in <registers>" T1(THUMB1) A8.8.57
+0 1 1 0 1 i i i i i n n n t t t                 "LDR<c> <Rt>, [<Rn>{, #<imm>}]" T1(THUMB1) A8.8.62
+1 0 0 1 1 t t t i i i i i i i i                 "LDR<c> <Rt>, [SP{, #<imm>}]" T2(THUMB1) A8.8.62
+0 1 0 0 1 t t t i i i i i i i i                 "LDR<c> <Rt>, <label>" T1(THUMB1) A8.8.64
+0 1 0 1 1 0 0 m m m n n n t t t                 "LDR<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.65
+0 1 1 1 1 i i i i i n n n t t t                 "LDRB<c> <Rt>, [<Rn>{, #<imm5>}]" T1(THUMB1) A8.8.67
+0 1 0 1 1 1 0 m m m n n n t t t                 "LDRB<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.70
+1 0 0 0 1 i i i i i n n n t t t                 "LDRH<c> <Rt>, [<Rn>{, #<imm>}]" T1(THUMB1) A8.8.79
+0 1 0 1 1 0 1 m m m n n n t t t                 "LDRH<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.82
+0 1 0 1 0 1 1 m m m n n n t t t                 "LDRSB<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.86
+0 1 0 1 1 1 1 m m m n n n t t t                 "LDRSH<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.90
+0 0 0 0 0 i i i i i m m m d d d                 "LSLS <Rd>, <Rm>, #<imm5> Outside IT block. LSL<c> <Rd>, <Rm>, #<imm5> Inside IT block." T1(THUMB1) A8.8.94
+0 1 0 0 0 0 0 0 1 0 m m m d d d                 "LSLS <Rdn>, <Rm> Outside IT block. LSL<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.95
+0 0 0 0 1 i i i i i m m m d d d                 "LSRS <Rd>, <Rm>, #<imm> Outside IT block. LSR<c> <Rd>, <Rm>, #<imm> Inside IT block." T1(THUMB1) A8.8.96
+0 1 0 0 0 0 0 0 1 1 m m m d d d                 "LSRS <Rdn>, <Rm> Outside IT block. LSR<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.97
+0 0 1 0 0 d d d i i i i i i i i                 "MOVS <Rd>, #<imm8> Outside IT block. MOV<c> <Rd>, #<imm8> Inside IT block." T1(THUMB1) A8.8.102
+0 1 0 0 0 1 1 0 D m m m m d d d                 "otherwise MOV<c> <Rd>, <Rm> If <Rd> is the PC, must be outside or last in IT block." T1(THUMB1) A8.8.103
+0 0 0 0 0 0 0 0 0 0 m m m d d d                 "MOVS <Rd>, <Rm> Not permitted in IT block" T2(THUMB1) A8.8.103
+0 1 0 0 0 0 1 1 0 1 n n n d d d                 "MULS <Rdm>, <Rn>, <Rdm> Outside IT block. MUL<c> <Rdm>, <Rn>, <Rdm> Inside IT block." T1(THUMB1) A8.8.114
+0 1 0 0 0 0 1 1 1 1 m m m d d d                 "MVNS <Rd>, <Rm> Outside IT block. MVN<c> <Rd>, <Rm> Inside IT block." T1(THUMB1) A8.8.116
+1 0 1 1 1 1 1 1 0 0 0 0 0 0 0 0                 NOP<c> T1(THUMB1) A8.8.119
+0 1 0 0 0 0 1 1 0 0 m m m d d d                 "ORRS <Rdn>, <Rm> Outside IT block. ORR<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.123
+1 0 1 1 1 1 0 P r r r r r r r r                 "POP<c> <registers>" T1(THUMB1) A8.8.131
+1 0 1 1 0 1 0 M r r r r r r r r                 "PUSH<c> <registers>" T1(THUMB1) A8.8.133
+1 0 1 1 1 0 1 0 0 0 m m m d d d                 "REV<c> <Rd>, <Rm>" T1(THUMB1) A8.8.145
+1 0 1 1 1 0 1 0 0 1 m m m d d d                 "REV16<c> <Rd>, <Rm>" T1(THUMB1) A8.8.146
+1 0 1 1 1 0 1 0 1 1 m m m d d d                 "REVSH<c> <Rd>, <Rm>" T1(THUMB1) A8.8.147
+0 1 0 0 0 0 0 1 1 1 m m m d d d                 "RORS <Rdn>, <Rm> Outside IT block. ROR<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.150
+0 1 0 0 0 0 1 0 0 1 n n n d d d                 "RSBS <Rd>, <Rn>, #0 Outside IT block. RSB<c> <Rd>, <Rn>, #0 Inside IT block." T1(THUMB1) A8.8.152
+0 1 0 0 0 0 0 1 1 0 m m m d d d                 "SBCS <Rdn>, <Rm> Outside IT block. SBC<c> <Rdn>, <Rm> Inside IT block." T1(THUMB1) A8.8.162
+1 0 1 1 0 1 1 0 0 1 0 1 E 0 0 0                 "SETEND <endianspecifier> Not permitted in IT block" T1(THUMB1) A8.8.167
+1 0 1 1 1 1 1 1 0 1 0 0 0 0 0 0                 SEV<c> T1(THUMB1) A8.8.168
+1 1 0 0 0 n n n r r r r r r r r                 "STM<c> <Rn>!, <registers>" T1(THUMB1) A8.8.199
+0 1 1 0 0 i i i i i n n n t t t                 "STR<c> <Rt>, [<Rn>{, #<imm>}]" T1(THUMB1) A8.8.203
+1 0 0 1 0 t t t i i i i i i i i                 "STR<c> <Rt>, [SP, #<imm>]" T2(THUMB1) A8.8.203
+0 1 0 1 0 0 0 m m m n n n t t t                 "STR<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.205
+0 1 1 1 0 i i i i i n n n t t t                 "STRB<c> <Rt>, [<Rn>, #<imm5>]" T1(THUMB1) A8.8.206
+0 1 0 1 0 1 0 m m m n n n t t t                 "STRB<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.208
+1 0 0 0 0 i i i i i n n n t t t                 "STRH<c> <Rt>, [<Rn>{, #<imm>}]" T1(THUMB1) A8.8.216
+0 1 0 1 0 0 1 m m m n n n t t t                 "STRH<c> <Rt>, [<Rn>, <Rm>]" T1(THUMB1) A8.8.218
+0 0 0 1 1 1 1 i i i n n n d d d                 "SUBS <Rd>, <Rn>, #<imm3> Outside IT block. SUB<c> <Rd>, <Rn>, #<imm3> Inside IT block." T1(THUMB1) A8.8.221
+0 0 1 1 1 d d d i i i i i i i i                 "SUBS <Rdn>, #<imm8> Outside IT block. SUB<c> <Rdn>, #<imm8> Inside IT block." T2(THUMB1) A8.8.221
+0 0 0 1 1 0 1 m m m n n n d d d                 "SUBS <Rd>, <Rn>, <Rm> Outside IT block. SUB<c> <Rd>, <Rn>, <Rm> Inside IT block." T1(THUMB1) A8.8.223
+1 0 1 1 0 0 0 0 1 i i i i i i i                 "SUB<c> SP, SP, #<imm>" T1(THUMB1) A8.8.225
+1 1 0 1 1 1 1 1 i i i i i i i i                 "SVC<c> #<imm8>" T1(THUMB1) A8.8.228
+1 0 1 1 0 0 1 0 0 1 m m m d d d                 "SXTB<c> <Rd>, <Rm>" T1(THUMB1) A8.8.233
+1 0 1 1 0 0 1 0 0 0 m m m d d d                 "SXTH<c> <Rd>, <Rm>" T1(THUMB1) A8.8.235
+0 1 0 0 0 0 1 0 0 0 m m m n n n                 "TST<c> <Rn>, <Rm>" T1(THUMB1) A8.8.241
+1 1 0 1 1 1 1 0 i i i i i i i i                 "UDF<c> #<imm8>" T1(THUMB1) A8.8.247
+1 0 1 1 0 0 1 0 1 1 m m m d d d                 "UXTB<c> <Rd>, <Rm>" T1(THUMB1) A8.8.274
+1 0 1 1 0 0 1 0 1 0 m m m d d d                 "UXTH<c> <Rd>, <Rm>" T1(THUMB1) A8.8.276
+1 0 1 1 1 1 1 1 0 0 1 0 0 0 0 0                 WFE<c> T1(THUMB1) A8.8.424
+1 0 1 1 1 1 1 1 0 0 1 1 0 0 0 0                 WFI<c> T1(THUMB1) A8.8.425
+1 0 1 1 1 1 1 1 0 0 0 1 0 0 0 0                 YIELD<c> T1(THUMB1) A8.8.426
+0 1 0 1 1 0 0 m m m n n n t t t                 "LDR<c> <Rt>, [<Rn>, <, <Rm>, LSL #2]" T1(THUMB1) A9.4.1
+0 1 0 1 1 0 1 m m m n n n t t t                 "LDRH<c> <Rt>, [<Rn>, <, <Rm>, LSL #1]" T1(THUMB1) A9.4.2
+0 1 0 1 1 1 1 m m m n n n t t t                 "LDRSH<c> <Rt>, [<Rn>, <Rm>, LSL #1]" T1(THUMB1) A9.4.3
+0 1 0 1 0 0 0 m m m n n n t t t                 "STR<c> <Rt>, [<Rn>, <Rm>, LSL #2]" T1(THUMB1) A9.4.4
+0 1 0 1 0 0 1 m m m n n n t t t                 "STRH<c> <Rt>, [<Rn>, <Rm>, LSL #1]" T1(THUMB1) A9.4.5
+1 0 1 1 0 1 1 0 0 1 1 i 0 A I F                 "CPS<effect> <iflags> Not permitted in IT block." T1(THUMB1) B9.3.1
