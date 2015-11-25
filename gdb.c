@@ -86,6 +86,14 @@ volatile gdb_watch_rec gdb_usr_watchpoint[GDB_MAX_WATCHPOINTS];
 // number of breakpoints in use
 volatile int gdb_num_watchps = 0;
 
+// for self-debugging
+typedef struct {
+	uint32_t type;
+	uint32_t addr;
+	uint32_t bytes;
+} gdb_dbg_rec_t;
+volatile gdb_dbg_rec_t self_watch;
+
 // breakpoint for single-stepping
 volatile gdb_trap_rec gdb_step_bkpt;
 volatile int gdb_single_stepping = 0; // flag: 1 = currently single stepping
@@ -107,6 +115,7 @@ static volatile uint8_t gdb_tmp_packet[GDB_MAX_MSG_LEN]; // for building packets
 static uint32_t gdb_swbreak;
 static uint32_t gdb_hwbreak;
 
+
 // flag: 0 = return to debuggee, 1 = stay in monitor
 static volatile int gdb_monitor_running = 0;
 
@@ -115,6 +124,10 @@ volatile uint32_t gdb_dyn_debug;
 #ifdef DEBUG_GDB
 static char scratchpad[16]; // scratchpad for debugging
 #endif
+
+// decode table debug
+extern unsigned int get_decode_table();
+extern unsigned int get_decode_table_sz();
 
 // The 'command interpreter'
 void gdb_monitor(int reason);
@@ -218,6 +231,9 @@ int gdb_check_watchpoint()
 		{
 			if (gdb_usr_watchpoint[i].size > 4)
 			{
+				LOG_PR_VAL("FAR: ", (unsigned int)(rpi2_dbg_rec.far));
+				LOG_PR_VAL_CONT(" mask: ", (unsigned int)(gdb_usr_watchpoint[i].mask));
+				LOG_PR_VAL_CONT(" val: ", (unsigned int)(gdb_usr_watchpoint[i].value));
 				if (rpi2_dbg_rec.far & gdb_usr_watchpoint[i].mask
 					== gdb_usr_watchpoint[i].value)
 				{
@@ -568,9 +584,12 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 	}
 	if (num >= GDB_MAX_WATCHPOINTS) return -1; // full
 
-	gdb_usr_watchpoint[i].type = type;
-	gdb_usr_watchpoint[i].size = bytes;
-	gdb_usr_watchpoint[i].address = (void *)addr;
+	gdb_usr_watchpoint[num].type = type;
+	gdb_usr_watchpoint[num].size = bytes;
+	gdb_usr_watchpoint[num].address = (void *)addr;
+
+	LOG_PR_VAL("addr: ", (unsigned int)addr);
+	LOG_PR_VAL_CONT(" bytes: ", (unsigned int)bytes);
 
 	// Cortex-A8 Technical Reference Manual
 	// 12.4.16. Watchpoint Control Registers
@@ -594,26 +613,33 @@ int dgb_add_watchpoint(uint32_t type, uint32_t addr, uint32_t bytes)
 		// check alignment
 		alignment = 0;
 		tmp = bytes;
-		while (tmp >>= 1)
+		while (tmp >>= 1) // msb bit place starting from 0
 		{
 			alignment++;
 		}
+		LOG_PR_VAL("align: ", (unsigned int)alignment);
 		if (alignment > 31) return -2; // invalid range
-		if (alignment < 4) return -2; // invalid range
+		if (alignment < 3) return -2; // invalid range
 
-		if (bytes & (~(1 << (alignment - 1)))) // more than 1 bit set?
+		tmp = ~(1 << alignment);
+		if (bytes & (~(1 << alignment))) // more than 1 bit set?
 		{
+			LOG_PR_VAL_CONT(" align - bytes: ", (unsigned int)tmp);
 			return -2; // illegal range, must be 2**n bytes
 		}
-#if 1
-		if (addr & ((1 << alignment) -1 )) return -3; // address not aligned with range
+		tmp = (~0) << alignment;
+#if 0
+		if (addr & (~tmp)) return -3; // address not aligned with range
 #else
 		// make base alignment consistent with the range
-		value = addr & (~((1<<alignment) - 1)); // mask off lower bits
+		value = addr & tmp; // mask off lower bits
 #endif
-		mask = alignment - 1;
+		mask = alignment;
 		bas = 0xff; // must be if mask is used
-		gdb_usr_watchpoint[num].mask = ((~0) << mask);
+		gdb_usr_watchpoint[num].mask = tmp;
+		LOG_PR_VAL_CONT(" addr mask: ", (unsigned int)(gdb_usr_watchpoint[num].mask));
+		LOG_PR_VAL_CONT(" from: ", (unsigned int) value);
+		LOG_PR_VAL_CONT(" to: ", (unsigned int)(value + (~tmp)));
 	}
 	control = mask << 24; // MASK
 	control |= (1 << 13); // HMC
@@ -1268,6 +1294,21 @@ void gdb_resp_target_halted(int reason)
 		//len = util_str_copy(resp_buff, "Ogdb stub started\n", resp_buff_len);
 		//gdb_send_packet(resp_buff, len);
 		// application terminated with status 0
+		tmp = get_decode_table();
+		tmp2 = (uint32_t) get_decode_table_sz();
+		LOG_PR_VAL("table start: ", tmp);
+		LOG_PR_VAL_CONT(" table size: ", (unsigned int)tmp2);
+		// self_watch.type = 2; // write
+		// self_watch.addr = 2;
+		// self_watch.bytes = 2;
+		tmp = tmp & 0xfffff000;
+		tmp = tmp + 0x1000;
+		tmp2 = dgb_add_watchpoint(2, tmp, 0x1000);
+		if (tmp2 < 0)
+		{
+			tmp2 = -tmp2;
+			LOG_PR_VAL_CONT(" watch fail: ", tmp2);
+		}
 		len = util_str_copy(resp_buff, "S05", resp_buff_len);
 		break;
 	case FINISHED: // program has finished

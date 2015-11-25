@@ -51,24 +51,30 @@ void loader_main()
 	static char scratch2[16];
 
 #if 0
-	rpi2_led_blink(2000, 300, 3);
-	rpi2_delay_loop(2000);
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(1000);
+		rpi2_led_blink(1000, 1000, 2);
+		rpi2_delay_loop(5000);
 #endif	
 
 	/* initialize rpi2 */
 	rpi2_init();
 	
 #if 0	
-	rpi2_led_blink(2000, 300, 4);
-	rpi2_delay_loop(2000);
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(1000);
+		rpi2_led_blink(1000, 1000, 3);
+		rpi2_delay_loop(5000);
 #endif
 
 	/* initialize serial for debugger */
 	serial_init(&serial_io);
 	log_init(&serial_io);
 #if 0
-	rpi2_led_blink(2000, 300, 5);
-	rpi2_delay_loop(2000);
+		rpi2_led_blink(100, 100, 3);
+		rpi2_delay_loop(1000);
+		rpi2_led_blink(1000, 1000, 4);
+		rpi2_delay_loop(5000);
 #endif
 
 	/* enable all exceptions */
@@ -279,11 +285,12 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	int tmp;
 		
 #if 0
-	int i;
 	for(i=0; i<5; i++)
 	{
-		rpi2_led_blink(300, 300, 5);
+		rpi2_led_blink(500, 500, 3);
 		rpi2_delay_loop(1000);
+		rpi2_led_blink(1000, 1000, 3);
+		rpi2_delay_loop(5000);
 	}
 #endif
 	rpi2_uart0_excmode = RPI2_UART0_POLL; // default

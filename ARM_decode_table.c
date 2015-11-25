@@ -61,6 +61,14 @@ typedef enum
 	arm_ret_lsl_imm,
 	arm_cdata_rrx_r,
 	arm_cdata_ror_imm,
+	arm_vldste_vld1_mult,
+	arm_vldste_vld2_mult,
+	arm_vldste_vld3_mult,
+	arm_vldste_vld4_mult,
+	arm_vldste_vst1_mult,
+	arm_vldste_vst2_mult,
+	arm_vldste_vst3_mult,
+	arm_vldste_vst4_mult,
 	arm_extras_last
 } ARM_decode_extra_t;
 
@@ -87,17 +95,30 @@ ARM_dec_tbl_entry_t ARM_decode_table[] =
 #include "ARM_decode_table_data.h"
 };
 
+// Neon context
+//__attribute__ ((aligned (8))) unsigned int vregs[64];
+unsigned int vregs[64];
+
 // set next address for linear execution
 // the address is set to 0xffffffff and flag to INSTR_ADDR_ARM
 // that indicates the main ARM decoding function to set the address
 // right for linear execution.
-inline instr_next_addr_t set_addr_lin(void)
+static inline instr_next_addr_t set_addr_lin(void)
 {
 	instr_next_addr_t retval = {
 			.flag = INSTR_ADDR_ARM,
 			.address = 0xffffffff
 	};
 	return retval;
+}
+
+unsigned int get_decode_table()
+{
+	return (unsigned int)ARM_decode_table;
+}
+unsigned int get_decode_table_sz()
+{
+	return (unsigned int)sizeof(ARM_decode_table);
 }
 
 // decoder dispatcher - finds the decoding function and calls it
@@ -121,6 +142,7 @@ instr_next_addr_t ARM_decoder_dispatch(unsigned int instr)
 		if ((instr & ARM_decode_table[i].mask) == ARM_decode_table[i].data)
 		{
 			LOG_PR_VAL("Decode table hit, i: ", (unsigned int)i);
+			LOG_PR_VAL_CONT(" at addr: ", (unsigned int)(&ARM_decode_table[i]));
 			LOG_PR_VAL_CONT(" instr: ", instr);
 			LOG_PR_VAL_CONT(" mask: ", ARM_decode_table[i].mask);
 			LOG_PR_VAL_CONT(" data: ", ARM_decode_table[i].data);
@@ -500,8 +522,7 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 				}
 				else // SPSR
 				{
-					// TODO: store SPSR too in exception and get it here
-					tmp2 = rpi2_reg_context.reg.cpsr;
+					tmp2 = rpi2_reg_context.reg.spsr;
 					retval.address = tmp2;
 					retval.flag = INSTR_ADDR_ARM;
 				}
@@ -590,342 +611,30 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 		// else UNDEFINED
 		break;
 	case arm_mux_vst_type:
-		// VST1-4 (multiple element structures) - type
-		// if Rm == 15, [<Rn>{:<align>}]
-		// else if Rm == 13, [<Rn>{:<align>}]!; Rn = Rn + transfer_size
-		// else [<Rn>{:<align>}], <Rm>; Rn = Rn + Rm
-		// size = bits 7,6; align = bits 5,4
-		// Rn = bits 19-16, Rm = bits 3-0
-		// if Rn = 15, UNPREDICTABLE
-		switch (bitrng(instr, 11, 8))
+		// arm_vldste_vst1_mult
+		// arm_vldste_vst2_mult
+		// arm_vldste_vst3_mult
+		// arm_vldste_vst4_mult
+		switch (bitrng(instr, 11, 8)) // type
 		{
 		case 2:
-			// VST1
-			// regs = 4;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// (bitrng(instr, 5, 4)? 1: 4 << bitrng(instr, 5, 4))
-			// vst1(instr, regs, align);
-			// if Rn is PC
-			if (bitrng(instr, 19, 16) == 15)
-			{
-				// if [<Rn>{:<align>}]
-				if (bitrng(instr, 3, 0) == 15)
-				{
-					// Rn doesn't change
-					retval = set_addr_lin();
-				}
-				else
-				{
-					// vst1(instr, 4, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-					retval = set_unpred_addr(retval);
-				}
-			}
-			else
-			{
-				// PC not involved
-				retval = set_addr_lin();
-			}
-			break;
 		case 6:
-			// VST1
-			// regs = 3; if align<1> == '1' then UNDEFINED;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bit(instr, 5) == 0)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst1(instr, 3, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 7:
-			// VST1
-			// regs = 1; if align<1> == '1' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bit(instr, 5) == 0)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst1(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 10:
-			// VST1
-			// regs = 2; if align == '11' then UNDEFINED;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bitrng(instr, 5, 4) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst1(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vst1_mult);
 			break;
 		case 3:
-			// VST2
-			// regs = 2; inc = 2;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// vst2(instr, regs, inc, align);
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst2(instr, 2, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 8:
-			// VST2
-			// regs = 1; inc = 1; if align == '11' then UNDEFINED;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if ((bitrng(instr, 5, 4) != 3) && (bitrng(instr, 7, 6) != 3))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst2(instr, 1, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 9:
-			// VST2
-			// regs = 1; inc = 2; if align == '11' then UNDEFINED;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if ((bitrng(instr, 5, 4) != 3) && (bitrng(instr, 7, 6) != 3))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst2(instr, 1, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vst2_mult);
 			break;
 		case 4:
-			// VST3
-			// inc = 1;
-			// if size == '11' || align<1> == '1' then UNDEFINED;
-			// alignment = if align<0> == '0' then 1 else 8;
-			// vst3(instr, inc, align);
-			// vst3(instr, inc, (bit(instr, 4)? 1: 8));
-			if ((bitrng(instr, 7, 6) != 3) && (bit(instr, 5) == 0))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst3(instr, 1, (bit(instr, 4)? 1: 8));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 5:
-			// VST3
-			// inc = 2;
-			// if size == '11' || align<1> == '1' then UNDEFINED;
-			// alignment = if align<0> == '0' then 1 else 8;
-			if ((bitrng(instr, 7, 6) != 3) && (bit(instr, 5) == 0))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst3(instr, 2, (bit(instr, 4)? 1: 8));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vst3_mult);
 			break;
 		case 0:
-			// VST4
-			// inc = 1;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// size = bits 7,6; align = bits 5,4
-			// vst4(instr, inc, align);
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst4(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 1:
-			// VST4
-			// inc = 2;
-			// if size == '11' then UNDEFINED
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vst4(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vst4_mult);
 			break;
 		default:
 			// UNDEFINED
@@ -933,341 +642,30 @@ instr_next_addr_t arm_mux(unsigned int instr, ARM_decode_extra_t extra)
 		}
 		break;
 	case arm_mux_vld_type:
-		// VLD1-4 (multiple element structures) - type
-		// if Rm == 15, [<Rn>{:<align>}]
-		// else if Rm == 13, [<Rn>{:<align>}]!; Rn = Rn + transfer_size
-		// else [<Rn>{:<align>}], <Rm>; Rn = Rn + Rm
-		// size = bits 7,6; align = bits 5,4
-		// Rn = bits 19-16, Rm = bits 3-0
-		// if Rn = 15, UNPREDICTABLE
+		// arm_vldste_vld1_mult
+		// arm_vldste_vld2_mult
+		// arm_vldste_vld3_mult
+		// arm_vldste_vld4_mult
 		switch (bitrng(instr, 11, 8))
 		{
 		case 2:
-			// VLD1
-			// regs = 4;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// (bitrng(instr, 5, 4)? 1: 4 << bitrng(instr, 5, 4))
-			// vld1(instr, regs, align);
-			// if Rn is PC
-			if (bitrng(instr, 19, 16) == 15)
-			{
-				// if [<Rn>{:<align>}]
-				if (bitrng(instr, 3, 0) == 15)
-				{
-					// Rn doesn't change
-					retval = set_addr_lin();
-				}
-				else
-				{
-					// vld1(instr, 4, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-					retval = set_unpred_addr(retval);
-				}
-			}
-			else
-			{
-				// PC not involved
-				retval = set_addr_lin();
-			}
-			break;
 		case 6:
-			// VLD1
-			// regs = 3; if align<1> == '1' then UNDEFINED;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bit(instr, 5) == 0)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld1(instr, 3, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 7:
-			// VLD1
-			// regs = 1; if align<1> == '1' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bit(instr, 5) == 0)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld1(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 10:
-			// VLD1
-			// regs = 2; if align == '11' then UNDEFINED;
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if (bitrng(instr, 5, 4) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld1(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vld1_mult);
 			break;
 		case 3:
-			// VLD2
-			// regs = 2; inc = 2;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// vld2(instr, regs, inc, align);
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld2(instr, 2, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 8:
-			// VLD2
-			// regs = 1; inc = 1; if align == '11' then UNDEFINED;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if ((bitrng(instr, 5, 4) != 3) && (bitrng(instr, 7, 6) != 3))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld2(instr, 1, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 9:
-			// VLD2
-			// regs = 1; inc = 2; if align == '11' then UNDEFINED;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			if ((bitrng(instr, 5, 4) != 3) && (bitrng(instr, 7, 6) != 3))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld2(instr, 1, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vld2_mult);
 			break;
 		case 4:
-			// VLD3
-			// inc = 1;
-			// if size == '11' || align<1> == '1' then UNDEFINED;
-			// alignment = if align<0> == '0' then 1 else 8;
-			// vld3(instr, inc, align);
-			if ((bitrng(instr, 7, 6) != 3) && (bit(instr, 5) == 0))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld3(instr, 1, (bit(instr, 4)? 1: 8));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 5:
-			// VLD3
-			// inc = 2;
-			// if size == '11' || align<1> == '1' then UNDEFINED;
-			// alignment = if align<0> == '0' then 1 else 8;
-			if ((bitrng(instr, 7, 6) != 3) && (bit(instr, 5) == 0))
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld3(instr, 2, (bit(instr, 4)? 1: 8));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vld3_mult);
 			break;
 		case 0:
-			// VLD4
-			// inc = 1;
-			// if size == '11' then UNDEFINED
-			// alignment = if align == '00' then 1 else 4 << UInt(align);
-			// size = bits 7,6; align = bits 5,4
-			// vld4(instr, inc, align);
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld4(instr, 1, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
-			break;
 		case 1:
-			// VLD4
-			// inc = 2;
-			// if size == '11' then UNDEFINED
-			if (bitrng(instr, 7, 6) != 3)
-			{
-				// if Rn is PC
-				if (bitrng(instr, 19, 16) == 15)
-				{
-					// if [<Rn>{:<align>}]
-					if (bitrng(instr, 3, 0) == 15)
-					{
-						// Rn doesn't change
-						retval = set_addr_lin();
-					}
-					else
-					{
-						// vld4(instr, 2, (bitrng(instr, 5, 4)? 1: (4 << bitrng(instr, 5, 4))));
-						retval = set_unpred_addr(retval);
-					}
-				}
-				else
-				{
-					// PC not involved
-					retval = set_addr_lin();
-				}
-			}
-			// else UNDEFINED
+			retval = arm_vfp_ldst_elem(instr, arm_vldste_vld4_mult);
 			break;
 		default:
 			// UNDEFINED
@@ -5635,7 +5033,6 @@ instr_next_addr_t arm_core_status(unsigned int instr, ARM_decode_extra_t extra)
 instr_next_addr_t arm_fp(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
 /*
 arm_fp_vcmp_r
@@ -5648,17 +5045,16 @@ arm_fp_vdiv
 arm_fp_vfnm
 
  */
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_bits(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
-
 /*
-arm_vbits_vmov_6432_i
-arm_vbits_vmov_6432_r
+arm_vbits_vmov_6432_i - lin
+arm_vbits_vmov_6432_r - lin
 arm_vbits_vand
 arm_vbits_vbic
 arm_vbits_vbif
@@ -5667,15 +5063,15 @@ arm_vbits_vbsl
 arm_vbits_veor
 arm_vbits_vmvn
 arm_vbits_vorn
-
  */
+	LOG_PR_STR("arm_v_bits");
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_comp(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
 /*
 arm_vcmp_vacge
@@ -5692,63 +5088,707 @@ arm_vcmp_vcgt_z
 arm_vcmp_vcle_z
 arm_vcmp_vclt_z
 arm_vcmp_vtst
-
  */
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_mac(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_misc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_par(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_v_shift(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	retval = set_undef_addr();
 
+	retval = set_addr_lin();
 	return retval;
 }
 
 instr_next_addr_t arm_vfp_ldst_elem(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int und = 0;
+	unsigned int unp = 0;
+
+/*
+arm_vldste_vld1_all
+arm_vldste_vld1_one
+arm_vldste_vld2_all
+arm_vldste_vld2_one
+arm_vldste_vld3_all
+arm_vldste_vld3_one
+arm_vldste_vld4_all
+arm_vldste_vld4_one
+arm_vldste_vst1_one
+arm_vldste_vst2_one
+arm_vldste_vst3_one
+arm_vldste_vst4_one
+arm_vldste_vld1_mult
+arm_vldste_vld2_mult
+arm_vldste_vld3_mult
+arm_vldste_vld4_mult
+arm_vldste_vst1_mult
+arm_vldste_vst2_mult
+arm_vldste_vst3_mult
+arm_vldste_vst4_mult
+*/
+	// bits 19-16 = Rn
+	// bits 3 - 0 = rm
+	// wback = (m != 15); register_index = (m != 15 && m != 13);
+	// if n == 15 || d+regs > 32 then UNPREDICTABLE
+	// Rn is updated by this instruction: Rn = Rn + Rm
+	// [<Rn>{:<align>}] Encoded as Rm = 0b1111.
+	// [<Rn>{:<align>}]! Encoded as Rm = 0b1101.
+	// [<Rn>{:<align>}], <Rm> Encoded as Rm = Rm. Rm must not be encoded
+	//   as 0b1111 or 0b1101, the PC or the SP.
 	retval = set_undef_addr();
 
+	//tmp1 = bitrng(instr, 19, 16); // accessed mode
+	//tmp1 |= bit(instr, 8) << 4;
+	// tmp2 = rpi2_reg_context.storage[tmp2]
+	tmp1 = bitrng(instr, 19, 16); // Rn
+	tmp2 = bitrng(instr, 3, 0); // Rm
+
+	switch (extra)
+	{
+	case arm_vldste_vld1_mult:
+	case arm_vldste_vst1_mult:
+		tmp3 = bitrng(instr, 5, 4); // align
+		switch (bitrng(instr, 11, 8)) // type
+		{
+		case 2:
+			tmp4 = 4; // regs
+			break;
+		case 6:
+			if (tmp3 & 2) und++;
+			tmp4 = 3;
+			break;
+		case 7:
+			if (tmp3 & 2) und++;
+			tmp4 = 1;
+			break;
+		case 10:
+			if (tmp3 == 3) und++;
+			tmp4 = 2;
+			break;
+		}
+		tmp4 *= 8; // Rn advancement if not Rm
+		break;
+	case arm_vldste_vld2_mult:
+	case arm_vldste_vst2_mult:
+		tmp3 = bitrng(instr, 5, 4); // align
+		if (bitrng(instr, 7, 6) == 3) und++; // size
+		switch (bitrng(instr, 11, 8)) // type
+		{
+		case 3:
+			tmp4 = 2; // regs
+			break;
+		case 8:
+			if (tmp3 == 3) und++;
+			tmp4 = 1;
+			break;
+		case 9:
+			if (tmp3 == 3) und++;
+			tmp4 = 1;
+			break;
+		}
+		tmp4 *= 16; // Rn advancement if not Rm
+		break;
+	case arm_vldste_vld3_mult:
+	case arm_vldste_vst3_mult:
+		if (bit(instr, 5)) und++; // align<1>
+		if (bitrng(instr, 7, 6) == 3) und++; // size
+		tmp4 = 24; // Rn advancement if not Rm
+		break;
+	case arm_vldste_vld4_mult:
+	case arm_vldste_vst4_mult:
+		if (bitrng(instr, 7, 6) == 3) und++; // size
+		tmp4 = 32; // Rn advancement if not Rm
+		break;
+	case arm_vldste_vld1_one:
+	case arm_vldste_vst1_one:
+		tmp3 = bitrng(instr, 7, 4); // index_align
+		// size == 3 => single element to all lanes
+		switch (bitrng(instr, 11, 10)) // size
+		{
+		case 0:
+			if (tmp3 & 1) und++;
+			tmp4 = 1; // Rn advancement if not Rm
+			break;
+		case 1:
+			if (tmp3 & 2) und++;
+			tmp4 = 2; // Rn advancement if not Rm
+			break;
+		case 2:
+			if (tmp3 & 4) und++;
+			if (((tmp3 & 3) == 1) || ((tmp3 & 3) == 2)) und++;
+			tmp4 = 4; // Rn advancement if not Rm
+			break;
+		}
+		break;
+	case arm_vldste_vld2_one:
+	case arm_vldste_vst2_one:
+		tmp3 = bitrng(instr, 7, 4); // index_align
+		// size == 3 => single element to all lanes
+		switch (bitrng(instr, 11, 10)) // size
+		{
+		case 0:
+			tmp4 = 1; // ebytes
+			break;
+		case 1:
+			tmp4 = 2;
+			break;
+		case 2:
+			if (tmp3 & 2) und++;
+			tmp4 = 4;
+			break;
+		}
+		tmp4 *= 2; // Rn advancement if not Rm (ebytes * 2)
+		break;
+	case arm_vldste_vld3_one:
+	case arm_vldste_vst3_one:
+		tmp3 = bitrng(instr, 7, 4); // index_align
+		// size == 3 => single element to all lanes
+		switch (bitrng(instr, 11, 10)) // size
+		{
+		case 0:
+			if (tmp3 & 1) und++;
+			tmp4 = 1; // ebytes
+			break;
+		case 1:
+			if (tmp3 & 1) und++;
+			tmp4 = 2;
+			break;
+		case 2:
+			if (tmp3 & 3) und++;
+			tmp4 = 4;
+			break;
+		}
+		tmp4 *= 3; // Rn advancement if not Rm (ebytes * 3)
+		break;
+	case arm_vldste_vld4_one:
+	case arm_vldste_vst4_one:
+		tmp3 = bitrng(instr, 7, 4); // index_align
+		// size == 3 => single element to all lanes
+		switch (bitrng(instr, 11, 10)) // size
+		{
+		case 0:
+			tmp4 = 1; // ebytes
+			break;
+		case 1:
+			tmp4 = 2;
+			break;
+		case 2:
+			if (tmp3 & 3) und++;
+			tmp4 = 4;
+			break;
+		}
+		tmp4 *= 4; // Rn advancement if not Rm (ebytes * 4)
+		break;
+	case arm_vldste_vld1_all:
+		tmp3 = bitrng(instr, 7, 6); // size
+		if (tmp3 == 3) und++;
+		if ((tmp3 == 0) &&  bit(instr, 4)) und++;
+		tmp4 = 1 << tmp3; // Rn advancement if not Rm (ebytes)
+		break;
+	case arm_vldste_vld2_all:
+		tmp3 = bitrng(instr, 7, 6); // size
+		if (tmp3 == 3) und++;
+		tmp4 = 1 << tmp3; // ebytes
+		tmp4 *= 2; // Rn advancement if not Rm (ebytes * 2)
+		break;
+	case arm_vldste_vld3_all:
+		tmp3 = bitrng(instr, 7, 6); // size
+		if ((tmp3 == 3) ||  bit(instr, 4)) und++;
+		tmp4 = 1 << tmp3; // ebytes
+		tmp4 *= 3; // Rn advancement if not Rm (ebytes * 3)
+		break;
+	case arm_vldste_vld4_all:
+		tmp3 = bitrng(instr, 7, 6); // size
+		if ((tmp3 == 3) && !bit(instr, 4)) und++;
+		if (tmp3 == 3) tmp3 = 4; // ebytes
+		else tmp4 = 1 << tmp3;
+		tmp4 *= 4; // Rn advancement if not Rm (ebytes * 4)
+		break;
+
+		if (tmp1 == 15) // Rn
+		{
+			unp++;
+			if (tmp2 == 15) // [<Rn>{:<align>}] => no writeback
+			{
+				retval = set_addr_lin();
+				break;
+			}
+			else if (tmp2 == 13) // [<Rn>{:<align>}]! => Rn += transfer size
+			{
+				tmp1 = rpi2_reg_context.reg.r15 + tmp4;
+				retval = set_arm_addr(tmp1);
+			}
+			else // [<Rn>{:<align>}], <Rm> => Rn += Rm
+			{
+				tmp4 = rpi2_reg_context.storage[tmp2];
+				tmp1 = rpi2_reg_context.reg.r15 + tmp4;
+				retval = set_arm_addr(tmp1);
+			}
+		}
+		else
+		{
+			retval = set_addr_lin();
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+	if (und) retval = set_undef_addr();
+	else if (unp) retval = set_unpred_addr(retval);
 	return retval;
 }
 
 instr_next_addr_t arm_vfp_ldst_ext(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int und = 0;
+	unsigned int unp = 0;
+/*
+arm_vldstx_vldm32
+arm_vldstx_vldm64
+arm_vldstx_vstm32
+arm_vldstx_vstm64
+arm_vldstx_vldr_d_imm
+arm_vldstx_vldr_s_imm
+arm_vldstx_vstr_d_imm
+arm_vldstx_vstr_s_imm
+arm_vldstx_vpop32
+arm_vldstx_vpop64
+arm_vldstx_vpush32
+arm_vldstx_vpush64
+*/
 	retval = set_undef_addr();
-
+	switch (extra)
+	{
+	case arm_vldstx_vldr_d_imm:
+	case arm_vldstx_vldr_s_imm:
+	case arm_vldstx_vstr_d_imm:
+	case arm_vldstx_vstr_s_imm:
+		// doesn't change the base register
+		retval = set_addr_lin();
+		break;
+	case arm_vldstx_vpop32:
+	case arm_vldstx_vpop64:
+	case arm_vldstx_vpush32:
+	case arm_vldstx_vpush64:
+		if ((instr & 0xff) == 0) unp++; // reglist = 0
+		// base register is always SP
+		retval = set_addr_lin();
+		break;
+	case arm_vldstx_vldm32:
+	case arm_vldstx_vldm64:
+	case arm_vldstx_vstm32:
+	case arm_vldstx_vstm64:
+		tmp3 = (0xd << 21); // mask for PUW-bits
+		tmp1 = bits(instr, tmp3); // PUW
+		if (bitrng(instr, 19, 16) == 15) // Rn == PC
+		{
+			tmp2 = bitrng(instr, 7, 0); // registers
+			// TODO: check FLDMX if vldm64/vstm64
+			tmp2 <<= 2;
+			tmp3 = rpi2_reg_context.reg.r15;
+			switch (tmp1)
+			{
+			case 2: // IA without writeback
+				tmp4 = tmp3;
+				break;
+			case 3: // IA with writeback
+				tmp4 = tmp3 + tmp2;
+				break;
+			case 5: // DB with writeback
+				tmp4 = tmp3 - tmp2;
+				break;
+			case 1:
+			case 7:
+				tmp4 = tmp3; // just in case...
+				und++;
+				break;
+			/*
+			case 0: 64-bit VMOV
+			case 4, 6: VLDR imm/VSTR imm
+			*/
+			}
+			retval = set_arm_addr(tmp4);
+		}
+		else
+		{
+			// PC not involved
+			if ((tmp1 == 1) || (tmp1 == 7)) und++;
+			retval = set_addr_lin();
+			break;
+		}
+		break;
+	}
+	if (und) retval = set_undef_addr();
+	else if (unp) retval = set_unpred_addr(retval);
 	return retval;
 }
 
 instr_next_addr_t arm_vfp_xfer_reg(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
+	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int und = 0;
+	unsigned int unp = 0;
+/*
+arm_vfpxfer_vmov_d
+arm_vfpxfer_vmov_ss
+arm_vfpxfer_vdup
+arm_vfpxfer_vmov_dt_dx
+arm_vfpxfer_vmov_dx
+arm_vfpxfer_vmov_s
+arm_vfpxfer_vmrs_fpscr
+arm_vfpxfer_vmrs_r
+arm_vfpxfer_vmsr_fpscr
+arm_vfpxfer_vmsr_r
+*/
 	retval = set_undef_addr();
 
+	asm volatile (
+			"vstmia.64 %[reg]!, {d0 - d15} @ read all regs\n\t"
+			"vstmia.64 %[reg], {d16 - d31} @ read all regs\n\t"
+			::[reg] "r" (&vregs):
+	);
+
+	switch (extra)
+	{
+	case arm_vfpxfer_vmov_d:
+	case arm_vfpxfer_vmov_ss:
+		// if bit 20 = 1: Neon -> arm else arm -> Neon
+		// ss:
+		// to_arm_registers = (op == 1); t = UInt(Rt); t2 = UInt(Rt2); m = UInt(Vm:M);
+		// if t == 15 || t2 == 15 || m == 31 then UNPREDICTABLE;
+		// if to_arm_registers && t == t2 then UNPREDICTABLE;
+		// d:
+		// to_arm_registers = (op == 1); t = UInt(Rt); t2 = UInt(Rt2); m = UInt(M:Vm);
+		// if t == 15 || t2 == 15 then UNPREDICTABLE;
+		// if to_arm_registers && t == t2 then UNPREDICTABLE;
+		tmp1 = bitrng(instr, 15, 12); // Rt
+		tmp2 = bitrng(instr, 19, 16); // Rt2
+		if (bit(instr, 20))
+		{
+			if (tmp1 == tmp2) unp++;
+		}
+		if (extra == arm_vfpxfer_vmov_ss)
+		{
+			tmp3 = (instr & 0xff) << 1;
+			tmp3 |= bit(instr, 5); // Neon-register
+			if (tmp3 == 31)
+			{
+				unp++;
+				tmp3 = 30;
+			}
+		}
+		else
+		{
+			tmp3 = (instr & 0xff);
+			tmp3 |= bit(instr, 5) << 4;	// Neon-register
+		}
+		if ((tmp1 == 15) && (tmp2 == 15))
+		{
+			unp++;
+			if (bit(instr, 20))
+			{
+				if (extra == arm_vfpxfer_vmov_ss)
+				{
+					// S[m+1] probably overwrites S[m]
+					tmp4 = vregs[tmp3+1];
+				}
+				else
+				{
+					// D[m]<63:32> probably overwrites D[m]<31:0>
+					tmp4 = vregs[tmp3*2+1];
+				}
+			}
+			else
+			{
+				// ARM -> Neon
+				retval = set_addr_lin();
+				break;
+			}
+		}
+		else if (tmp1 == 15)
+		{
+			unp++;
+			if (bit(instr, 20))
+			{
+				if (extra == arm_vfpxfer_vmov_ss)
+				{
+					// S[m+1] probably overwrites S[m]
+					tmp4 = vregs[tmp3];
+				}
+				else
+				{
+					// D[m]<63:32> probably overwrites D[m]<31:0>
+					tmp4 = vregs[tmp3*2];
+				}
+			}
+			else
+			{
+				// ARM -> Neon
+				retval = set_addr_lin();
+				break;
+			}
+		}
+		else if (tmp2 == 15)
+		{
+			unp++;
+			if (bit(instr, 20))
+			{
+				if (extra == arm_vfpxfer_vmov_ss)
+				{
+					// S[m+1] probably overwrites S[m]
+					tmp4 = vregs[tmp3+1];
+				}
+				else
+				{
+					// D[m]<63:32> probably overwrites D[m]<31:0>
+					tmp4 = vregs[tmp3*2+1];
+				}
+			}
+			else
+			{
+				// ARM -> Neon
+				retval = set_addr_lin();
+				break;
+			}
+		}
+		else
+		{
+			// PC not involved
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_vfpxfer_vmrs_fpscr:
+		// PC can't be involved: if Rt = 15, target is APSR_nzcv
+		retval = set_addr_lin();
+		break;
+	case arm_vfpxfer_vmsr_fpscr:
+		// if Rt == PC unp
+		if (bitrng(instr, 15, 12) == 15) unp++;
+		// ARM -> Neon
+		retval = set_addr_lin();
+		break;
+	case arm_vfpxfer_vmrs_r:
+		// if t == 15 && reg != '0001' then UNPREDICTABLE;
+		tmp1 = bitrng(instr, 15, 12); // Rt
+		if (tmp1 == 15) // PC
+		{
+			tmp2 = bitrng(instr, 19, 16); // reg
+			switch (tmp2)
+			{
+			case 0:
+				asm volatile(
+						"vmrs %[retreg], FPSID\n\t"
+						: [retreg] "=r" (tmp3)::
+				);
+				retval = set_arm_addr(tmp3);
+				retval = set_unpred_addr(retval);
+				break;
+			case 1:
+				asm volatile(
+						"vmrs %[retreg], FPSCR\n\t"
+						: [retreg] "=r" (tmp3)::
+				);
+				retval = set_arm_addr(tmp3);
+				break;
+			case 6:
+				asm volatile(
+						"vmrs %[retreg], MVFR1\n\t"
+						: [retreg] "=r" (tmp3)::
+				);
+				retval = set_arm_addr(tmp3);
+				retval = set_unpred_addr(retval);
+				break;
+			case 7:
+				asm volatile(
+						"vmrs %[retreg], MVFR0\n\t"
+						: [retreg] "=r" (tmp3)::
+				);
+				retval = set_arm_addr(tmp3);
+				retval = set_unpred_addr(retval);
+				break;
+			case 8:
+				asm volatile(
+						"vmrs %[retreg], FPEXC\n\t"
+						: [retreg] "=r" (tmp3)::
+				);
+				retval = set_arm_addr(tmp3);
+				retval = set_unpred_addr(retval);
+				break;
+			default:
+				retval = set_undef_addr();
+				break;
+			}
+		}
+		else
+		{
+			// PC not involved
+			retval = set_addr_lin();
+		}
+		break;
+	case arm_vfpxfer_vmsr_r:
+		// if Rt == PC unp
+		if (bitrng(instr, 15, 12) == 15) unp++;
+		// ARM -> Neon
+		retval = set_addr_lin();
+		break;
+	case arm_vfpxfer_vdup: // linear
+		// B=bit22, E=bit 5
+		if ((bit(instr, 22) == 1) && (bit(instr, 5) == 1)) und++;
+		// ARM -> Neon
+		retval = set_addr_lin();
+		break;
+	case arm_vfpxfer_vmov_dx: // linear
+		// opc1 = bits 22-21, opc2 = bits 6-5
+		if ((bit(instr, 22) == 0) && (bitrng(instr, 6, 5) == 2)) und++;
+		// ARM -> Neon
+		retval = set_addr_lin();
+	case arm_vfpxfer_vmov_dt_dx: // scalar to ARM
+		// Rt = 15, unp
+		tmp1 = bitrng(instr, 15, 12); // Rt
+		tmp2 = bitrng(instr, 22, 21); // opc1
+		tmp3 = bitrng(instr, 6, 5); // opc2
+		if (tmp2 & 2)
+		{
+			// esize = 8; index = UInt(opc1<0>:opc2);
+			tmp4 = (tmp2 & 1) << 2; // index
+			tmp4 |= tmp3;
+			tmp3 = bitrng(instr, 19, 16)*2; // Dn
+			// &vregs[Dn*2] points to beginning of the lower word of Dn
+			// it is used as an array of the 8-bytes of Dn
+			tmp3 = (unsigned int) ((unsigned char *) &vregs[tmp3])[tmp4];
+			if (bit(instr, 23)) // unsigned?
+			{
+				retval = set_arm_addr(tmp3);
+			}
+			else
+			{
+				tmp3 = (unsigned int)instr_util_signx_byte(tmp3);
+				retval = set_arm_addr(tmp3);
+			}
+
+		}
+		else
+		{
+			if (tmp3 & 1)
+			{
+				// esize = 16; index = UInt(opc1<0>:opc2<1>);
+				tmp4 = (tmp2 & 1) << 1; // index
+				tmp4 |= tmp3 >> 1;
+				tmp3 = bitrng(instr, 19, 16)*2; // Dn
+				// &vregs[Dn*2] points to beginning of the lower word of Dn
+				// it is used as an array of the 4-half-words of Dn
+				tmp3 = (unsigned int) ((unsigned short *) &vregs[tmp3])[tmp4];
+				if (bit(instr, 23)) // unsigned?
+				{
+					retval = set_arm_addr(tmp3);
+				}
+				else
+				{
+					tmp3 = (unsigned int)instr_util_signx_short(tmp3);
+					retval = set_arm_addr(tmp3);
+				}
+			}
+			else
+			{
+				if (tmp3 & 2)
+				{
+					und++;
+				}
+				else
+				{
+					if (bit(instr, 23)) // U
+					{
+						und++;
+					}
+					else
+					{
+						// esize = 32; index = UInt(opc1<0>);
+						tmp4 = (tmp2 & 1);
+						tmp3 = bitrng(instr, 19, 16)*2; // Dn
+						// &vregs[Dn*2] points to beginning of the lower word of Dn
+						// it is used as an array of the 2 words of Dn
+						tmp3 = (unsigned int) ((unsigned int *) &vregs[tmp3])[tmp4];
+						retval = set_arm_addr(tmp3);
+					}
+				}
+			}
+		}
+		if (und == 0)
+		{
+			if (tmp1 == 15) // PC
+			{
+				unp++;
+			}
+			else
+			{
+				// PC not involved
+				retval = set_addr_lin();
+			}
+		}
+		else
+		{
+			retval = set_undef_addr();
+		}
+		break;
+	case arm_vfpxfer_vmov_s: // ARM <-> Neon
+		if (bit(instr, 20)) // op
+		{
+			if (bitrng(instr, 15, 12) == 15) // PC
+			{
+				tmp1 = bitrng(instr, 19, 16); // Vn
+				tmp2 = vregs[tmp1];
+				retval = set_arm_addr(tmp2);
+			}
+			else
+			{
+				// PC not involved
+				retval = set_addr_lin();
+			}
+		}
+		else
+		{
+			// ARM -> Neon
+			retval = set_addr_lin();
+		}
+		break;
+	default:
+		retval = set_undef_addr();
+		break;
+	}
+
+	if (und) retval = set_undef_addr();
+	else if (unp) retval = set_unpred_addr(retval);
 	return retval;
 }

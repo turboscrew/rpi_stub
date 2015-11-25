@@ -1746,7 +1746,7 @@ void rpi2_dabt_handler()
 
 			"1:\n\t"
 	);
-#ifdef DEBUG_PDBT
+#ifdef DEBUG_DABT
 	// rpi2_dabt_handler2() // - No C in naked function
 	asm volatile (
 			"ldr r0, dabt_sp_store2\n\t"
@@ -3439,6 +3439,12 @@ void rpi2_init()
 		*((uint32_t *) (dbg_reg_base + 0xfb0)) = 0xC5ACCE55; // DBGLAR
 		SYNC;
 	}
+#if 0
+	rpi2_led_blink(100, 100, 5);
+	rpi2_delay_loop(1000);
+	rpi2_led_blink(1000, 1000, 2);
+	rpi2_delay_loop(5000);
+#endif
 
 	// double lock
 	asm volatile (
@@ -3446,6 +3452,13 @@ void rpi2_init()
 			"dsb\n\t"
 			: [retreg] "=r" (tmp1)::
 	);
+
+#if 0
+	rpi2_led_blink(100, 100, 5);
+	rpi2_delay_loop(1000);
+	rpi2_led_blink(1000, 1000, 3);
+	rpi2_delay_loop(5000);
+#endif
 
 	if (tmp1 & 1) // double lock on
 	{
@@ -3456,6 +3469,13 @@ void rpi2_init()
 		);
 		SYNC;
 	}
+
+#if 0
+	rpi2_led_blink(100, 100, 5);
+	rpi2_delay_loop(1000);
+	rpi2_led_blink(1000, 1000, 4);
+	rpi2_delay_loop(5000);
+#endif
 
 	// OS lock
 	asm volatile (
@@ -3480,6 +3500,12 @@ void rpi2_init()
 		);
 		SYNC;
 	}
+#if 0
+	rpi2_led_blink(100, 100, 5);
+	rpi2_delay_loop(1000);
+	rpi2_led_blink(1000, 1000, 5);
+	rpi2_delay_loop(5000);
+#endif
 
 	// enable fp & vectors (if possible)
 	asm volatile (
@@ -3518,6 +3544,12 @@ void rpi2_init()
 				:: [retreg] "r" (tmp1):
 		);
 	}
+#if 0
+	rpi2_led_blink(100, 100, 5);
+	rpi2_delay_loop(1000);
+	rpi2_led_blink(1000, 1000, 6);
+	rpi2_delay_loop(5000);
+#endif
 
 	cpsr_store = rpi2_disable_save_ints();
 	rpi2_set_vectors();

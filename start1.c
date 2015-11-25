@@ -46,12 +46,13 @@ void start1_fun(uint32_t R0, uint32_t R1, uint32_t R2)
 #endif
 	// rpi2_init_led(); already done in start.S
 #if 0
-	do
+	for (i=0; i<5; i++)
 	{
-		rpi2_led_blink(300, 1000, 3);
+		rpi2_led_blink(500, 500, 3);
 		rpi2_delay_loop(1000);
-		i++;
-	} while(i < 4);
+		rpi2_led_blink(1000, 1000, 2);
+		rpi2_delay_loop(5000);
+	}
 #endif
 	//rpi2_led_blink(1000, 100, 5);
 

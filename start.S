@@ -258,13 +258,13 @@ _Int_vectors:
 	ldr pc, jumptbl+28 @ FIRQ
 	jumptbl: @ 8 addresses
 	.word _start
-	.word gen_exc_4
-	.word gen_exc_0
-	.word gen_exc_4
-	.word gen_exc_8
+	.word gen_exc_4 @ undef
+	.word gen_exc_0 @ SVC
+	.word gen_exc_4 @ prefetch
+	.word gen_exc_8 @ data
 	.word _start @ not used
-	.word gen_exc_4
-	.word gen_exc_4
+	.word gen_exc_4 @ IRQ
+	.word gen_exc_4 @ FIQ
 
 	// dummy exception handlers
 gen_exc_0:
