@@ -22,8 +22,8 @@ ENTRY(_start)
 
 MEMORY
 {
-	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 1M /* initial */
-	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 1M /* runtime */
+	LOAD (rwx) : ORIGIN = 0x00008000, LENGTH = 512k /* initial */
+	EXEC (rwx) : ORIGIN = 0x1f000000, LENGTH = 512k /* runtime */
 }
 
 SECTIONS
