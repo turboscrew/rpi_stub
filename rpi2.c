@@ -1062,7 +1062,32 @@ void gdb_exception_handler()
 	{
 		rpi2_reg_context.storage[i] = ctx->storage[i];
 	}
-
+#ifdef RPI2_NEON_SUPPORTED
+	if (rpi2_neon_used)
+	{
+		// save Neon registers
+		// FPEXC, FPINST and FPINST2 must be read first
+		// TODO: add the upper half of the registers
+		asm volatile (
+				"push {r0, r1}\n\t"
+				"ldr r1, =rpi2_neon_context\n\t"
+				"add r1, #0x100 @ rpi2_neon_context.fpexc\n\t"
+				"vmrs r0, FPEXC\n\t"
+				"str r0, [r1] @ fpexc\n\t"
+#if 0
+				// not implemented in this chip
+				"vmrs r0, FPINST @ FPINST \n\t"
+				"str r0, [r1, #4]\n\t"
+				"vmrs r0, FPINST2 @ FPINST2 \n\t"
+				"str r0, [r1, #4]\n\t"
+#endif
+				"ldr r1, =rpi2_neon_context\n\t"
+				"vstmia.64 r1!, {d0 - d15}\n\t"
+				"@vstmia.64 r1, {d16 - d31}\n\t"
+				"pop {r0, r1}\n\t"
+		);
+	}
+#endif
 	if (rpi2_sigint_flag) rpi2_ctrl_c_flag = 0;
 
 	// interrupts need to be enabled for serial I/O?
@@ -1115,7 +1140,31 @@ void gdb_exception_handler()
 #endif
 
 	rpi2_trap_handler();
-
+#ifdef RPI2_NEON_SUPPORTED
+	if (rpi2_neon_used)
+	{
+		// restore Neon registers
+		// reg ==0b1001 for FPINST
+		// reg ==0b1010 for FPINST2
+		// TODO: add the upper half of the registers
+		asm volatile (
+				"push {r0, r1}\n\t"
+				"ldr r1, =rpi2_neon_context\n\t"
+				"vldmia.64 r1!, {d0 - d15}\n\t"
+				"@vldmia.64 r1!, {d16 - d31}\n\t"
+#if 0
+				// not implemented in this chip
+				"ldr r0, [r1, #8]\n\t"
+				"vmsr FPINST2, r0 @ FPINST2\n\t"
+				"ldr r0, [r1, #4]\n\t"
+				"vmsr FPINST, r0 @ FPINST\n\t"
+#endif
+				"ldr r0, [r1]\n\t"
+				"vmsr FPEXC, r0\n\t"
+				"pop {r0, r1}\n\t"
+		);
+	}
+#endif
 	if (rpi2_keep_ctrlc)
 	{
 		if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
@@ -2824,11 +2873,17 @@ void rpi2_check_debug()
 	{
 		if (((tmp2 >> 20) & 5) == 5) // PL1 access to cp10 and cp11 enabled
 		{
+			// read FPEXC, but make sure the existence of FPINST
+			// and FPINST2 shows in it
 			asm volatile (
-					"VMRS %[retreg], FPEXC @ get FPEXC\n\t"
+					"vmrs %[retreg], FPEXC @ get FPEXC\n\t"
+					"orr %[retreg], #0x90000000\n\t"
+					"vmsr FPEXC, %[retreg] @ set FPEXC.EX & FPEXC.FP2V\n\t"
+					"vmrs %[retreg], FPEXC @ get FPEXC\n\t"
 					"dsb\n\t"
 					: [retreg] "=r" (tmp3)::
 			);
+
 			serial_raw_puts(" FPEXC: ");
 			util_word_to_hex(scratchpad, tmp3);
 			serial_raw_puts(scratchpad);
@@ -2837,6 +2892,30 @@ void rpi2_check_debug()
 				serial_raw_puts("\r\nFP and SIMD");
 				serial_raw_puts(" enabled!");
 			}
+			asm volatile (
+					"VMRS %[retreg], FPSID\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp3)::
+			);
+			serial_raw_puts("\r\nFPSID: ");
+			util_word_to_hex(scratchpad, tmp3);
+			serial_raw_puts(scratchpad);
+			asm volatile (
+					"VMRS %[retreg], MVFR0\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp3)::
+			);
+			serial_raw_puts(" MVFR0: ");
+			util_word_to_hex(scratchpad, tmp3);
+			serial_raw_puts(scratchpad);
+			asm volatile (
+					"VMRS %[retreg], MVFR1\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp3)::
+			);
+			serial_raw_puts(" MVFR1: ");
+			util_word_to_hex(scratchpad, tmp3);
+			serial_raw_puts(scratchpad);
 		}
 		else
 		{
@@ -3385,6 +3464,16 @@ void rpi2_init()
 	rpi2_sigint_flag = 0;
 	rpi2_ctrl_c_flag = 0;
 	rpi2_dgb_enabled = 0; // disable use of gdb trap handler
+
+	// zero neon context
+	p = (uint32_t *)rpi2_neon_context.storage;
+	for (i=0; i<64; i++)
+	{
+		*(p++) = 0;
+	}
+	rpi2_neon_context.fpscr = 0;
+	rpi2_neon_context.fpexc = 0;
+
 	rpi2_debuggee_running = 0;
 	gdb_dyn_debug = 0;
 	rpi2_arm_ramsize = rpi2_get_arm_ram(&rpi2_arm_ramstart);
@@ -3439,12 +3528,6 @@ void rpi2_init()
 		*((uint32_t *) (dbg_reg_base + 0xfb0)) = 0xC5ACCE55; // DBGLAR
 		SYNC;
 	}
-#if 0
-	rpi2_led_blink(100, 100, 5);
-	rpi2_delay_loop(1000);
-	rpi2_led_blink(1000, 1000, 2);
-	rpi2_delay_loop(5000);
-#endif
 
 	// double lock
 	asm volatile (
@@ -3452,13 +3535,6 @@ void rpi2_init()
 			"dsb\n\t"
 			: [retreg] "=r" (tmp1)::
 	);
-
-#if 0
-	rpi2_led_blink(100, 100, 5);
-	rpi2_delay_loop(1000);
-	rpi2_led_blink(1000, 1000, 3);
-	rpi2_delay_loop(5000);
-#endif
 
 	if (tmp1 & 1) // double lock on
 	{
@@ -3469,13 +3545,6 @@ void rpi2_init()
 		);
 		SYNC;
 	}
-
-#if 0
-	rpi2_led_blink(100, 100, 5);
-	rpi2_delay_loop(1000);
-	rpi2_led_blink(1000, 1000, 4);
-	rpi2_delay_loop(5000);
-#endif
 
 	// OS lock
 	asm volatile (
@@ -3500,57 +3569,50 @@ void rpi2_init()
 		);
 		SYNC;
 	}
-#if 0
-	rpi2_led_blink(100, 100, 5);
-	rpi2_delay_loop(1000);
-	rpi2_led_blink(1000, 1000, 5);
-	rpi2_delay_loop(5000);
-#endif
 
-	// enable fp & vectors (if possible)
-	asm volatile (
-			"mrc p15, 0, %[retreg], c1, c1, 2 @ get NSACR\n\t"
-			"dsb\n\t"
-			: [retreg] "=r" (tmp1)::
-	);
-	if (((tmp1 >> 10) & 3) == 3) // unsecure cp10 and cp11 access enabled
+	if (rpi2_neon_enable)
 	{
-		// make sure cp10 and cp11 are accessible
+		// enable fp & vectors (if possible)
+		rpi2_neon_used = 0;
 		asm volatile (
-				"mrc p15, 0, %[retreg], c1, c0, 2 @ get CPACR\n\t"
+				"mrc p15, 0, %[retreg], c1, c1, 2 @ get NSACR\n\t"
 				"dsb\n\t"
 				: [retreg] "=r" (tmp1)::
 		);
-		tmp1 &=  ~(0xf0000000); // all fp/vect instructions allowed
-		tmp1 |= (0xf << 20); // set cp10/11 access conf bits
-		asm volatile (
-				"mcr p15, 0, %[retreg], c1, c0, 2 @ set CPACR\n\t"
-				"dsb\n\t"
-				"isb\n\t"
-				:: [retreg] "r" (tmp1):
-		);
-		// enable fp & vectors
-		asm volatile (
-				"vmrs %[retreg], FPEXC @ get FPEXC\n\t"
-				"dsb\n\t"
-				: [retreg] "=r" (tmp1)::
-		);
-		tmp1 &= ~(1 << 29); // clear exception flag
-		tmp1 |= (1 << 30); // enable fp & vectors
+		if (((tmp1 >> 10) & 3) == 3) // unsecure cp10 and cp11 access enabled
+		{
+			// make sure cp10 and cp11 are accessible
+			asm volatile (
+					"mrc p15, 0, %[retreg], c1, c0, 2 @ get CPACR\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp1)::
+			);
+			tmp1 &=  ~(0xf0000000); // all fp/vect instructions allowed
+			tmp1 |= (0xf << 20); // set cp10/11 access conf bits
+			asm volatile (
+					"mcr p15, 0, %[retreg], c1, c0, 2 @ set CPACR\n\t"
+					"dsb\n\t"
+					"isb\n\t"
+					:: [retreg] "r" (tmp1):
+			);
+			// enable fp & vectors
+			asm volatile (
+					"vmrs %[retreg], FPEXC @ get FPEXC\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp1)::
+			);
+			rpi2_neon_context.fpexc = tmp1;
+			tmp1 &= ~(1 << 29); // clear exception flag
+			tmp1 |= (1 << 30); // enable fp & vectors
 
-		asm volatile (
-				"vmsr FPEXC, %[retreg] @ set FPEXC\n\t"
-				"dsb\n\t"
-				:: [retreg] "r" (tmp1):
-		);
+			asm volatile (
+					"vmsr FPEXC, %[retreg] @ set FPEXC\n\t"
+					"dsb\n\t"
+					:: [retreg] "r" (tmp1):
+			);
+			rpi2_neon_used = 1;
+		}
 	}
-#if 0
-	rpi2_led_blink(100, 100, 5);
-	rpi2_delay_loop(1000);
-	rpi2_led_blink(1000, 1000, 6);
-	rpi2_delay_loop(5000);
-#endif
-
 	cpsr_store = rpi2_disable_save_ints();
 	rpi2_set_vectors();
 	if (rpi2_use_mmu)

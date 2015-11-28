@@ -95,10 +95,6 @@ ARM_dec_tbl_entry_t ARM_decode_table[] =
 #include "ARM_decode_table_data.h"
 };
 
-// Neon context
-//__attribute__ ((aligned (8))) unsigned int vregs[64];
-unsigned int vregs[64];
-
 // set next address for linear execution
 // the address is set to 0xffffffff and flag to INSTR_ADDR_ARM
 // that indicates the main ARM decoding function to set the address
@@ -5458,6 +5454,7 @@ instr_next_addr_t arm_vfp_xfer_reg(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int *ptmp;
 	unsigned int und = 0;
 	unsigned int unp = 0;
 /*
@@ -5473,12 +5470,6 @@ arm_vfpxfer_vmsr_fpscr
 arm_vfpxfer_vmsr_r
 */
 	retval = set_undef_addr();
-
-	asm volatile (
-			"vstmia.64 %[reg]!, {d0 - d15} @ read all regs\n\t"
-			"vstmia.64 %[reg], {d16 - d31} @ read all regs\n\t"
-			::[reg] "r" (&vregs):
-	);
 
 	switch (extra)
 	{
@@ -5522,12 +5513,12 @@ arm_vfpxfer_vmsr_r
 				if (extra == arm_vfpxfer_vmov_ss)
 				{
 					// S[m+1] probably overwrites S[m]
-					tmp4 = vregs[tmp3+1];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3+1];
 				}
 				else
 				{
 					// D[m]<63:32> probably overwrites D[m]<31:0>
-					tmp4 = vregs[tmp3*2+1];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3*2+1];
 				}
 			}
 			else
@@ -5545,12 +5536,12 @@ arm_vfpxfer_vmsr_r
 				if (extra == arm_vfpxfer_vmov_ss)
 				{
 					// S[m+1] probably overwrites S[m]
-					tmp4 = vregs[tmp3];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3];
 				}
 				else
 				{
 					// D[m]<63:32> probably overwrites D[m]<31:0>
-					tmp4 = vregs[tmp3*2];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3*2];
 				}
 			}
 			else
@@ -5568,12 +5559,12 @@ arm_vfpxfer_vmsr_r
 				if (extra == arm_vfpxfer_vmov_ss)
 				{
 					// S[m+1] probably overwrites S[m]
-					tmp4 = vregs[tmp3+1];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3+1];
 				}
 				else
 				{
 					// D[m]<63:32> probably overwrites D[m]<31:0>
-					tmp4 = vregs[tmp3*2+1];
+					tmp4 = ((unsigned int *)rpi2_neon_context.storage)[tmp3*2+1];
 				}
 			}
 			else
@@ -5685,9 +5676,11 @@ arm_vfpxfer_vmsr_r
 			tmp4 = (tmp2 & 1) << 2; // index
 			tmp4 |= tmp3;
 			tmp3 = bitrng(instr, 19, 16)*2; // Dn
-			// &vregs[Dn*2] points to beginning of the lower word of Dn
+			// &rpi2_neon_context.storage[Dn*2] points to beginning of
+			// the lower word of Dn
 			// it is used as an array of the 8-bytes of Dn
-			tmp3 = (unsigned int) ((unsigned char *) &vregs[tmp3])[tmp4];
+			ptmp = (unsigned int *)rpi2_neon_context.storage;
+			tmp3 = (unsigned int) ((unsigned char *) &(ptmp[tmp3]))[tmp4];
 			if (bit(instr, 23)) // unsigned?
 			{
 				retval = set_arm_addr(tmp3);
@@ -5707,9 +5700,11 @@ arm_vfpxfer_vmsr_r
 				tmp4 = (tmp2 & 1) << 1; // index
 				tmp4 |= tmp3 >> 1;
 				tmp3 = bitrng(instr, 19, 16)*2; // Dn
-				// &vregs[Dn*2] points to beginning of the lower word of Dn
-				// it is used as an array of the 4-half-words of Dn
-				tmp3 = (unsigned int) ((unsigned short *) &vregs[tmp3])[tmp4];
+				// &rpi2_neon_context.storage[Dn*2] points to beginning of
+				// the lower word of Dn
+				// it is used as an array of the 8-bytes of Dn
+				ptmp = (unsigned int *)rpi2_neon_context.storage;
+				tmp3 = (unsigned int) ((unsigned char *) &(ptmp[tmp3]))[tmp4];
 				if (bit(instr, 23)) // unsigned?
 				{
 					retval = set_arm_addr(tmp3);
@@ -5737,9 +5732,11 @@ arm_vfpxfer_vmsr_r
 						// esize = 32; index = UInt(opc1<0>);
 						tmp4 = (tmp2 & 1);
 						tmp3 = bitrng(instr, 19, 16)*2; // Dn
-						// &vregs[Dn*2] points to beginning of the lower word of Dn
-						// it is used as an array of the 2 words of Dn
-						tmp3 = (unsigned int) ((unsigned int *) &vregs[tmp3])[tmp4];
+						// &rpi2_neon_context.storage[Dn*2] points to beginning of
+						// the lower word of Dn it is used as an array of the
+						// 8-bytes of Dn
+						ptmp = (unsigned int *)rpi2_neon_context.storage;
+						tmp3 = (unsigned int) ((unsigned char *) &(ptmp[tmp3]))[tmp4];
 						retval = set_arm_addr(tmp3);
 					}
 				}
@@ -5768,7 +5765,7 @@ arm_vfpxfer_vmsr_r
 			if (bitrng(instr, 15, 12) == 15) // PC
 			{
 				tmp1 = bitrng(instr, 19, 16); // Vn
-				tmp2 = vregs[tmp1];
+				tmp2 = ((unsigned int *)rpi2_neon_context.storage)[tmp1];
 				retval = set_arm_addr(tmp2);
 			}
 			else

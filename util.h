@@ -38,11 +38,20 @@ unsigned char util_hex_to_byte(char *p);
 // convert upto 8 hex digits to unsigned int
 unsigned int util_hex_to_word(char *p);
 
+// convert upto 16 hex digits to unsigned long long
+unsigned long long util_hex_to_dword(char *p);
+
 // convert unsigned char to 2 hex digits
 void util_byte_to_hex(char *dst, unsigned char b);
 
 // convert unsigned int to 8 hex digits
 void util_word_to_hex(char *dst, unsigned int w);
+
+// convert unsigned int to (max) 10 decimal digits
+void util_word_to_dec(char *dst, unsigned int w);
+
+// convert unsigned long long to 16 hex digits
+void util_dword_to_hex(char *dst, unsigned long long dw);
 
 // convert"escaped" string used in gdb serial protocol to unsigned char
 int util_bin_to_byte(unsigned char *src, unsigned char *dst);
@@ -83,6 +92,9 @@ int util_read_dec(char *str, int *result);
 
 // converts a word endianness (swaps bytes)
 void util_swap_bytes(unsigned int *src, unsigned int *dst);
+
+// converts a double word endianness
+void util_swap_bytesd(unsigned long long *src, unsigned long long *dst);
 
 // number of bits needed to represent a value
 int util_num_bits(unsigned int val);

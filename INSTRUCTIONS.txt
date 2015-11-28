@@ -43,8 +43,6 @@ Limitations:
 - The stub runs in addresses 0x1f000000 upwards leaving the
   lower memory for the debuggee.
 - Floating point and vector registers are not supported (yet).
-  Floating point and SIMD HW (Neon) can be used, but the registers
-  are not visible on gdb.
 
 The stub supports:
 - Both hex and binary data transfer.

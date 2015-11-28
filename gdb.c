@@ -25,6 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "gdb.h"
 #include "instr.h"
 #include "log.h"
+#include "target_xml.h"
+
+#ifdef RPI2_NEON_SUPPORTED
+// tell stub to send architecture description xml
+#define GDB_FEATURE_XML
+#endif
 
 // 'reasons'-Events mapping (see below)
 // SIG_INT = ctrl-C
@@ -33,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // SIG_BUS = abort
 // SIG_USR1 = unhandled HW interrupt
 // SIG_USR2 = unhandled SW interrupt
-// SIG_STOP = Any reason without defined reason
+// SIG_STOP = Any undefined reason
 
 // 'reasons' for target halt
 #define SIG_INT  RPI2_REASON_SIGINT
@@ -51,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define GDB_MAX_WATCHPOINTS 4
 #define GDB_MAX_MSG_LEN 1024
 
-//extern void loader_main();
 extern volatile uint32_t rpi2_debuggee_running; // for debug
 
 // breakpoint
@@ -64,6 +69,11 @@ typedef struct {
 	int trap_kind;
 	int valid;	// 1=valid
 } gdb_trap_rec;
+
+#ifdef GDB_FEATURE_XML
+target_xml xml_desc;
+uint32_t gdb_xmlregs; // flag: whether neon regs are sent or not
+#endif
 
 // debug breakpoints set by user
 volatile gdb_trap_rec gdb_usr_breakpoint[GDB_MAX_BREAKPOINTS];
@@ -222,9 +232,6 @@ int gdb_check_watchpoint()
 		{
 			if (gdb_usr_watchpoint[i].size > 4)
 			{
-				LOG_PR_VAL("FAR: ", (unsigned int)(rpi2_dbg_rec.far));
-				LOG_PR_VAL_CONT(" mask: ", (unsigned int)(gdb_usr_watchpoint[i].mask));
-				LOG_PR_VAL_CONT(" val: ", (unsigned int)(gdb_usr_watchpoint[i].value));
 				if (rpi2_dbg_rec.far & gdb_usr_watchpoint[i].mask
 					== gdb_usr_watchpoint[i].value)
 				{
@@ -426,6 +433,13 @@ void gdb_init(io_device *device)
 	// flag: 0 = return to debuggee, 1 = stay in monitor
 	gdb_monitor_running = 0;
 	gdb_dyn_debug = 0;
+#ifdef GDB_FEATURE_XML
+	if (rpi2_neon_used)
+	{
+		gen_target(&xml_desc, arch_arm);
+		gdb_xmlregs = 0;
+	}
+#endif
 #ifdef DEBUG_GDB
 	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
 #endif
@@ -1350,11 +1364,11 @@ void gdb_cmd_cont(char *src, int len)
 // g
 void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 {
-	int len, i;
-	const int resp_buff_len = 512; // should be enough to hold 'g' response
-	static char resp_buff[512]; // response buff
-	const int tmp_buff_len = 256; // should be enough to hold 'g' response
-	static char tmp_buff[256]; // response buff
+	int len, i, regbytes;
+	//const int resp_buff_len = 512; // should be enough to hold 'g' response
+	//static char resp_buff[512]; // response buff
+	const int tmp_buff_len = 512; // should be enough to hold 'g' response
+	static char tmp_buff[512]; // response buff
 #if 0
 	char scratchpad[16]; // scratchpad
 #endif
@@ -1374,35 +1388,51 @@ void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 
 	if (packet_len >= 0)
 	{
-		// response for 'g' - regs r0 - r15 + cpsr
-#if 0
-		p1 = (char *)&(rpi2_reg_context.storage);
-		p2 = tmp_buff;
-		// regs reported
-		for (i=0; i<16; i++) // r0 - r15
-		{
-			util_swap_bytes(p1, p2);
-			p1 += 4;
-			p2 += 4;
-		}
-#else
+		// response for 'g' - regs r0 - r15
 		p1 = (uint32_t *)&(rpi2_reg_context.storage);
 		p2 = (uint32_t *)tmp_buff;
 		for (i=0; i<16; i++) // r0 - r15
 		{
 			*(p2++) = *(p1++);
 		}
+		regbytes = 16*4;
 
-#endif
-		//for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
+#ifdef RPI2_NEON_SUPPORTED
+		if (!gdb_xmlregs)
+		{
+			for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
+			{
+				*(p2++) = 0x90000009;
+			}
+			regbytes += 9*4;
+		}
+#else
 		for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
 		{
 			*(p2++) = 0x90000009;
+			regbytes += 9*4;
 		}
+#endif
 		// p1 = (char *)&(rpi2_reg_context.reg.cpsr);
 		// util_swap_bytes(p1, p2);
-		*p2 = rpi2_reg_context.reg.cpsr;
-		len = gdb_write_hex_data(tmp_buff, 4*26, resp_buff, resp_buff_len);
+		*(p2++) = rpi2_reg_context.reg.cpsr;
+		regbytes += 4;
+#ifdef RPI2_NEON_SUPPORTED
+		// Neon-registers (low word first)
+		if (gdb_xmlregs)
+		{
+			p1 = (uint32_t *)&rpi2_neon_context;
+			for(i=0; i<32*2; i++)
+			{
+				*(p2++) = *(p1++);
+			}
+			regbytes += 32*8;
+			*(p2++) = rpi2_neon_context.fpscr;
+			regbytes += 4;
+			//*p2 = '\0'; // just in case
+		}
+#endif
+		len = gdb_write_hex_data(tmp_buff, regbytes, (char *)gdb_tmp_packet, GDB_MAX_MSG_LEN);
 #if 0
 		util_word_to_hex(scratchpad, len);
 		gdb_iodev->put_string("\r\ng_cmd2: ", 10);
@@ -1411,7 +1441,7 @@ void gdb_cmd_get_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 		gdb_iodev->put_string(resp_buff, len);
 		gdb_iodev->put_string("\r\n", 3);
 #endif
-		gdb_send_packet(resp_buff, len); // two digits per byte
+		gdb_send_packet((char *)gdb_tmp_packet, len); // two digits per byte
 	}
 }
 
@@ -1420,22 +1450,21 @@ void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 {
 	int len, i;
 	char *resp_str = "OK";
-	const int resp_buff_len = 512; // should be enough to hold 'g' response
-	static char resp_buff[512]; // response buff
-	const int tmp_buff_len = 256; // should be enough to hold 'g' response
-	static char tmp_buff[256]; // response buff
+	//const int resp_buff_len = 512; // should be enough to hold 'g' response
+	//static char resp_buff[512]; // response buff
+	const int tmp_buff_len = 512; // should be enough to hold 'g' response
+	static char tmp_buff[512]; // response buff
 #if 0
 	char scratchpad[16]; // scratchpad
 #endif
-	//char *p1, *p2;
-	uint32_t *p1, *p2;
+	unsigned int *p1, *p2;
 
 	if (packet_len > 0)
 	{
 		gdb_read_hex_data((char *)gdb_in_packet, packet_len,
 				tmp_buff, tmp_buff_len);
-		p2 = (uint32_t *)tmp_buff;
-		p1 = (uint32_t *)&(rpi2_reg_context.storage);
+		p2 = (unsigned int *)tmp_buff;
+		p1 = (unsigned int *)&(rpi2_reg_context.storage);
 #if 0
 		util_word_to_hex(scratchpad, packet_len);
 		gdb_iodev->put_string("\r\nG_cmd: ", 10);
@@ -1444,23 +1473,80 @@ void gdb_cmd_set_regs(volatile uint8_t *gdb_in_packet, int packet_len)
 		gdb_iodev->put_string((char *)gdb_in_packet, 26*4);
 		gdb_iodev->put_string("\r\n", 3);
 #endif
+		len = 0;
 		// 17 regs
 		for (i=0; i<16; i++) // r0 - r15
 		{
-/*
-			util_swap_bytes(p2, p1);
-			p1 += 4;
-			p2 += 4;
-
-*/
 			*(p1++) = *(p2++);
+			len += 8;
+			if (len > packet_len)
+			{
+				gdb_send_packet("E00", util_str_len("E00"));
+				return;
+			}
 		}
-		// for (i=0; i<9*4; i++) // 8 x fp + fps (all dummy)
+
+#ifdef RPI2_NEON_SUPPORTED
+		if (!gdb_xmlregs)
+		{
+			if (len > packet_len)
+			{
+				gdb_send_packet("E00", util_str_len("E00"));
+				return;
+			}
+			for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
+			{
+				p2++;
+				len += 8;
+				if (len > packet_len)
+				{
+					gdb_send_packet("E00", util_str_len("E00"));
+					return;
+				}
+			}
+		}
+#else
 		for (i=16; i<25; i++) // 8 x fp + fps (all dummy)
 		{
 			p2++;
 		}
-		*p2 = (uint32_t)(rpi2_reg_context.reg.cpsr);
+#endif
+		if (len > packet_len)
+		{
+			gdb_send_packet("E00", util_str_len("E00"));
+			return;
+		}
+		rpi2_reg_context.reg.cpsr = *(p2++);
+		len += 8;
+
+#ifdef RPI2_NEON_SUPPORTED
+		// Neon-registers
+		if (gdb_xmlregs)
+		{
+			if (len > packet_len)
+			{
+				gdb_send_packet("E00", util_str_len("E00"));
+				return;
+			}
+			p1 = (unsigned int *)&rpi2_neon_context;
+			for(i=0; i<32*2; i++)
+			{
+				*(p1++) = *(p2++);
+				len += 8;
+				if (len > packet_len)
+				{
+					gdb_send_packet("E00", util_str_len("E00"));
+					return;
+				}
+			}
+			if (len > packet_len)
+			{
+				gdb_send_packet("E00", util_str_len("E00"));
+				return;
+			}
+			rpi2_neon_context.fpscr = *p2;
+		}
+#endif
 		// p2 = (char *)&(rpi2_reg_context.reg.cpsr);
 		// util_swap_bytes(p1, p2);
 		// send response
@@ -1547,12 +1633,13 @@ void gdb_cmd_write_mem_hex(volatile uint8_t *gdb_in_packet, int packet_len)
 void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 {
 	unsigned int value, tmp;
+	unsigned long long dvalue, dtmp;
 	uint32_t reg;
 	uint32_t *p;
 	char *cp;
 	char *err = "E00";
 	int len;
-	const int scratch_len = 16;
+	const int scratch_len = 32;
 	char scratchpad[scratch_len]; // scratchpad
 	if (packet_len > 0)
 	{
@@ -1582,6 +1669,30 @@ void gdb_cmd_read_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 			util_word_to_hex(scratchpad, tmp);
 			gdb_send_packet(scratchpad, util_str_len(scratchpad));
 		}
+#ifdef RPI2_NEON_SUPPORTED
+		else if (gdb_xmlregs)
+		{
+			if ((reg > 25) && (reg < 58))
+			{
+				reg -= 26; // gdb reg number -> storage item
+				dvalue = rpi2_neon_context.storage[reg];
+				util_swap_bytesd(&dvalue, &dtmp);
+				util_dword_to_hex(scratchpad, dtmp);
+				gdb_send_packet(scratchpad, util_str_len(scratchpad));
+			}
+			else if (reg == 58)
+			{
+				value = rpi2_neon_context.fpscr;
+				util_swap_bytes(&value, &tmp);
+				util_word_to_hex(scratchpad, tmp);
+				gdb_send_packet(scratchpad, util_str_len(scratchpad));
+			}
+			else
+			{
+				gdb_send_packet(err, util_str_len(err));
+			}
+		}
+#endif
 		else
 		{
 			gdb_send_packet(err, util_str_len(err));
@@ -1603,9 +1714,10 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 {
 	int len;
 	char *resp_str = "OK";
-	const int scratch_len = 16;
+	const int scratch_len = 32;
 	char scratchpad[scratch_len]; // scratchpad
 	unsigned int value, tmp;
+	unsigned long long dvalue, dtmp;
 	uint32_t reg;
 	uint32_t *p;
 	char *err = "E00";
@@ -1615,8 +1727,6 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 		reg = (uint32_t)util_hex_to_word(scratchpad);
 		gdb_in_packet += (len + 1);  // skip register number and '='
 		packet_len -= (len + 1);
-		tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
-		util_swap_bytes(&tmp, &value);
 #ifdef DEBUG_GDB
 		gdb_iodev->put_string((char *)gdb_in_packet, packet_len);
 		gdb_iodev->put_string("\r\nP_cmd: ", 10);
@@ -1635,10 +1745,13 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 #endif
 		if ((reg > 15) && (reg < 25))
 		{
-			// gdb_send_packet("OK", 2); // dummy fp-register
+			// dummy fp-register
 		}
 		else if (reg < 16)
 		{
+			tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
+			util_swap_bytes(&tmp, &value);
+
 			//util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
 			// p = (uint32_t *) &(rpi2_reg_context.storage);
 			// p[reg] = value;
@@ -1646,11 +1759,35 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 		}
 		else if (reg == 25) // cpsr
 		{
+			tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
+			util_swap_bytes(&tmp, &value);
 			//util_swap_bytes((unsigned char *)(&value), (unsigned char *)(&tmp));
 			// p = (uint32_t *) &(rpi2_reg_context.storage);
 			// p[reg] = value;
 			rpi2_reg_context.reg.cpsr = value;
 		}
+#ifdef RPI2_NEON_SUPPORTED
+		else if (gdb_xmlregs)
+		{
+			if ((reg > 25) && (reg < 58))
+			{
+				reg -= 26; // gdb reg number -> storage item
+				dtmp = util_hex_to_dword((char *)gdb_in_packet);
+				util_swap_bytesd(&dtmp, &dvalue);
+				rpi2_neon_context.storage[reg] = dvalue;
+			}
+			else if (reg == 58)
+			{
+				tmp = (uint32_t)util_hex_to_word((char *)gdb_in_packet);
+				util_swap_bytes(&tmp, &value);
+				rpi2_neon_context.fpscr = value;
+			}
+			else
+			{
+				gdb_send_packet(err, util_str_len(err));
+			}
+		}
+#endif
 		else
 		{
 			gdb_send_packet(err, util_str_len(err));
@@ -1758,12 +1895,14 @@ void gdb_cmd_set_thread(volatile uint8_t *gdb_packet, int packet_len)
 // then ad-hoc way to switch cores
 void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 {
-	int len;
+	int len, i;
 	int packlen = 0, params = 0;
 	char *msg;
 	char *packet;
+	char *p;
+	uint32_t tmp1, tmp2, tmp3;
 	const int scratch_len = 32;
-	const int resp_buff_len = 128; // should be enough to hold any response
+	const int resp_buff_len = 128; // should be enough to hold most responses
 	char scratchpad[scratch_len]; // scratchpad
 	char resp_buff[resp_buff_len]; // response buffer
 	// q name params
@@ -1811,8 +1950,8 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 					params++;
 					len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 					len = util_append_str(resp_buff + len, "=", resp_buff_len);
-					util_word_to_hex(resp_buff + len, 256);
-//					util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
+					//util_word_to_hex(resp_buff + len, 256);
+					util_word_to_hex(resp_buff + len, GDB_MAX_MSG_LEN);
 					len = util_str_len(resp_buff);
 				}
 				else if (util_str_cmp(scratchpad, "swbreak+") == 0)
@@ -1883,6 +2022,23 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 					len = util_str_len(resp_buff);
 					gdb_hwbreak = 0;
 				}
+				else if (util_cmp_substr(scratchpad, "xmlRegisters")
+						== util_str_len("xmlRegisters"))
+				{
+#ifdef GDB_FEATURE_XML
+					if (params)
+					{
+						len = util_append_str(resp_buff + len, ";", resp_buff_len);
+					}
+					params++;
+					if (rpi2_neon_used)
+					{
+						len = util_append_str(resp_buff, "qXfer:features:read+", resp_buff_len);
+						len = util_str_len(resp_buff);
+					}
+#endif
+					// else keep silent on this
+				}
 				else
 				{
 					/* unsupported feature */
@@ -1952,6 +2108,73 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 			len = util_str_copy(resp_buff, "OK", resp_buff_len);
 			gdb_send_packet(resp_buff, len);
 		}
+#ifdef GDB_FEATURE_XML
+		// qXfer:features:read:annex:offset,length (target.xml)
+		else if (util_str_cmp(scratchpad, "qXfer") == 0)
+		{
+			len = util_cmp_substr("features:read:", packet);
+			packet += len;
+			packet_len -= len;
+			if (len == util_str_len("features:read:"))
+			{
+				len = util_cpy_substr(scratchpad, packet, ':', scratch_len);
+				packet += len+1; // the read and delimiter
+				packet_len -= (len + 1);
+				if (util_str_cmp(scratchpad, "target.xml") == 0)
+				{
+					p = xml_desc.buff;
+					tmp3 = xml_desc.len;
+				}
+				else
+				{
+					p = (char *)0;
+					msg = "E00";
+					gdb_send_packet(msg, util_str_len(msg));
+					return;
+				}
+				len = util_cpy_substr(scratchpad, packet, ',', scratch_len);
+				packet += len+1; // skip the read and delimiter
+				packet_len -= (len+1);
+				tmp1 = (uint32_t)util_hex_to_word(scratchpad); // offset
+				tmp2 = (uint32_t)util_hex_to_word(packet); // length
+				// reply: description from offset upto length (bytes?)
+				if (tmp1 >= tmp3) // offset too big
+				{
+					gdb_send_packet("l", util_str_len("l"));
+					return;
+				}
+				// the response is written to gdb_out_packet, from there
+				// it's converted to binary in gdb_tmp_packet and from there
+				// it's written into a packet prepared in gdb_out_packet
+				msg = (char *)gdb_out_packet;
+				if (tmp1 + tmp2 >= tmp3) // last chunk
+				{
+					gdb_tmp_packet[0] = 'l';
+					tmp2 = tmp3 - tmp1;
+					gdb_xmlregs = 1; // last part - probably success
+				}
+				else
+				{
+					gdb_tmp_packet[0] = 'm';
+				}
+				p += tmp1;
+				for (i=0; i<tmp2; i++)
+				{
+					*(msg++) = *(p++);
+				}
+				*msg = '\0';
+				len = util_str_len((char *)gdb_out_packet);
+				len = gdb_write_bin_data((uint8_t *)gdb_out_packet, len,
+						(uint8_t *)(gdb_tmp_packet + 1),
+						 GDB_MAX_MSG_LEN - 6); // -6 to allow message overhead + 'm'/'l'
+				gdb_send_packet((char *)gdb_tmp_packet, len+1); // message + 'm'/'l'
+			}
+			else
+			{
+				gdb_response_not_supported();
+			}
+		}
+#endif
 		else
 		{
 			gdb_response_not_supported(); // for now

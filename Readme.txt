@@ -39,6 +39,15 @@ watchpoints are disabled. Default is 1.
 the debug HW present, and some settings, like whether or not FP and SIMD are enabled.
 To use this parameter, start with serial terminal instead of gdb, and after
 the info is printed, close the serial terminal and start gdb normally.
+'rpi_stub_enable_neon', if present, causes rpi_stub to try to enable Neon and support
+for xml description of Neon registers. It initializes Neon (if possible) and turns
+also the 'rpi_stub_use_neon'-option on.
+'rpi_stub_use_neon', if present, causes rpi_stub to believe that the debuggee
+enables the Neon and turns on support for xml target description. If used gdb version
+supports xml target descriptions the Neon registers can be seen with
+'info all-registers', and Neon registers can be read and written.
+NOTE: if debuggee fails to enable neon, rpi_stub probably crashes, because
+rpi_stub doesn't poll the Neon state before accessessing it.
 
 At the moment the main restrictions are:
 - Only ARM instruction set is supported

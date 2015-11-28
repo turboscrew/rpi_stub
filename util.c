@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "util.h"
 
+// TODO: harmonize the parameter order of functions
+
 // hex digit to 4-bit value (nibble)
 int util_hex_to_nib(char ch)
 {
@@ -52,10 +54,11 @@ int util_hex_to_nib(char ch)
 		break;
 	default:
 		val = (int)ch - (int)'0';
-	}
-	if ((val < 0) || (val > 15))
-	{
-		val = -1; // illegal hex
+		if ((val < 0) || (val > 9))
+		{
+			val = -1; // illegal hex
+		}
+		break;
 	}
 	return val;
 }
@@ -101,6 +104,24 @@ unsigned int util_hex_to_word(char *p)
 	return retval;
 }
 
+// convert upto 16 hex digits to unsigned long long
+unsigned long long util_hex_to_dword(char *p)
+{
+	int val;
+	int i;
+	unsigned long long retval = 0ULL;
+	for (i=0; i<16; i++)
+	{
+		val = util_hex_to_nib(*p);
+		if (val < 0) return retval;
+		retval <<= 4;
+		retval |= (val & 0x0f);
+		p++;
+	}
+	return retval;
+
+}
+
 // byte to hex
 void util_byte_to_hex(char *dst, unsigned char b)
 {
@@ -124,6 +145,63 @@ void util_word_to_hex(char *dst, unsigned int w)
 	util_byte_to_hex(dst, byte);
 	dst +=2;
 	byte = (unsigned char)(w & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	*dst = 0;
+}
+
+// convert unsigned int to (max) 10 decimal digits
+// not very clever algorithm, but fortunately not used often
+void util_word_to_dec(char *dst, unsigned int w)
+{
+	char dig_array[11];
+	int digval, i;
+
+	for (i=0; i<10; i++) dig_array[i] = '0';
+	dig_array[10] = '\0'; // end-null
+	i = 9; // index for the least significant digit
+	while (w > 0)
+	{
+		digval = w % 10;
+		w = w / 10;
+		dig_array[i--] = ((char)digval) + '0';
+	}
+	i = 0;
+	while (dig_array[i++] == '0'); // skip zeros in the beginning
+	// copy to dest
+	while (dig_array[i] != '\0')
+	{
+		*(dst++) = dig_array[i++];
+	}
+	*dst = '\0'; // end-null
+}
+
+// long long to hex
+void util_dword_to_hex(char *dst, unsigned long long dw)
+{
+	unsigned char byte;
+	byte = (unsigned char)((dw >> 56) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 48) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 40) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 32) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 24) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 16) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)((dw >> 8) & 0xff);
+	util_byte_to_hex(dst, byte);
+	dst +=2;
+	byte = (unsigned char)(dw & 0xff);
 	util_byte_to_hex(dst, byte);
 	dst +=2;
 	*dst = 0;
@@ -331,6 +409,22 @@ void util_swap_bytes(unsigned int *src, unsigned int *dst)
 	unsigned char *p1, *p2;
 	p1 = (unsigned char *)src;
 	p2 = (unsigned char *)dst;
+	*(p2++) = *(p1+3);
+	*(p2++) = *(p1+2);
+	*(p2++) = *(p1+1);
+	*p2 = *p1;
+}
+
+// converts a double word endianness
+void util_swap_bytesd(unsigned long long *src, unsigned long long *dst)
+{
+	unsigned char *p1, *p2;
+	p1 = (unsigned char *)src;
+	p2 = (unsigned char *)dst;
+	*(p2++) = *(p1+7);
+	*(p2++) = *(p1+6);
+	*(p2++) = *(p1+5);
+	*(p2++) = *(p1+4);
 	*(p2++) = *(p1+3);
 	*(p2++) = *(p1+2);
 	*(p2++) = *(p1+1);

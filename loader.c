@@ -36,7 +36,14 @@ extern volatile gdb_program_rec gdb_debuggee;
 
 // split in 'main' and 'loader_main', because GCC wants to
 // put 'main' into a special section - now 'loader_main' can
-// be relocated into upper memory more easily 
+// be relocated into upper memory more easily
+//
+// addition: the special section is only used with higher optimization
+// levels - to keep consistent, the special section use is explicitly
+// requested so that the program doesn't crash is compiled with lower
+// optimization levels.
+// void main(uint32_t r0, uint32_t r1, uint32_t r2) __attribute__ ((section (".text.startup")));
+
 void loader_main()
 {
 	int i;
@@ -123,6 +130,14 @@ void loader_main()
 		msg = " rpi2_use_hw_debug ";
 		serial_io.put_string(msg, util_str_len(msg));
 		util_word_to_hex(scratchpad, rpi2_use_hw_debug);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_use_neon ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_neon_used);
+		serial_io.put_string(scratchpad, 9);
+		msg = " rpi2_enable_neon ";
+		serial_io.put_string(msg, util_str_len(msg));
+		util_word_to_hex(scratchpad, rpi2_neon_enable);
 		serial_io.put_string(scratchpad, 9);
 		
 		serial_io.put_string("\r\n", 3);
@@ -299,6 +314,8 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	rpi2_uart0_baud = 115200;
 	rpi2_use_hw_debug = 1;
 	rpi2_print_dbg_info = 0;
+	rpi2_neon_used = 0;
+	rpi2_neon_enable = 0;
 	
 	rpi2_get_cmdline(cmdline);
 	
@@ -370,6 +387,22 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 					rpi2_print_dbg_info = 1;
 					// else ignore
 				}
+				else if (util_cmp_substr("use_neon", cmdline + i) >= util_str_len("use_neon"))
+				{
+					// rpi_stub_use_neon
+					i += util_str_len("use_neon");
+					rpi2_neon_used = 1;
+					// else ignore
+				}
+				else if (util_cmp_substr("enable_neon", cmdline + i) >= util_str_len("enable_neon"))
+				{
+					// rpi_stub_enable_neon
+					i += util_str_len("enable_neon");
+					rpi2_neon_enable = 1;
+					rpi2_neon_used = 1;
+					// else ignore
+				}
+				
 			}
 		}
 	}

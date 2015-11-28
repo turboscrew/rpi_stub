@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //#define RPI2_DEBUG_TIMER
 
+#define RPI2_NEON_SUPPORTED
 // The peripherals base address
 #define PERIPH_BASE 0x3f000000
 
@@ -223,6 +224,8 @@ extern volatile int exception_extra;
 extern unsigned int rpi2_arm_ramsize; // ARM ram in megs
 extern unsigned int rpi2_arm_ramstart; // ARM ram start address
 extern unsigned int rpi2_uart_clock;
+extern unsigned int rpi2_neon_used;
+extern unsigned int rpi2_neon_enable;
 
 // command line parameters
 extern unsigned int rpi2_keep_ctrlc; // ARM ram start address
@@ -260,6 +263,20 @@ typedef union reg_ctx {
 } rpi2_reg_context_t;
 
 extern volatile rpi2_reg_context_t rpi2_reg_context;
+
+typedef struct neon_ctx {
+	unsigned long long storage[32]; // 256 bytes
+	unsigned int fpscr;
+	// must be stored/restored, but not sent to gdb
+	unsigned int fpexc;
+#if 0
+	// not implemented in this chip
+	unsigned int fpinst;
+	unsigned int fpinst2;
+#endif
+} rpi2_neon_ctx_t;
+
+extern volatile __attribute__ ((aligned (8))) rpi2_neon_ctx_t rpi2_neon_context;
 
 unsigned int rpi2_disable_save_ints();
 void rpi2_restore_ints(unsigned int status);
