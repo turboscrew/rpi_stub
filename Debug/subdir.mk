@@ -14,6 +14,7 @@ C_SRCS += \
 ../rpi2.c \
 ../serial.c \
 ../start1.c \
+../target_xml.c \
 ../util.c 
 
 S_UPPER_SRCS += \
@@ -31,6 +32,7 @@ OBJS += \
 ./serial.o \
 ./start.o \
 ./start1.o \
+./target_xml.o \
 ./util.o 
 
 S_UPPER_DEPS += \
@@ -47,6 +49,7 @@ C_DEPS += \
 ./rpi2.d \
 ./serial.d \
 ./start1.d \
+./target_xml.d \
 ./util.d 
 
 

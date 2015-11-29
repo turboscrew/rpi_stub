@@ -237,25 +237,23 @@ void rpi2_enable_ints()
 
 /*
  * Exceptions are handled as follows:
- * First exception handler stores the processor context and fixes the return address.
- * PABT exception is checked for BKPT or real PABT. In case of BKPT, the
- * debugger is entered normally. Otherwise the debugger is entered as unhandled exception.
- * IRQ exception is checked whether it's a serial interrupt. If it is,
- * it's handled like a normal interrupt, otherwise the mode is set to the
- * debugger's and a jump to debugger is made.
- * Other exceptions are handled like non-serial interrupt.
+ * First exception handler stores the SP and switches to a stub stack.
+ * Then the registers are pushed into the stack. Then the exception handler
+ * checks if it's a stub's own exception. In case of stub'r own exception, the
+ * debugger is entered normally - the context is stored and the return address
+ * is fixed. Otherwise the debugger pops the registers, restores the SP and
+ * jumps to the lower vector.
+ *
+ * If the lower vector isn't taken by the debuggee, there is a jump to an unhandled
+ * exception handler that stores the processor context and enters debugger.
+ *
  * On return, the exception handler loads the processor context and returns from
  * the exception. No offset is added to the return address, so the return address
- * needs to be fixed at the entry.
- *
- * TODO: maybe the immediate part of BKPT-instruction can be easily used for
- * telling apart different ways to enter the debugger: ARM/Thumb, direct with
- * context save or unhandled interrupt with context already saved?
- * (exception -> handler, context save -> bkpt -> debugger)
+ * needs to be fixed at the entry. Otherwise, if the PC is changed in gdb, the
+ * return address would be wrong.
  *
  * BKPT is a bit dangerous, because the debugger LR may be destroyed by PABT.
  * (PABT is asynchronous exception to the same mode as BKPT - ABT)
- * For now, we keep PABT disabled.
  */
 
 /* A fixed vector table - copied to 0x0 */
@@ -355,6 +353,7 @@ void rpi2_set_upper_vectable()
 	);
 }
 
+// for debug
 void rpi2_dump_context(volatile rpi2_reg_context_t *context)
 {
 	char *pp;
@@ -858,6 +857,7 @@ static inline void naked_debug()
 }
 
 #if 0
+// for debug
 static inline void check_irq_stack()
 {
 	asm volatile (
@@ -1083,7 +1083,7 @@ void gdb_exception_handler()
 #endif
 				"ldr r1, =rpi2_neon_context\n\t"
 				"vstmia.64 r1!, {d0 - d15}\n\t"
-				"@vstmia.64 r1, {d16 - d31}\n\t"
+				"vstmia.64 r1, {d16 - d31}\n\t"
 				"pop {r0, r1}\n\t"
 		);
 	}
@@ -1146,12 +1146,11 @@ void gdb_exception_handler()
 		// restore Neon registers
 		// reg ==0b1001 for FPINST
 		// reg ==0b1010 for FPINST2
-		// TODO: add the upper half of the registers
 		asm volatile (
 				"push {r0, r1}\n\t"
 				"ldr r1, =rpi2_neon_context\n\t"
 				"vldmia.64 r1!, {d0 - d15}\n\t"
-				"@vldmia.64 r1!, {d16 - d31}\n\t"
+				"vldmia.64 r1!, {d16 - d31}\n\t"
 #if 0
 				// not implemented in this chip
 				"ldr r0, [r1, #8]\n\t"
@@ -3114,9 +3113,6 @@ void rpi2_check_debug()
 		serial_raw_puts(scratchpad);
 	}
 	serial_raw_puts("\r\n");
-
-	/* remember to check the lock: DBGLSR, DBGLAR */
-
 }
 
 unsigned int rpi2_get_clock(unsigned int clock_id)

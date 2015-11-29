@@ -436,8 +436,12 @@ void gdb_init(io_device *device)
 #ifdef GDB_FEATURE_XML
 	if (rpi2_neon_used)
 	{
+		xml_desc.len = 0;
 		gen_target(&xml_desc, arch_arm);
 		gdb_xmlregs = 0;
+		LOG_PR_VAL("desc buff: ", (unsigned int)(xml_desc.buff));
+		LOG_PR_VAL_CONT(" desc len: ", (unsigned int)(xml_desc.len));
+		LOG_NEWLINE();
 	}
 #endif
 #ifdef DEBUG_GDB
@@ -1066,6 +1070,7 @@ int gdb_send_packet(char *src, int count)
 	int checksum = 0;
 	int cnt = 0; // message byte count
 	int ch; // temporary for checksum handling
+	int wbc; // write bytecount
 	char *ptr = (char *) gdb_out_packet;
 #ifdef GDB_DEBUG_TX
 	int i, tmp;
@@ -1117,7 +1122,13 @@ int gdb_send_packet(char *src, int count)
 	}
 #endif
 	// send
-	gdb_iodev->write((char *)gdb_out_packet, cnt);
+	wbc = gdb_iodev->write((char *)gdb_out_packet, cnt);
+	// if all didn't fit, retry
+	while (wbc < cnt)
+	{
+		cnt -= wbc;
+		wbc = gdb_iodev->write(((char *)gdb_out_packet) + wbc, cnt);
+	}
 	return cnt;
 }
 
@@ -2062,6 +2073,7 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 				params++;
 				len = util_append_str(resp_buff, "PacketSize=", resp_buff_len);
 				util_word_to_hex(scratchpad, 256); // GDB_MAX_MSG_LEN / 4
+				//util_word_to_hex(scratchpad, GDB_MAX_MSG_LEN);
 				len = util_append_str(resp_buff, scratchpad, resp_buff_len);
 			}
 //#ifdef DEBUG_GDB
@@ -2123,7 +2135,7 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 				if (util_str_cmp(scratchpad, "target.xml") == 0)
 				{
 					p = xml_desc.buff;
-					tmp3 = xml_desc.len;
+					tmp3 = (uint32_t)(xml_desc.len);
 				}
 				else
 				{
@@ -2137,7 +2149,12 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 				packet_len -= (len+1);
 				tmp1 = (uint32_t)util_hex_to_word(scratchpad); // offset
 				tmp2 = (uint32_t)util_hex_to_word(packet); // length
+				LOG_PR_VAL("buff addr: ", (unsigned int)p);
+				LOG_PR_VAL_CONT("offs: ", tmp1);
+				LOG_PR_VAL_CONT("len: ", tmp2);
+				LOG_NEWLINE();
 				// reply: description from offset upto length (bytes?)
+				// tmp3 = descriptor length, tmp1 = offset, tmp2 = data length
 				if (tmp1 >= tmp3) // offset too big
 				{
 					gdb_send_packet("l", util_str_len("l"));
@@ -2163,6 +2180,8 @@ void gdb_cmd_common_query(volatile uint8_t *gdb_packet, int packet_len)
 					*(msg++) = *(p++);
 				}
 				*msg = '\0';
+				LOG_PR_STR_CONT((char *)gdb_out_packet);
+				LOG_NEWLINE();
 				len = util_str_len((char *)gdb_out_packet);
 				len = gdb_write_bin_data((uint8_t *)gdb_out_packet, len,
 						(uint8_t *)(gdb_tmp_packet + 1),

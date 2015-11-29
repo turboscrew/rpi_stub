@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "util.h"
+#include "log.h"
 
 // TODO: harmonize the parameter order of functions
 
@@ -167,7 +168,8 @@ void util_word_to_dec(char *dst, unsigned int w)
 		dig_array[i--] = ((char)digval) + '0';
 	}
 	i = 0;
-	while (dig_array[i++] == '0'); // skip zeros in the beginning
+	// skip leading zeros but leave the last digit
+	while ((dig_array[i] == '0') && (i < 9)) i++;
 	// copy to dest
 	while (dig_array[i] != '\0')
 	{
