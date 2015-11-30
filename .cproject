@@ -132,6 +132,12 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.512205672.565103665" name="gdb.c" rcbsApplicability="disable" resourcePath="gdb.c" toolsToInvoke="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761.28387666">
+						<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761.28387666" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.287127761">
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.asmlisting.64048449" name="Generate assembler listing (-Wa,-adhlns=&quot;$@.lst&quot;)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.asmlisting" value="false" valueType="boolean"/>
+							<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1798811181" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
+						</tool>
+					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>

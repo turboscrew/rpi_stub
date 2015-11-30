@@ -63,3 +63,31 @@ void log_pr_val(char *str, unsigned int val)
 	util_word_to_hex(scratch, val);
 	logdev->put_string(scratch, util_str_len(scratch));
 }
+
+// dump number of bytes from memory
+void log_dump_bytes(unsigned char *mem, int bytes)
+{
+	char scratch[83]; // just in case
+	int i, j;
+
+	j = 0;
+	for (i=0; i<bytes; i++)
+	{
+		util_byte_to_hex(scratch + j, mem[i]);
+		j += 2;
+		scratch[j++] = ' ';
+		if (j >= 80) // split long lines into 80 chars
+		{
+			scratch[j+1] = '\0';
+			logdev->put_string(scratch, util_str_len(scratch));
+			logdev->put_string("\r\n", 3);
+			j = 0;
+			scratch[j] = '\0';
+		}
+	}
+	if (j != 0)
+	{
+		logdev->put_string(scratch, util_str_len(scratch));
+		logdev->put_string("\r\n", 3);
+	}
+}

@@ -59,13 +59,21 @@ instr_next_addr_t next_address_arm(unsigned int address)
 
 	// if execution is linear, address = 0xffffffff is returned
 	// here we get the true address
-	if ((retval.flag == INSTR_ADDR_ARM) && (retval.address == 0xffffffff))
+	if ((retval.flag & INSTR_ADDR_ARM) && (retval.address == 0xffffffff))
 	{
 		// get next address for linear execution
 		// PABT leaves PC to point at the instruction that caused PABT,
 		// in our case BKPT. We have to skip that to reach the address
 		// after the BKPT (BKPT is replaced with the restored instruction).
 		retval.address = rpi2_reg_context.reg.r15 + 4;
+	}
+	else if ((retval.flag & INSTR_ADDR_THUMB) && (retval.address == 0xffffffff))
+	{
+		// get next address for linear execution
+		// PABT leaves PC to point at the instruction that caused PABT,
+		// in our case BKPT. We have to skip that to reach the address
+		// after the BKPT (BKPT is replaced with the restored instruction).
+		retval.address = rpi2_reg_context.reg.r15 + 2;
 	}
 
 	return retval;

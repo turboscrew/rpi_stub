@@ -1782,6 +1782,7 @@ void gdb_cmd_write_reg(volatile uint8_t *gdb_in_packet, int packet_len)
 		{
 			if ((reg > 25) && (reg < 58))
 			{
+				// regs are stored low word first
 				reg -= 26; // gdb reg number -> storage item
 				dtmp = util_hex_to_dword((char *)gdb_in_packet);
 				util_swap_bytesd(&dtmp, &dvalue);
@@ -2241,7 +2242,7 @@ void gdb_do_single_step(void)
 	next_addr = next_address(curr_addr);
 	if (next_addr.flag & (~INSTR_ADDR_UNPRED) == INSTR_ADDR_UNDEF)
 	{
-		LOG_PR_VAL("Next instr undef: ", *((uint32_t *)next_addr.address));
+		LOG_PR_VAL("Next instr undef: ", *((uint32_t *)curr_addr));
 		LOG_PR_VAL_CONT(" addr: ", next_addr.address);
 		LOG_NEWLINE();
 		// stop single stepping
@@ -2256,7 +2257,7 @@ void gdb_do_single_step(void)
 	}
 	else if (next_addr.flag & INSTR_ADDR_UNPRED)
 	{
-		LOG_PR_VAL("Next instr unpred: ", *((uint32_t *)next_addr.address));
+		LOG_PR_VAL("Next instr unpred: ", *((uint32_t *)curr_addr));
 		LOG_PR_VAL_CONT(" addr: ", next_addr.address);
 		LOG_NEWLINE();
 		// TODO: configuration - allow unpredictables
@@ -2384,7 +2385,7 @@ void gdb_cmd_special(volatile uint8_t *gdb_in_packet, int packet_len)
 	const int scratch_len = 16;
 	char scratchpad[scratch_len];
 	uint32_t tmp;
-	if (packet_len > 1)
+	if (packet_len > 0)
 	{
 		switch (*gdb_in_packet)
 		{
@@ -2394,6 +2395,14 @@ void gdb_cmd_special(volatile uint8_t *gdb_in_packet, int packet_len)
 			gdb_in_packet += len+1; // skip address and delimiter
 			tmp = util_hex_to_word((char *)gdb_in_packet);
 			gdb_dyn_debug = tmp;
+			gdb_send_packet("OK", util_str_len("OK"));
+			break;
+		case '1':
+			// Y1
+			// set d0 = 123
+			*((unsigned int *)&(rpi2_neon_context.storage[0])) = 0x0;
+			*(((unsigned int *)&(rpi2_neon_context.storage[0])) + 1) = 0x405ec000;
+			gdb_send_packet("OK", util_str_len("OK"));
 			break;
 		default:
 			gdb_response_not_supported();
@@ -2973,7 +2982,8 @@ void gdb_monitor(int reason)
 				gdb_cmd_read_mem_bin(++inpkg, --packet_len);
 				break;
 			case 'Y':	// specials
-				gdb_cmd_special(++inpkg, --packet_len);
+				//gdb_cmd_special(++inpkg, --packet_len);
+				gdb_response_not_supported();
 				break;
 			case 'Z':	// add Z0-breakpoint +
 				// Z1 - Z4 = HW breakpoints/watchpoints

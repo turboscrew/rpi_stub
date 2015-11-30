@@ -77,7 +77,7 @@ SECTIONS
 		__fiq_stack = .;
 		. = . + 512;	/* usr & sys stack size (common) */
 		__usrsys_stack = .;
-		. = . + 512;	/* svc stack size (start-up) */
+		. = . + 1024;	/* svc stack size (start-up) */
 		__svc_stack = .;
 		. = . + 1024;	/* irq stack size (serial) */
 		__irq_stack = .;

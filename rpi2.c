@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdint.h>
 #include "util.h"
+#include "rpi2.h"
 
 extern void serial_irq(); // this shouldn't be public, so it's not in serial.h
 extern int serial_raw_puts(char *str); // used for debugging
@@ -28,12 +29,6 @@ extern volatile uint32_t gdb_dyn_debug;
 extern char __hivec;
 // for logging via 'O'-packets
 extern void gdb_send_text_packet(char *msg, unsigned int msglen);
-// Another naughty trick - allocates
-// exception_info, exception_extra and rpi2_reg_context
-// This way definitions and extern-declarations don't clash
-#define extern
-#include "rpi2.h"
-#undef extern
 
 #define DEBUG_REG_CONTEXT
 
@@ -48,6 +43,28 @@ extern void gdb_send_text_packet(char *msg, unsigned int msglen);
 
 #define TRAP_INSTR_T 0xbe00
 #define TRAP_INSTR_A 0xe1200070
+
+// global stuff
+debug_exc_rec_t rpi2_dbg_rec;
+volatile int exception_info;
+volatile int exception_extra;
+unsigned int rpi2_arm_ramsize; // ARM ram in megs
+unsigned int rpi2_arm_ramstart; // ARM ram start address
+unsigned int rpi2_uart_clock;
+unsigned int rpi2_neon_used;
+unsigned int rpi2_neon_enable;
+
+// command line parameters
+unsigned int rpi2_keep_ctrlc; // ARM ram start address
+unsigned int rpi2_uart0_excmode;
+unsigned int rpi2_uart0_baud;
+unsigned int rpi2_use_mmu;
+unsigned int rpi2_use_hw_debug;
+unsigned int rpi2_print_dbg_info;
+
+volatile rpi2_reg_context_t rpi2_reg_context;
+volatile __attribute__ ((aligned (8))) rpi2_neon_ctx_t rpi2_neon_context;
+
 
 // for mailbox
 #define MBOX_BUFF_SIZE (1024 + 16)

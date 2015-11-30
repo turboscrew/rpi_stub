@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // stuff for debugging
 
-#define LOGGING_ON
+//#define LOGGING_ON
 
 #include "io_dev.h"
 
@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LOG_PR_VAL(x, y)
 #define LOG_PR_VAL_CONT(x, y)
 #define LOG_NEWLINE()
+#define LOG_DUMP_BYTES(x, y)
 
 #else
 
@@ -51,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define LOG_NEWLINE() log_pr_str("\r\n")
 
+#define LOG_DUMP_BYTES(x, y) log_dump_bytes((x),(y))
+
 #endif
 
 // initialize logging
@@ -61,5 +64,7 @@ void log_pr_head(const char *file, int line);
 void log_pr_str(char *str);
 // print an unsigned integer
 void log_pr_val(char *str, unsigned int val);
+// dump number of bytes from memory
+void log_dump_bytes(unsigned char *mem, int bytes);
 
 #endif /* LOG_H_ */

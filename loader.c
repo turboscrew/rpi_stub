@@ -42,7 +42,7 @@ extern volatile gdb_program_rec gdb_debuggee;
 // levels - to keep consistent, the special section use is explicitly
 // requested so that the program doesn't crash is compiled with lower
 // optimization levels.
-// void main(uint32_t r0, uint32_t r1, uint32_t r2) __attribute__ ((section (".text.startup")));
+void main(uint32_t r0, uint32_t r1, uint32_t r2) __attribute__ ((section (".text.startup")));
 
 void loader_main()
 {
@@ -58,9 +58,9 @@ void loader_main()
 	static char scratch2[16];
 
 #if 0
-		rpi2_led_blink(100, 100, 3);
+		rpi2_led_blink(500, 500, 3);
 		rpi2_delay_loop(1000);
-		rpi2_led_blink(1000, 1000, 2);
+		rpi2_led_blink(1000, 1000, 4);
 		rpi2_delay_loop(5000);
 #endif	
 
@@ -300,7 +300,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	int tmp;
 		
 #if 0
-	for(i=0; i<5; i++)
+	for(i=0; i<3; i++)
 	{
 		rpi2_led_blink(500, 500, 3);
 		rpi2_delay_loop(1000);
@@ -321,6 +321,7 @@ void main(uint32_t r0, uint32_t r1, uint32_t r2)
 	
 	for (i=0; i< 1024; i++)
 	{
+		if (cmdline[i] == '\0') break;
 		if (cmdline[i] == 'r')
 		{
 			if (util_cmp_substr("rpi_stub_", cmdline + i) >= util_str_len("rpi_stub_"))

@@ -46,7 +46,7 @@ void start1_fun(uint32_t R0, uint32_t R1, uint32_t R2)
 #endif
 	// rpi2_init_led(); already done in start.S
 #if 0
-	for (i=0; i<5; i++)
+	for (i=0; i<3; i++)
 	{
 		rpi2_led_blink(500, 500, 3);
 		rpi2_delay_loop(1000);

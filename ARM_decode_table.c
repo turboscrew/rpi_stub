@@ -4616,22 +4616,22 @@ instr_next_addr_t arm_core_status(unsigned int instr, ARM_decode_extra_t extra)
 		//   then UNPREDICTABLE;
 		// if (imod == '00' && M == '0') || imod == '01' then UNPREDICTABLE;
 
+		retval = set_addr_lin(); // in all cases
 		if (check_proc_mode(INSTR_PMODE_USR, 0, 0, 0))
 		{
-			retval = set_addr_lin(); // NOP
+			 // NOP
 			return retval;
 		}
+
 		tmp1 = bitrng(instr, 4, 0); // mode
 		if ((bit(instr, 17) == 0) && (tmp1 != 0))
 		{
-			retval = set_addr_lin();
 			retval = set_unpred_addr(retval);
 			return retval;
 		}
 		tmp2 = bitrng(instr, 19, 18); // imod
 		if ((tmp2 == 1) || ((tmp2 = 0) && (bit(instr, 17) == 0)))
 		{
-			retval = set_addr_lin();
 			retval = set_unpred_addr(retval);
 			return retval;
 		}
@@ -4639,7 +4639,6 @@ instr_next_addr_t arm_core_status(unsigned int instr, ARM_decode_extra_t extra)
 		{
 			if (bit(instr, 19))
 			{
-				retval = set_addr_lin();
 				retval = set_unpred_addr(retval);
 				return retval;
 			}
@@ -4648,62 +4647,63 @@ instr_next_addr_t arm_core_status(unsigned int instr, ARM_decode_extra_t extra)
 		{
 			if (!bit(instr, 19))
 			{
-				retval = set_addr_lin();
 				retval = set_unpred_addr(retval);
 				return retval;
 			}
 		}
 
-		retval = set_addr_lin();
-		switch (tmp1)
+		if (bit(instr, 17))
 		{
-		case INSTR_PMODE_MON:
+			switch (tmp1)
+			{
+			case INSTR_PMODE_MON:
 
-			if (!get_security_state())
-			{
-				unp++;
-			}
-			break;
-		case INSTR_PMODE_FIQ:
-			tmp2 = get_security_state();
-			tmp3 = get_NSACR();
-			if (bit(tmp3, 19) && (tmp2 == 0))
-			{
-				unp++;
-			}
-			break;
-		case INSTR_PMODE_HYP:
-			if (get_security_state() && (!check_proc_mode(INSTR_PMODE_MON, 0, 0, 0)))
-			{
-				unp++;
-			}
-			else if (check_proc_mode(INSTR_PMODE_MON, 0, 0, 0))
-			{
-				if((get_SCR() & 1) == 0)
+				if (!get_security_state())
 				{
 					unp++;
 				}
-			}
-			else
-			{
-				if (!check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+				break;
+			case INSTR_PMODE_FIQ:
+				tmp2 = get_security_state();
+				tmp3 = get_NSACR();
+				if (bit(tmp3, 19) && (tmp2 == 0))
 				{
 					unp++;
 				}
+				break;
+			case INSTR_PMODE_HYP:
+				if (get_security_state() && (!check_proc_mode(INSTR_PMODE_MON, 0, 0, 0)))
+				{
+					unp++;
+				}
+				else if (check_proc_mode(INSTR_PMODE_MON, 0, 0, 0))
+				{
+					if((get_SCR() & 1) == 0)
+					{
+						unp++;
+					}
+				}
+				else
+				{
+					if (!check_proc_mode(INSTR_PMODE_HYP, 0, 0, 0))
+					{
+						unp++;
+					}
+				}
+				break;
+			case INSTR_PMODE_IRQ:
+			case INSTR_PMODE_SVC:
+			case INSTR_PMODE_ABT:
+			case INSTR_PMODE_UND:
+			case INSTR_PMODE_SYS:
+				break;
+			default:
+				unp++;
+				break;
 			}
-			break;
-		case INSTR_PMODE_IRQ:
-		case INSTR_PMODE_SVC:
-		case INSTR_PMODE_ABT:
-		case INSTR_PMODE_UND:
-		case INSTR_PMODE_SYS:
-			break;
-		default:
-			unp++;
-			break;
 		}
 	}
-	else
+	else // MSR/MRS (banked reg)
 	{
 		proc_mode = get_proc_mode();
 		secure_state = get_security_state();
