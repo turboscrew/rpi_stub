@@ -64,10 +64,9 @@ At the moment the main restrictions are:
 - UART0 (the full UART) is reserved exclusively for the rpi_stub.
 - The breakpoints bkpt #0x7ffb to 0x7fff are reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
-- Watchpoints
 - Single-stepping works with newer gdb-versions that can do single-stepping,
   without stub support (using breakpoints), but rpi_stub single-stepping support
-  works too, at least to some extent (mostly untested).
+  works too, at least to some extent (still partly untested).
 	- If Neon instruction single-stepping doesn't work, try parameter 'rpi_stub_dbg_info' to find out why.
 
 Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
@@ -84,7 +83,7 @@ Roughly: rpi_stub supports:
 - Loading programs
 - Execution with 'cont' (not 'run')
 - SW breakpoints (64)
-- HW watchpoints (4) (see Limitations)
+- HW watchpoints (4) (see Limitations about possible problems)
 	- If watchpoints do not work, try parameter 'rpi_stub_dbg_info' to find out why.
 - Single-stepping (see Limitations)
 	- If Neon instructions don't work, try with command line parameter 'rpi_stub_dbg_info' to find out why.
