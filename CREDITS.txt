@@ -1,5 +1,5 @@
 Thanks for nickname 'rst' (@ www.raspberrypi.org/forums/) for sending me
 a special patch for circle sample 4 (https://github.com/rsta2/circle) to fit
 my needs for testing the exception handling of the stub.
-Thanks for 'rst' also for doing some testing and helping me to understand
+Thanks for 'rst' also for doing quite some testing and helping me to understand
 the mailbox between GPU and ARM.
