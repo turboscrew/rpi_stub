@@ -180,6 +180,10 @@ void rpi2_reroute_exc_aux() __attribute__ ((naked));
 void rpi2_reroute_exc_irq() __attribute__ ((naked));
 void rpi2_reroute_exc_fiq() __attribute__ ((naked));
 
+// processor context store/restore
+void write_context() __attribute__ ((naked));
+void read_context() __attribute__ ((naked));
+
 /* delay() borrowed from OSDev.org */
 static inline void delay(int32_t count)
 {
@@ -513,7 +517,7 @@ void rpi2_dump_context(volatile rpi2_reg_context_t *context)
 }
 
 // save processor context
-static inline void write_context()
+void write_context()
 {
 	// NOTE: mrs (banked regs) is unpredictable if accessing
 	// regs of our own mode
@@ -522,9 +526,10 @@ static inline void write_context()
 			"@ldr r12, =rpi2_reg_context\n\t"
 			"stmia r12, {r0 - r11}\n\t"
 			"mov r0, r12\n\t"
-			"pop {r12, lr}\n\t"
-			"str r12, [r0, #4*12]\n\t"
-
+			"pop {r1, r2}\n\t"
+			"str r1, [r0, #4*12] @ original R12\n\t"
+			"push {lr} @ our return address\n\t"
+			"mov lr, r2 @ the exception address\n\t"
 			"mrs r1, spsr\n\t"
 			"dsb\n\t"
 			"str r1, [r0, #4*16]\n\t"
@@ -641,18 +646,20 @@ static inline void write_context()
 			"str r1, [r0, #4*13]\n\t"
 			"str r2, [r0, #4*14]\n\t"
 			"str r3, [r0, #4*17]\n\t"
+			"pop {lr} @ our return address\n\t"
+			"bx lr\n\t"
 	);
 }
 
 // restore processor context
-static inline void read_context()
+void read_context()
 {
 	// NOTE: msr (banked regs) is unpredictable if accessing
 	// regs of our own mode
 	asm volatile(
 			"@ldr r0, =rpi2_reg_context\n\t"
 			"@ mode specifics\n\t"
-			"push {lr}\n\t"
+			"push {lr} @ our return address\n\t"
 			"ldr r1, [r0, #4*16] @ cpsr\n\t"
 			"msr spsr_fsxc, r1\n\t"
 			"dsb\n\t"
@@ -764,9 +771,10 @@ static inline void read_context()
 			"isb\n\t"
 			"ldr r2, [r0, #4*15] @ return address\n\t"
 			"ldr r1, [r0] @ r0-value\n\t"
-			"pop {lr}\n\t"
+			"pop {lr} @ our return address\n\t"
 			"push {r1, r2} @ prepare for return\n\t"
 			"ldmia r0, {r0 - r12}\n\t"
+			"bx lr\n\t"
 	);
 }
 
@@ -1083,7 +1091,6 @@ void gdb_exception_handler()
 	{
 		rpi2_reg_context.storage[i] = ctx->storage[i];
 	}
-	serial_raw_puts("\r\nGDB EXC\r\n");
 
 #ifdef RPI2_NEON_SUPPORTED
 	if (rpi2_neon_used) // (rpi2_neon_used && rpi2_neon_enable)
@@ -2650,7 +2657,6 @@ void rpi2_pabt_handler()
 			"sub lr, #4\n\t"
 			"pop {r0 - r12}\n\t"
 );
-
 	asm volatile (
 			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
@@ -2722,6 +2728,7 @@ void rpi2_gdb_trap()
 #ifdef DEBUG_EXCEPTIONS
 	serial_raw_puts("\r\ninit_trap\r\n");
 #endif
+
 	asm("bkpt #0x7ffd\n\t");
 }
 /* set BKPT to given address */

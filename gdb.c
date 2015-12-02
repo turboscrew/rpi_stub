@@ -443,15 +443,11 @@ void gdb_init(io_device *device)
 	{
 		xml_desc.len = 0;
 		gen_target(&xml_desc, arch_arm);
-		LOG_PR_VAL("desc buff: ", (unsigned int)(xml_desc.buff));
-		LOG_PR_VAL_CONT(" desc len: ", (unsigned int)(xml_desc.len));
-		LOG_NEWLINE();
 	}
 #endif
 #ifdef DEBUG_GDB
 	gdb_iodev->put_string("\r\ngdb_init\r\n", 13);
 #endif
-	return;
 }
 
 /* Clean-up after last session */
