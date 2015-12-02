@@ -80,6 +80,7 @@ uint32_t *iptr;
 void exec_instr(unsigned int instr, unsigned int r0, unsigned int r1,
 		unsigned int r2, unsigned int r3)
 {
+	(void) instr; // TODO: remove this
 	tmp1 = rpi2_reg_context.storage[r0]; // r0
 	tmp2 = rpi2_reg_context.storage[r1]; // r1
 	tmp3 = rpi2_reg_context.storage[r2]; // r2
@@ -116,11 +117,11 @@ unsigned int instr_comm_regret = 0;
 // reg is register number (16 = spsr)
 unsigned int get_mode_reg(unsigned int mode, unsigned int reg)
 {
-	unsigned int retval;
+	unsigned int retval = 0;
 	unsigned int *rd_ptr;
 	unsigned int tmp = 0x01000200;
-	unsigned int secure_mode = 0;
-	static unsigned int mode_store; // due to different SPs used
+	//unsigned int secure_mode = 0;
+	//static unsigned int mode_store; // due to different SPs used
 	instr_comm_regret = 0;
 
 	// 0x01000200 = mrs r1, r8_usr (R and M fields are zero)
@@ -324,7 +325,6 @@ inline unsigned int bitrng(unsigned int value, int hi, int lo)
 unsigned int bits(unsigned int value, unsigned int mask)
 {
 	unsigned int retval = 0;
-	unsigned int curr_bit = 0;
 	unsigned int tmp;
 	int i, j;
 
@@ -395,8 +395,8 @@ inline int sx32(unsigned int val, int hi, int lo)
 int will_branch(unsigned int instr)
 {
 	unsigned int flags;
-	if ((instr & 0xf0000000) == 0xf << 28) return 1; // NV / special
-	if ((instr & 0xf0000000) == 0xe << 28) return 1; // AL
+	if ((instr & 0xf0000000) == (0xf << 28)) return 1; // NV / special
+	if ((instr & 0xf0000000) == (0xe << 28)) return 1; // AL
 	// true conditional
 	flags = (rpi2_reg_context.reg.cpsr & 0xf0000000) >> 28; // flags
 	switch ((instr & 0xf0000000) >> 28) // condition

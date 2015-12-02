@@ -236,7 +236,7 @@ feature_t *feats_arm[] =
 arch_t arch_list[] =
 {
 	{arch_arm, "arm", feats_arm},
-	{arch_last, "", }
+	{arch_last, "", (feature_t **)0}
 };
 
 // print string in the target description buffer
@@ -382,8 +382,8 @@ void gen_target(target_xml *buf, arch_type_t arch)
 	LOG_PR_VAL("target_xml.buff: ", (unsigned int)(msg_buff->buff));
 	gen_target_header();
 	tgt_put("<target>");
-	gen_arch(arch_arm);
-	feature_list = get_features(arch_arm);
+	gen_arch(arch);
+	feature_list = get_features(arch);
 	i = 0;
 	while (feature_list[i] != ((feature_t *) 0))
 	{

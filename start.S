@@ -262,66 +262,137 @@ _Int_vectors:
 	.word gen_exc_0 @ SVC
 	.word gen_exc_4 @ prefetch
 	.word gen_exc_8 @ data
-	.word _start @ not used
+	.word gen_exc_0 @ aux
 	.word gen_exc_4 @ IRQ
 	.word gen_exc_4 @ FIQ
 
 	// dummy exception handlers
 gen_exc_0:
+	cpsid aif
+	mov r4, lr
 1:
-	ldr r0, =500 @ led on - half a second
-	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	ldr r0, =200 @ led on - half a second
+	ldr r1, =200 @ led off - half a second
+	mov r2, #5  @ 5 times
 	bl debug_blink
-	ldr r0, =1000 @ led on - 1 second
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	ldr r0, =500 @ led on - 1 second
 	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	mov r2, #2  @ times
 	bl debug_blink
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	mov r0, r4
+	bl blink_value
 	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 1b @ eternal loop
 
 gen_exc_2:
+	cpsid aif
+	mov r4, lr
 2:
-	ldr r0, =500 @ led on - half a second
-	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	ldr r0, =200 @ led on - half a second
+	ldr r1, =200 @ led off - half a second
+	mov r2, #5  @ 5 times
 	bl debug_blink
-	ldr r0, =8000 @ led on - 8 seconds
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	ldr r0, =500 @ led on - 1 second
 	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	mov r2, #3  @ times
 	bl debug_blink
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	mov r0, r4
+	bl blink_value
 	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 2b @ eternal loop
 
 gen_exc_4:
+	cpsid aif
+	mov r4, lr
 3:
-	ldr r0, =500 @ led on - half a second
-	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	ldr r0, =200 @ led on - half a second
+	ldr r1, =200 @ led off - half a second
+	mov r2, #5  @ 5 times
 	bl debug_blink
-	ldr r0, =2000 @ led on - 2 seconds
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	ldr r0, =500 @ led on - 1 second
 	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	mov r2, #4  @ times
 	bl debug_blink
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	mov r0, r4
+	bl blink_value
 	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 3b @ eternal loop
 
 gen_exc_8:
+	cpsid aif
+	mov r4, lr
 4:
-	ldr r0, =500 @ led on - half a second
-	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	ldr r0, =200 @ led on - half a second
+	ldr r1, =200 @ led off - half a second
+	mov r2, #5  @ 5 times
 	bl debug_blink
-	ldr r0, =4000 @ led on - 4 seconds
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	ldr r0, =500 @ led on - 1 second
 	ldr r1, =500 @ led off - half a second
-	mov r2, #3  @ 5 times
+	mov r2, #5  @ times
 	bl debug_blink
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	mov r0, r4
+	bl blink_value
 	ldr r3, =5000 @ 5 s pause
 	bl debug_wait
 	b 4b @ eternal loop
+
+@ 1 blink after "clock" = 0, 2 blinks = 1
+@ value in r0
+blink_value:
+	push {r2 - r12, lr}
+	mov r7, r0 @ value
+	mov r6, #32 @ bitcount
+
+bit_loop:
+	@ blink "clock"
+	ldr r0, =500 @ led on - half a second
+	ldr r1, =500 @ led off - half a second
+	mov r2, #1  @ once
+	bl debug_blink
+
+	lsls r7, #1
+	bcs signal_one
+signal_zero:
+	@ blink "data"
+	ldr r0, =200 @ led on
+	ldr r1, =300 @ led off
+	mov r2, #1  @ once
+	bl debug_blink
+	movw r3, #500
+	bl debug_wait
+	b next_bit
+signal_one:
+	ldr r0, =200 @ led on
+	ldr r1, =300 @ led off
+	mov r2, #2  @ twice
+	bl debug_blink
+next_bit:
+	ldr r3, =1000 @ 1 s pause
+	bl debug_wait
+	sub r6, #1
+	cmp r6, #0
+	bne bit_loop
+	pop {r2 - r12, lr}
+	blx lr
 
 init_debug_led:
 	mov r2, #150 @ delay count

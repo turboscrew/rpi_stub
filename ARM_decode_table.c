@@ -1212,9 +1212,9 @@ instr_next_addr_t arm_core_data_macd(unsigned int instr, ARM_decode_extra_t extr
 			// result is 64 bit value in RdHi and RdLo
 			utmp = (long long)(tmp1 * tmp2);
 			if (tmp3 == 15) // if PC is RdHi
-				tmp4 = (unsigned int)((ltmp >> 32) & 0xffffffff);
+				tmp4 = (unsigned int)((utmp >> 32) & 0xffffffff);
 			else // PC is RdLo
-				tmp4 = (unsigned int)(ltmp & 0xffffffff);
+				tmp4 = (unsigned int)(utmp & 0xffffffff);
 			break;
 		case arm_cmac_smlald:
 			// signed multiply upper and lower 16 bits (maybe Rm swapped)
@@ -1609,7 +1609,6 @@ instr_next_addr_t arm_core_data_pack(unsigned int instr, ARM_decode_extra_t extr
 {
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4, tmp5;
-	unsigned short htmp1, htmp2;
 	int stmp1, stmp2;
 
 	retval = set_undef_addr();
@@ -2749,7 +2748,6 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 	// TODO: add check for T-bit, return thumb address if set (CPSR)
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
-	int stmp1;
 
 	retval = set_undef_addr();
 
@@ -2921,7 +2919,7 @@ instr_next_addr_t arm_core_data_std_i(unsigned int instr, ARM_decode_extra_t ext
 instr_next_addr_t arm_core_exc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
-	unsigned int tmp1, tmp2, tmp3, tmp4;
+	unsigned int tmp1, tmp2, tmp3;
 
 	retval = set_undef_addr();
 
@@ -3139,6 +3137,8 @@ instr_next_addr_t arm_core_ldst(unsigned int instr, ARM_decode_extra_t extra)
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int stmp1; // for making '>>' to work like ASR
 	int unp = 0;
+
+	(void) extra;
 
 	retval = set_undef_addr();
 
@@ -3603,6 +3603,8 @@ instr_next_addr_t arm_core_ldstrd(unsigned int instr, ARM_decode_extra_t extra)
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int unp = 0; // unpredictable
 
+	(void) extra;
+
 	retval = set_undef_addr();
 
 	tmp1 = bitrng(instr, 19, 16); // Rn
@@ -3919,6 +3921,8 @@ instr_next_addr_t arm_core_ldstrh(unsigned int instr, ARM_decode_extra_t extra)
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int unp = 0;
 
+	(void) extra;
+
 	retval = set_undef_addr();
 
 	tmp1 = bitrng(instr, 15, 12); // Rt
@@ -4161,6 +4165,8 @@ instr_next_addr_t arm_core_ldstrsb(unsigned int instr, ARM_decode_extra_t extra)
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int unp = 0;
 
+	(void) extra;
+
 	retval = set_undef_addr();
 
 	tmp1 = bitrng(instr, 15, 12); // Rt
@@ -4347,6 +4353,8 @@ instr_next_addr_t arm_core_ldstsh(unsigned int instr, ARM_decode_extra_t extra)
 	instr_next_addr_t retval;
 	unsigned int tmp1, tmp2, tmp3, tmp4;
 	int unp = 0;
+
+	(void) extra;
 
 	retval = set_undef_addr();
 
@@ -5041,6 +5049,9 @@ arm_fp_vdiv
 arm_fp_vfnm
 
  */
+	(void) instr;
+	(void) extra;
+
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5060,7 +5071,8 @@ arm_vbits_veor
 arm_vbits_vmvn
 arm_vbits_vorn
  */
-	LOG_PR_STR("arm_v_bits");
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5085,6 +5097,8 @@ arm_vcmp_vcle_z
 arm_vcmp_vclt_z
 arm_vcmp_vtst
  */
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5093,6 +5107,8 @@ instr_next_addr_t arm_v_mac(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5101,6 +5117,8 @@ instr_next_addr_t arm_v_misc(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5109,6 +5127,8 @@ instr_next_addr_t arm_v_par(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }
@@ -5117,6 +5137,8 @@ instr_next_addr_t arm_v_shift(unsigned int instr, ARM_decode_extra_t extra)
 {
 	instr_next_addr_t retval;
 
+	(void) instr;
+	(void) extra;
 	retval = set_addr_lin();
 	return retval;
 }

@@ -132,7 +132,6 @@ void serial_init(io_device *device)
 	uint32_t cpsr_store;
 	uint32_t ibrd;
 	uint32_t fbrd;
-	char scratch[9];
 #if 0
 	for (tmp=0; tmp < 2; tmp++)
 	{
@@ -549,7 +548,7 @@ int serial_put_string(char *st, int n)
 			if (serial_write_char(*st) == -1)
 			{
 				retry++;
-				if (retry > 100) break;
+				if (retry > 10) break;
 				continue;
 				// break;
 			}
@@ -715,7 +714,6 @@ void serial_rx()
 {
 	uint32_t ch;
 	uint32_t uart0_fr;
-	char scratchpad[16];
 
 	SYNC;
 	// if buffer is full

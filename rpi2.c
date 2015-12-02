@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include "util.h"
 #include "rpi2.h"
+#include "log.h"
 
 extern void serial_irq(); // this shouldn't be public, so it's not in serial.h
 extern int serial_raw_puts(char *str); // used for debugging
@@ -29,6 +30,9 @@ extern volatile uint32_t gdb_dyn_debug;
 extern char __hivec;
 // for logging via 'O'-packets
 extern void gdb_send_text_packet(char *msg, unsigned int msglen);
+
+// don't use with optimization level less than 2
+//#define DEBUG_EXCEPTIONS
 
 #define DEBUG_REG_CONTEXT
 
@@ -514,11 +518,11 @@ static inline void write_context()
 	// NOTE: mrs (banked regs) is unpredictable if accessing
 	// regs of our own mode
 	asm volatile(
-			"@push {r12}\n\t"
+			"@push {r12, lr}\n\t"
 			"@ldr r12, =rpi2_reg_context\n\t"
 			"stmia r12, {r0 - r11}\n\t"
 			"mov r0, r12\n\t"
-			"pop {r12}\n\t"
+			"pop {r12, lr}\n\t"
 			"str r12, [r0, #4*12]\n\t"
 
 			"mrs r1, spsr\n\t"
@@ -648,7 +652,7 @@ static inline void read_context()
 	asm volatile(
 			"@ldr r0, =rpi2_reg_context\n\t"
 			"@ mode specifics\n\t"
-
+			"push {lr}\n\t"
 			"ldr r1, [r0, #4*16] @ cpsr\n\t"
 			"msr spsr_fsxc, r1\n\t"
 			"dsb\n\t"
@@ -760,9 +764,9 @@ static inline void read_context()
 			"isb\n\t"
 			"ldr r2, [r0, #4*15] @ return address\n\t"
 			"ldr r1, [r0] @ r0-value\n\t"
+			"pop {lr}\n\t"
 			"push {r1, r2} @ prepare for return\n\t"
 			"ldmia r0, {r0 - r12}\n\t"
-			"pop {r0, lr}\n\t"
 	);
 }
 
@@ -832,7 +836,6 @@ void rpi2_timer_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 // debug print for naked exception functions
 void naked_debug_2(uint32_t src, uint32_t link, uint32_t stack)
 {
-	int len;
 	char tmp[16];
 
 	if (rpi2_debuggee_running)
@@ -1036,9 +1039,10 @@ void gdb_exception_handler()
 {
 	volatile rpi2_reg_context_t *ctx;
 	int i;
-#ifdef DEBUG_GDB_EXC
-	uint32_t exc_cpsr;
 	uint32_t tmp;
+
+#ifdef DEBUG_GDB_EXC
+	//uint32_t exc_cpsr;
 	char *pp;
 	static char scratchpad[16]; // scratchpad
 #endif
@@ -1079,32 +1083,64 @@ void gdb_exception_handler()
 	{
 		rpi2_reg_context.storage[i] = ctx->storage[i];
 	}
+	serial_raw_puts("\r\nGDB EXC\r\n");
+
 #ifdef RPI2_NEON_SUPPORTED
-	if (rpi2_neon_used)
+	if (rpi2_neon_used) // (rpi2_neon_used && rpi2_neon_enable)
 	{
-		// save Neon registers
-		// FPEXC, FPINST and FPINST2 must be read first
-		// TODO: add the upper half of the registers
-		asm volatile (
-				"push {r0, r1}\n\t"
-				"ldr r1, =rpi2_neon_context\n\t"
-				"add r1, #0x100 @ rpi2_neon_context.fpexc\n\t"
-				"vmrs r0, FPEXC\n\t"
-				"str r0, [r1] @ fpexc\n\t"
-#if 0
-				// not implemented in this chip
-				"vmrs r0, FPINST @ FPINST \n\t"
-				"str r0, [r1, #4]\n\t"
-				"vmrs r0, FPINST2 @ FPINST2 \n\t"
-				"str r0, [r1, #4]\n\t"
-#endif
-				"ldr r1, =rpi2_neon_context\n\t"
-				"vstmia.64 r1!, {d0 - d15}\n\t"
-				"vstmia.64 r1, {d16 - d31}\n\t"
-				"pop {r0, r1}\n\t"
-		);
+		if (!rpi2_neon_enable)
+		{
+			// check if debuggee has enabled Neon
+			asm volatile (
+					"mrc p15, 0, %[retreg], c1, c1, 2 @ get NSACR\n\t"
+					"dsb\n\t"
+					: [retreg] "=r" (tmp)::
+			);
+			if (((tmp >> 10) & 3) == 3) // unsecure cp10 and cp11 access enabled
+			{
+				// make sure cp10 and cp11 are accessible
+				asm volatile (
+						"mrc p15, 0, %[retreg], c1, c0, 2 @ get CPACR\n\t"
+						"dsb\n\t"
+						: [retreg] "=r" (tmp)::
+				);
+
+				tmp &=  0xc0500000; // fp/vect instructions allowed
+				if (tmp == 0xc0500000)
+				{
+					rpi2_neon_enable = 1; // Neon enabled
+				}
+			}
+
+		}
+
+		if (rpi2_neon_enable)
+		{
+			// save Neon registers
+			// FPEXC, FPINST and FPINST2 must be read first
+			// TODO: add the upper half of the registers
+			asm volatile (
+					"push {r0, r1}\n\t"
+					"ldr r1, =rpi2_neon_context\n\t"
+					"add r1, #0x100 @ rpi2_neon_context.fpexc\n\t"
+					"vmrs r0, FPEXC\n\t"
+					"str r0, [r1] @ fpexc\n\t"
+	#if 0
+					// not implemented in this chip
+					"vmrs r0, FPINST @ FPINST \n\t"
+					"str r0, [r1, #4]\n\t"
+					"vmrs r0, FPINST2 @ FPINST2 \n\t"
+					"str r0, [r1, #4]\n\t"
+	#endif
+					"ldr r1, =rpi2_neon_context\n\t"
+					"vstmia.64 r1!, {d0 - d15}\n\t"
+					"vstmia.64 r1, {d16 - d31}\n\t"
+					"pop {r0, r1}\n\t"
+			);
+		}
 	}
 #endif
+
 	if (rpi2_sigint_flag) rpi2_ctrl_c_flag = 0;
 
 	// interrupts need to be enabled for serial I/O?
@@ -1157,8 +1193,9 @@ void gdb_exception_handler()
 #endif
 
 	rpi2_trap_handler();
+
 #ifdef RPI2_NEON_SUPPORTED
-	if (rpi2_neon_used)
+	if (rpi2_neon_used && rpi2_neon_enable)
 	{
 		// restore Neon registers
 		// reg ==0b1001 for FPINST
@@ -1181,6 +1218,7 @@ void gdb_exception_handler()
 		);
 	}
 #endif
+
 	if (rpi2_keep_ctrlc)
 	{
 		if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
@@ -1241,6 +1279,7 @@ void rpi2_gdb_exception()
 	read_context();
 
 	asm volatile (
+			"pop {r0, lr}\n\t"
 #ifdef DEBUG_GDB_EXC
 			"push {r0 - r4, lr}\n\t"
 			"mov r0, lr\n\t"
@@ -1276,7 +1315,7 @@ void rpi2_reset_handler()
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
 	write_context();
@@ -1324,6 +1363,8 @@ void rpi2_undef_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	static char scratchpad[16];
 	char *p;
 	int i;
+
+	(void) stack_frame_addr;
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -1363,7 +1404,7 @@ void rpi2_undef_handler()
 			"movw sp, #:lower16:__und_stack\n\t"
 			"movt sp, #:upper16:__und_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 			"sub lr, #4 @ on return, skip the instruction\n\t"
 	);
@@ -1461,7 +1502,7 @@ void rpi2_svc_handler()
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
 	write_context();
@@ -1561,7 +1602,7 @@ void rpi2_aux_handler()
 			"movw sp, #:lower16:__svc_stack\n\t"
 			"movt sp, #:upper16:__svc_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_svc_context\n\t"
 	);
 	write_context();
@@ -1621,6 +1662,7 @@ void rpi2_dabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	int i;
 	char *p;
 
+	(void) stack_frame_addr;
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -1671,7 +1713,7 @@ void rpi2_unhandled_dabt()
 			"movw sp, #:lower16:__abrt_stack\n\t"
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"sub lr, #8 @ fix return address\n\t"
 			"ldr r12, =rpi2_dabt_context\n\t"
 	);
@@ -1786,7 +1828,7 @@ void rpi2_dabt_handler()
 );
 
 	asm volatile (
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_dabt_context\n\t"
 	);
 	// store processor context
@@ -1852,12 +1894,13 @@ uint32_t rpi2_serial_handler(uint32_t stack_pointer, uint32_t exc_addr)
 {
 	uint32_t irq_status;
 	uint32_t retval;
+#ifdef SER_DEBUG
 	uint32_t exc_cpsr;
 	uint32_t tmp;
 	int i;
 	char *p;
 	static char scratchpad[16]; // scratchpad
-
+#endif
 	retval = 0; // default: goto low vector
 
 	if (rpi2_uart0_excmode == RPI2_UART0_FIQ)
@@ -1966,7 +2009,7 @@ void rpi2_unhandled_irq()
 			"movw sp, #:lower16:__irq_stack\n\t"
 			"movt sp, #:upper16:__irq_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_irq_context\n\t"
 			"sub lr, #4 @ fix return address\n\t"
 	);
@@ -2057,7 +2100,7 @@ void rpi2_irq_handler()
 			"isb\n\t"
 			"pop {r0 - r12}\n\t"
 			"sub lr, #4 @ fix return address\n\t"
-			"push {r12}\n\t"
+			"push {r12, lr}\n\t"
 			"ldr r12, =rpi2_irq_context\n\t"
 	);
 // store processor context
@@ -2102,7 +2145,7 @@ void rpi2_unhandled_fiq()
 			"movw sp, #:lower16:__fiq_stack\n\t"
 			"movt sp, #:upper16:__fiq_stack\n\t"
 			"dsb\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"sub lr, #4 @ fix return address\n\t"
 			"ldr r12, =rpi2_fiq_context\n\t"
 	);
@@ -2196,7 +2239,7 @@ void rpi2_fiq_handler()
 			"isb\n\t"
 			"pop {r0 - r12}\n\t"
 			"sub lr, #4 @ fix return address\n\t"
-			"push {r12}\n\t"
+			"push {r12, lr}\n\t"
 			"ldr r12, =rpi2_fiq_context\n\t"
 	);
 // store processor context
@@ -2255,16 +2298,17 @@ void rpi2_print_dbg(uint32_t xlr, uint32_t xcpsr, uint32_t xspsr)
 void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 {
 	int i;
-	uint32_t *p;
+	//uint32_t *p;
 	uint32_t exc_cpsr;
-	uint32_t dbg_state;
+	//uint32_t dbg_state;
 	uint32_t ifsr;
 	uint32_t our_lr;
-	volatile rpi2_reg_context_t *ctx;
-	uint32_t tmp;
+	//volatile rpi2_reg_context_t *ctx;
+	//uint32_t tmp;
 	char *pp;
 	static char scratchpad[16]; // scratchpad
 
+	(void) stack_frame_addr;
 	asm volatile
 	(
 			"mrs %[var_reg], spsr\n\t"
@@ -2304,16 +2348,16 @@ void rpi2_pabt_handler2(uint32_t stack_frame_addr, uint32_t exc_addr)
 	serial_raw_puts(" SPSR: ");
 	util_word_to_hex(scratchpad, exc_cpsr);
 	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\ndbgdscr: ");
-	util_word_to_hex(scratchpad, dbg_state);
-	serial_raw_puts(scratchpad);
+//	serial_raw_puts("\r\ndbgdscr: ");
+//	util_word_to_hex(scratchpad, dbg_state);
+//	serial_raw_puts(scratchpad);
 	serial_raw_puts(" IFSR: ");
 	util_word_to_hex(scratchpad, ifsr);
 	serial_raw_puts(scratchpad);
-	serial_raw_puts("\r\nctx: ");
-	util_word_to_hex(scratchpad, (unsigned int)ctx);
-	serial_raw_puts(scratchpad);
-	serial_raw_puts(" info: ");
+//	serial_raw_puts("\r\nctx: ");
+//	util_word_to_hex(scratchpad, (unsigned int)ctx);
+//	serial_raw_puts(scratchpad);
+	serial_raw_puts("\r\ninfo: ");
 	util_word_to_hex(scratchpad, (unsigned int)exception_info);
 	serial_raw_puts(scratchpad);
 	serial_raw_puts(" extra: ");
@@ -2422,7 +2466,7 @@ void rpi2_unhandled_pabt()
 			"movt sp, #:upper16:__abrt_stack\n\t"
 			"dsb\n\t"
 			"sub lr, #4 @ gdb wants fixed address\n\t"
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
 	);
 	// store processor context
@@ -2608,7 +2652,7 @@ void rpi2_pabt_handler()
 );
 
 	asm volatile (
-			"push {r12} @ popped in write_context\n\t"
+			"push {r12, lr} @ popped in write_context\n\t"
 			"ldr r12, =rpi2_pabt_context\n\t"
 	);
 	// store processor context
@@ -2685,7 +2729,9 @@ void rpi2_set_trap(void *address, int kind)
 {
 	uint16_t *location_t = (uint16_t *)address;
 	uint32_t *location_a = (uint32_t *)address;
+	unsigned int caller;
 
+	LOG_GET_CALLER(caller);
 	/* poke BKPT instruction */
 	if (kind == RPI2_TRAP_THUMB)
 	{
@@ -2695,6 +2741,10 @@ void rpi2_set_trap(void *address, int kind)
 	else
 	{
 #ifdef DEBUG_GDB_EXC
+		serial_raw_puts("\r\ncalled: ");
+		util_word_to_hex(dbg_tmp_buff, (unsigned int)caller);
+		serial_raw_puts(dbg_tmp_buff);
+
 		serial_raw_puts("\r\nbkpt at: ");
 		util_word_to_hex(dbg_tmp_buff, (unsigned int)location_a);
 		serial_raw_puts(dbg_tmp_buff);
@@ -2741,8 +2791,8 @@ void rpi2_set_watchpoint(unsigned int num, unsigned int addr, unsigned int contr
 	uint32_t dbgdscr;
 	SYNC;
 
-	volatile uint32_t *pval;
-	pval = (volatile uint32_t *)(dbg_reg_base + 0x088);
+	//volatile uint32_t *pval;
+	//pval = (volatile uint32_t *)(dbg_reg_base + 0x088);
 
 #if 1
 	// set debug monitor mode
@@ -3151,11 +3201,11 @@ unsigned int rpi2_get_clock(unsigned int clock_id)
 	request |= 8; // channel for property tags
 
 	SYNC;
-	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == (uint32_t)MBOX_STATUS_FULL);
 	*((volatile uint32_t *)MBOX1_WRITE) = request;
 	do {
 		SYNC;
-		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		while (*((volatile uint32_t *)MBOX0_STATUS) == (uint32_t)MBOX_STATUS_EMPTY);
 		response = *((volatile uint32_t *)MBOX0_READ);
 	} while ((response & 0xf) != 8);
 
@@ -3185,11 +3235,11 @@ unsigned int rpi2_get_arm_ram(unsigned int *start)
 	request |= 8; // channel for property tags
 
 	SYNC;
-	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == (uint32_t)MBOX_STATUS_FULL);
 	*((volatile uint32_t *)MBOX1_WRITE) = request;
 	do {
 		SYNC;
-		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		while (*((volatile uint32_t *)MBOX0_STATUS) == (uint32_t)MBOX_STATUS_EMPTY);
 		response = *((volatile uint32_t *)MBOX0_READ);
 	} while ((response & 0xf) != 8);
 
@@ -3202,7 +3252,7 @@ unsigned int rpi2_get_arm_ram(unsigned int *start)
 
 void rpi2_get_cmdline(char *line)
 {
-	int i;
+	uint32_t i;
 	uint32_t request, response, linelen;
 	request_response_t *arm_mem_req = (request_response_t *)rpi2_mbox_buff;
 	arm_mem_req->buff_size = sizeof(rpi2_mbox_buff);
@@ -3217,11 +3267,11 @@ void rpi2_get_cmdline(char *line)
 	request &= ((~0) << 4);
 	request |= 8; // channel for property tags
 	SYNC;
-	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == MBOX_STATUS_FULL);
+	while ( (*((volatile uint32_t *)MBOX0_STATUS)) == (uint32_t)MBOX_STATUS_FULL);
 	*((volatile uint32_t *)MBOX1_WRITE) = request;
 	do {
 		SYNC;
-		while (*((volatile uint32_t *)MBOX0_STATUS) == MBOX_STATUS_EMPTY);
+		while (*((volatile uint32_t *)MBOX0_STATUS) == (uint32_t)MBOX_STATUS_EMPTY);
 		response = *((volatile uint32_t *)MBOX0_READ);
 	} while ((response & 0xf) != 8);
 
@@ -3706,7 +3756,7 @@ void rpi2_led_on()
 
 void rpi2_delay_loop(unsigned int delay_ms)
 {
-	int i,j;
+	//int i,j;
 #if 1
 	uint32_t tm_start, tm_curr, tm_period, tm_delay;
 	volatile uint32_t *tmr;
@@ -3741,7 +3791,7 @@ void rpi2_delay_loop(unsigned int delay_ms)
 
 void rpi2_led_blink(unsigned int on_ms, unsigned int off_ms, unsigned int count)
 {
-	uint32_t i,j;
+	uint32_t i;
 
 	for (i=0; i<count; i++)
 	{

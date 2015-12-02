@@ -126,7 +126,6 @@ unsigned long long util_hex_to_dword(char *p)
 // byte to hex
 void util_byte_to_hex(char *dst, unsigned char b)
 {
-	char ch;
 	*(dst++) = util_nib_to_hex((int) ((b >> 4) & 0x0f));
 	*(dst++) = util_nib_to_hex((int) (b & 0x0f));
 	*dst = 0;
@@ -369,7 +368,10 @@ int util_read_dec(char *str, int *result)
 {
 	int neg = 0; // flag - if the number is negative
 	int tmp, i=0;
-	long long tmp2;
+	// couldn't use long long because with -O0 and -mfpu=neon-vfpv4
+	// gcc generates Neon instructions, and Neon isn't enabled yet
+	// when this is called the first time
+	long tmp2;
 
 	*result = 0;
 
@@ -379,7 +381,7 @@ int util_read_dec(char *str, int *result)
 		str++;
 		i++;
 	}
-	tmp2 = 0LL;
+	tmp2 = 0L;
 	while (*str != '\0')
 	{
 		tmp = (int)(*str) - (int)'0';
@@ -390,7 +392,7 @@ int util_read_dec(char *str, int *result)
 		else
 		{
 			tmp2 *= 10;
-			tmp2 += (long long)tmp;
+			tmp2 += (long)tmp;
 			if (tmp2 > 0x7fffffff) break; // integer overflow
 			str++;
 			i++;

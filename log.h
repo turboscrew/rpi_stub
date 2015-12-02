@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // stuff for debugging
 
-//#define LOGGING_ON
+#define LOGGING_ON
 
 #include "io_dev.h"
 
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LOG_PR_VAL_CONT(x, y)
 #define LOG_NEWLINE()
 #define LOG_DUMP_BYTES(x, y)
+#define LOG_WHERE_CALLED()
 
 #else
 
@@ -53,6 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LOG_NEWLINE() log_pr_str("\r\n")
 
 #define LOG_DUMP_BYTES(x, y) log_dump_bytes((x),(y))
+
+#define LOG_GET_CALLER(x) asm volatile("mov %[reg], lr\n\t" :[reg] "=r" (x)::)
 
 #endif
 
