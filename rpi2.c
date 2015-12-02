@@ -1113,7 +1113,7 @@ void gdb_exception_handler()
 				);
 
 				tmp &=  0xc0500000; // fp/vect instructions allowed
-				if (tmp == 0xc0500000)
+				if (tmp == 0x00500000)
 				{
 					rpi2_neon_enable = 1; // Neon enabled
 				}
