@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // stuff for debugging
 
-#define LOGGING_ON
+//#define LOGGING_ON
 
 #include "io_dev.h"
 
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LOG_PR_VAL_CONT(x, y)
 #define LOG_NEWLINE()
 #define LOG_DUMP_BYTES(x, y)
-#define LOG_WHERE_CALLED()
+#define LOG_GET_CALLER(x)
 
 #else
 
