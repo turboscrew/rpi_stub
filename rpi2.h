@@ -225,6 +225,7 @@ extern unsigned int rpi2_arm_ramstart; // ARM ram start address
 extern unsigned int rpi2_uart_clock;
 extern unsigned int rpi2_neon_used;
 extern unsigned int rpi2_neon_enable;
+extern unsigned int rpi2_debug_leds;
 
 // command line parameters
 extern unsigned int rpi2_keep_ctrlc; // ARM ram start address

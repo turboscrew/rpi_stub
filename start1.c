@@ -34,7 +34,9 @@ extern char __code_begin;
 
 void start1_fun(uint32_t R0, uint32_t R1, uint32_t R2)
 {
-	// uint32_t i = 0;
+#if 0
+	uint32_t i = 0;
+#endif
 #ifdef DO_RELOC_HERE
 	char *s, *d;
 	s = &__load_start;

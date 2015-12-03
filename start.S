@@ -17,6 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+//#define ENABLE_DEBUG_LEDS
 
 .extern __code_begin
 .extern __load_start
@@ -31,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 .extern __abrt_stack
 .extern __new_org
 .extern start1_fun
-.extern dbg_print
+.extern rpi2_debug_leds
 .globl _start
 .globl debug_blink
 .globl debug_wait
@@ -73,7 +74,12 @@ r2_store:
 codecopy:
 	cpsid aif
 	ldr r13, =__svc_stack @ our stack (at startup)
-	bl init_debug_led @ for start-up debugging
+#ifdef ENABLE_DEBUG_LEDS
+	bl init_debug_led
+#else
+	bl disable_debug_led
+#endif
+
 #if 0
 	ldr r0, =1000 @ led on - a second
 	ldr r1, =1000 @ led off - a second
@@ -394,6 +400,12 @@ next_bit:
 	pop {r2 - r12, lr}
 	blx lr
 
+disable_debug_led:
+	ldr r3, =rpi2_debug_leds
+	mov r2, #0
+	str r2,[r3]
+	bx lr
+
 init_debug_led:
 	mov r2, #150 @ delay count
 	mov r3, #150 @ delay count
@@ -429,6 +441,9 @@ init_debug_led:
 	orr r3, r2
 	str r3, [r6, #0x10] @ write GPFSEL4
 	dsb
+	ldr r3, =rpi2_debug_leds
+	mov r2, #1
+	str r2,[r3]
 	bx lr
 
 systmr_wait:
@@ -482,6 +497,7 @@ loop5$:
 
 debug_blink: @ r0=on, r1=off, r2=count, 0x1000 ~ 1s
 	push {r0, r1, r6, r7, r8, r9, r10, lr}
+#ifdef ENABLE_DEBUG_LEDS
 	ldr r6, =0x8000 @ 1 << 15
 	@mov r7, #0
 	@movt r7, #0x3f20
@@ -497,7 +513,7 @@ loop6$:
 	bl debug_wait1
 	subs r2, #1
 	bne loop6$
-
+#endif
 	pop {r0, r1, r6, r7, r8, r9, r10, lr}
 	bx lr
 

@@ -57,6 +57,7 @@ unsigned int rpi2_arm_ramstart; // ARM ram start address
 unsigned int rpi2_uart_clock;
 unsigned int rpi2_neon_used;
 unsigned int rpi2_neon_enable;
+unsigned int rpi2_debug_leds;
 
 // command line parameters
 unsigned int rpi2_keep_ctrlc; // ARM ram start address
@@ -3705,6 +3706,7 @@ void rpi2_init()
 #if 0
 /*
  * for restart situations - maybe
+ * currently done in start.S for boot debugging
  */
 
 void rpi2_init_led()
@@ -3753,12 +3755,18 @@ void rpi2_init_led()
 
 void rpi2_led_off()
 {
-	*((volatile uint32_t *)GPIO_CLRREG1) = (1<<15);
+	if (rpi2_debug_leds)
+	{
+		*((volatile uint32_t *)GPIO_CLRREG1) = (1<<15);
+	}
 }
 
 void rpi2_led_on()
 {
-	*((volatile uint32_t *)GPIO_SETREG1) = (1 << 15);
+	if (rpi2_debug_leds)
+	{
+		*((volatile uint32_t *)GPIO_SETREG1) = (1 << 15);
+	}
 }
 
 void rpi2_delay_loop(unsigned int delay_ms)
