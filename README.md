@@ -4,7 +4,6 @@ Copyright (C) 2015 Juha Aaltonen
 # BARE METAL STANDALONE GDB STUB
 ## for Raspberry Pi 2B
 
-**WORK IN PROGRESS!**
 
 ### Description
 The rpi_stub is a bare metal standalone gdb server/stub/agent/whatchacallit to aid in remote debugging of bare metal programs using gdb via serial cable. It boots from the SD-card and runs without any additional programs.
