@@ -92,6 +92,7 @@ The rpi_stub can be compiled using the makefile in the 'Debug' subdirectory
 - Boot the Raspberry Pi with the SD card containing the image.
 - Start the gdb on the debugging host
 - In gdb, give the commands:
+```
 	set architecture arm # if you use gdb-multiarch
 	set serial baud 115200
 	target remote /dev/ttyUSB0 # or which ever serial device you use
@@ -106,28 +107,33 @@ The rpi_stub can be compiled using the makefile in the 'Debug' subdirectory
 	info register # look at the registers
 	detach # to stop debugging, leave the debuggee running
 	quit # to quit gdb
-
+```
 # USING DDD:
 
 You can also use ddd:
 - create a text file (say, "script.gdb") in the directory where your .elf
   of your program is.
 - put the following lines in the file:
-
+```
 set architecture arm # if you use gdb-multiarch. It doesn't harm with other gdbs either
 set serial baud 115200
 target remote /dev/ttyUSB0 # or which ever serial device you use
-
+```
 - start ddd in the directory where the .elf and the script file is with command:
+```
 ddd --debugger "arm-none-eabi-gdb -x script.gdb" # or which ever gdb you have
+```
 
 - If ddd refuses to start, delete the ddd-sessions directory:
+```
 rm -rf ~/.ddd
+```
 
 You can also put the loading into the gdb-script by adding:
+```
 	file my_program.elf # select the program to debug (reads symbols etc.)
 	load my_program.elf # load your program onto RPi 2B
-
+```
 	
 
 
