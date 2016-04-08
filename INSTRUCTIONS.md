@@ -108,6 +108,22 @@ The rpi_stub can be compiled using the makefile in the 'Debug' subdirectory
 	detach # to stop debugging, leave the debuggee running
 	quit # to quit gdb
 ```
+- You can also put lines
+```
+	set architecture arm # if you use gdb-multiarch
+	set serial baud 115200
+	target remote /dev/ttyUSB0 # or which ever serial device you use
+	file my_program/Debug/my_program.elf # select the program to debug
+	load my_program/Debug/my_program.elf # load your program
+	break main # set breakpoint to the function 'main' in your program
+```
+  in a command file, say, startup.txt in the directory where the .elf is,
+  and after starting gdb, give command
+```
+source startup.txt
+```
+  and continue manually from 'cont'
+  
 # USING DDD:
 
 You can also use ddd:

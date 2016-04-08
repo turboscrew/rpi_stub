@@ -9,6 +9,10 @@ Copyright (C) 2015 Juha Aaltonen
 The rpi_stub is a bare metal standalone gdb server/stub/agent/whatchacallit to aid in remote debugging of bare metal programs using gdb via serial cable. It boots from the SD-card and runs without any additional programs.
 Firmware (boot files) of Oct 11 2015 or later is recommended.
 
+There is a rumor that rpi_stub also works with Raspberry Pi 3. In Raspberry Pi 3
+strictly ordered memory is needed for communicating with gpu using property mailbox.
+For that purpose one such memory block of 1 MB is added. See 'supported features'.
+
 The bare metal program to be debugged is loaded on Raspberry Pi 2B using
 gdb's 'load'-command (see the INSTRUCTIONS.txt), and then run with gdb's
 'cont'-command. You can break a runaway program with ctrl-C.
@@ -61,17 +65,12 @@ At the moment the main restrictions are:
 	- All gdb versions don't support Neon registers nor xml target descriptions. In that case the Neon registers are not available for reading/writing.
 - Only single core supported
 - UART0 (the full UART) is reserved exclusively for the rpi_stub.
-- The breakpoints bkpt #0x7ffb to 0x7fff are reserved exclusively for the stub.
+- The breakpoints bkpt #0x7ffa to 0x7fff are reserved exclusively for the stub.
 - The double vectoring adds exception latency, especially for IRQ.
 - Single-stepping works with newer gdb-versions that can do single-stepping,
   without stub support (using breakpoints), but rpi_stub single-stepping support
   works too, at least to some extent (still partly untested).
 	- If Neon instruction single-stepping doesn't work, try parameter 'rpi_stub_dbg_info' to find out why.
-
-Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
-The pointer to the string needs to be in r0.
-Breakpoint #0x7ffc sends a null-terminated string and #0x7ffb needs the length
-to be in r1.
 
 ### Supported Features
 I could list the gdb serial protocol commands that rpi_stub supports,
@@ -92,6 +91,17 @@ Roughly: rpi_stub supports:
 - Reading and writing memory
 - Stopping with ctrl-C
 - Through-gdb logging
+- Currently one 1 MB block of strictly ordered memory
+
+Breakpoint #0x7ffc and #0x7ffb can be used for sending messages to gdb client.
+The pointer to the string needs to be in r0.
+Breakpoint #0x7ffc sends a null-terminated string and #0x7ffb needs the length
+to be in r1.
+
+Breakpoint #0x7ffa is used for querying information from rpi_stub. The query ID
+needs to be in r0 and possible parameter in r1. For now only one query is implemented.
+Query ID 1, no parameters - returns the strictly ordered memory block start address in r0 and
+its byte length in r1.
 
 About mmu, caches and UART0 configuration (including interrupt), check
 the command line parameters.
