@@ -54,10 +54,15 @@ volatile int exception_info;
 volatile int exception_extra;
 unsigned int rpi2_arm_ramsize; // ARM ram in megs
 unsigned int rpi2_arm_ramstart; // ARM ram start address
+unsigned int rpi2_strict_start; // strictly ordered ram start address
+unsigned int rpi2_strict_size;
 unsigned int rpi2_uart_clock;
 unsigned int rpi2_neon_used;
 unsigned int rpi2_neon_enable;
 unsigned int rpi2_debug_leds;
+
+// query variable
+unsigned int rpi2_query_vars[3];
 
 // command line parameters
 unsigned int rpi2_keep_ctrlc; // ARM ram start address
@@ -101,6 +106,11 @@ typedef struct
 // for now
 #define MMU_SECT_ATTR_NORMAL 0x00090c0a
 #define MMU_SECT_ATTR_DEV 0x00090c06
+#define MMU_SECT_ATTR_ORD 0x00090c02
+
+// One segment of strictly ordered RAM to support
+// RPi 3 property mailbox use - and maybe something else
+#define MMU_STRICT_RAM_SECTS 1
 
 // TTBCR_N:
 // if N = 0, TTBR0 maps all addresses and the table size is 16 kB
@@ -941,6 +951,22 @@ void rpi2_gdb_log(char *ptr, uint32_t size, uint32_t fun)
 	gdb_send_text_packet(ptr, (unsigned int) len);
 }
 
+// 'query syscall'
+// uses rpi2_query_vars for parameter and result passing
+void rpi2_gdb_query()
+{
+	switch (rpi2_query_vars[0])
+	{
+		case RPI2_QUERY_ORDMEM:
+			// return start address and length of the
+			// strictly ordered memory region
+			rpi2_query_vars[0] = rpi2_strict_start;
+			rpi2_query_vars[1] = rpi2_strict_size;
+			break;
+		default:
+			break;
+	}
+}
 // common trap handler outside exception handlers
 void rpi2_trap_handler()
 {
@@ -2560,7 +2586,6 @@ void rpi2_unhandled_pabt()
 	);
 }
 
-
 void rpi2_pabt_handler()
 {
 #ifdef DEBUG_EXCEPTIONS
@@ -2610,16 +2635,21 @@ void rpi2_pabt_handler()
 			"cmp r1, r0\n\t"
 			"moveq r3, #1 @ RPI2_TRAP_ARM\n\t"
 			"beq 2f @ our bkpt\n\t"
-			"movw r0, #0xff7c @ logging bkpt\n\t"
+			"movw r0, #0xff7a @ query bkpt\n\t"
+			"movt r0, #0xe127\n\t"
+			"cmp r1, r0\n\t"
+			"moveq r3, #12 @ RPI2_TRAP_QUERY\n\t"
+			"beq bkpt_sys @ our bkpt\n\t"
+			"movw r0, #0xff7b @ logging bkpt\n\t"
 			"movt r0, #0xe127\n\t"
 			"cmp r1, r0\n\t"
 			"moveq r3, #13 @ RPI2_TRAP_LOGZ\n\t"
-			"beq bkpt_log @ our bkpt\n\t"
+			"beq bkpt_sys @ our bkpt\n\t"
 			"movw r0, #0xff7b @ logging bkpt\n\t"
 			"movt r0, #0xe127\n\t"
 			"cmp r1, r0\n\t"
 			"moveq r3, #14 @ RPI2_TRAP_LOGN\n\t"
-			"beq bkpt_log @ our bkpt\n\t"
+			"beq bkpt_sys @ our bkpt\n\t"
 			"movw r0, #0xff7d @ internal bkpt\n\t"
 			"movt r0, #0xe127\n\t"
 			"cmp r1, r0\n\t"
@@ -2696,16 +2726,39 @@ void rpi2_pabt_handler()
 			"b rpi2_gdb_exception\n\t"
 	);
 	asm volatile (
-			"bkpt_log: @ logging\n\t"
+			"bkpt_sys: @ 'syscall'\n\t"
 			"mov r0, r5\n\t"
 			"mov r1, r6\n\t"
 			"mov r2, r3\n\t"
+			"cmp r2, #12\n\t"
+			"beq 4f @ our bkpt\n\t"
 			"bl rpi2_gdb_log\n\t"
 			"pop {r0, r1, lr}\n\t"
 			"msr cpsr_fsxc, r0\n\t"
 			"dsb\n\t"
 			"isb\n\t"
 			"pop {r0 - r12}\n\t"
+			"ldr sp, pabt_sp_store2\n\t"
+			"subs pc, lr, #0\n\t"
+
+			"4:\n\t"
+			"@ store parameters\n\t"
+			"ldr r5, =rpi2_query_vars\n\t"
+			"str r0, [r5]\n\t"
+			"str r1, [r5, #4]\n\t"
+			"bl rpi2_gdb_query\n\t"
+			"pop {r0, r1, lr}\n\t"
+			"msr cpsr_fsxc, r0\n\t"
+			"dsb\n\t"
+			"isb\n\t"
+			"pop {r0 - r12}\n\t"
+			"@ get results\n\t"
+			"push {r5, lr}\n\t"
+			"ldr r5, =rpi2_query_vars\n\t"
+			"ldr r0, [r5]\n\t"
+			"ldr r1, [r5, #4]\n\t"
+			"pop {r5, lr}\n\t"
+			"@ return \n\t"
 			"ldr sp, pabt_sp_store2\n\t"
 			"subs pc, lr, #0\n\t"
 	);
@@ -3477,9 +3530,16 @@ void rpi2_enable_mmu()
 	}
 #else
 	// program RAM
-	for (tmp=ramstart; tmp<ramsz; tmp++)
+	for (tmp=ramstart; tmp<(ramsz - MMU_STRICT_RAM_SECTS); tmp++)
 	{
 		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_NORMAL);
+	}
+	// Strictly ordered RAM
+	rpi2_strict_start = (ramsz - MMU_STRICT_RAM_SECTS) << 20;
+	rpi2_strict_size = MMU_STRICT_RAM_SECTS << 20;
+	for (tmp=(ramsz - MMU_STRICT_RAM_SECTS); tmp<ramsz; tmp++)
+	{
+		master_xlat_tbl[tmp] = MMU_SECT_ENTRY(tmp, MMU_SECT_ATTR_ORD);
 	}
 	// video RAM (?)
 	for (tmp=ramsz; tmp<0x3f0; tmp++)

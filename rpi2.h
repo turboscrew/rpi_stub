@@ -38,6 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define RPI2_DEBUG_TIMER
 
 #define RPI2_NEON_SUPPORTED
+
+// ---------------------
+// System queries
+// query number in R0, possible parameter in R1
+
+// strictly ordered memory
+// start address in R0, byte length in R1
+#define RPI2_QUERY_ORDMEM 1
+
+// ---------------------
+
 // The peripherals base address
 #define PERIPH_BASE 0x3f000000
 
@@ -187,6 +198,8 @@ typedef struct
 #define RPI2_TRAP_BUS 5
 // watchpoint
 #define RPI2_TRAP_WATCH 6
+// query
+#define RPI2_TRAP_QUERY 12
 // logging - null terminated
 #define RPI2_TRAP_LOGZ 13
 // logging - size in r1
